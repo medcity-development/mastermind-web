@@ -1,0 +1,61 @@
+export default function PriceInfo({
+    label,
+    value,
+    icon,
+  }) {
+    return (
+      <div
+        className="
+          flex
+          items-center
+          gap-3
+          rounded-[15px]
+          border
+          border-[#e4edf6]
+          bg-white
+          p-4
+        "
+      >
+        <div
+          className="
+            flex
+            h-10
+            w-10
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            bg-[#eef6ff]
+            text-[#164fa5]
+          "
+        >
+          {icon}
+        </div>
+  
+        <div>
+          <p
+            className="
+              text-[10px]
+              font-bold
+              uppercase
+              tracking-[0.08em]
+              text-slate-400
+            "
+          >
+            {label}
+          </p>
+  
+          <p
+            className="
+              mt-1
+              text-sm
+              font-black
+              text-[#0b216c]
+            "
+          >
+            {value}
+          </p>
+        </div>
+      </div>
+    );
+  }

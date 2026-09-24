@@ -1,15 +1,41 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-poppins);
+
+  --color-primary: #017dc0;
+  --color-secondary: #082e5a;
+  --color-lightGrey: #dbddde;
+  --color-darkGray: #2c2b2b;
+  --color-darkBlue: #164fa5;
+  --color-lightBlue: #00b5e8;
+  --color-mediumBlue: #017cc0;
+  --color-violetBlue:#0b216c;
+ 
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Colors in RGB format */
+  --primary: 1 125 192;
+  --secondary: 8 46 90;
+  --lightGrey: 219 221 222;
+  --darkGray: 44 43 43;
+
+  --darkBlue: #164fa5;
+  --lightBlue: #00b5e8;
+  --mediumBlue: #017cc0;
+  --color-violetBlue:#0b216c;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white font-sans text-gray-900;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +45,59 @@
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* =========================
+   Topbar marquee
+========================= */
+
+@keyframes topbar-marquee {
+  from {
+    transform: translateX(100vw);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.topbar-marquee {
+  display: flex;
+  width: max-content;
+  animation: topbar-marquee 18s linear infinite;
+  will-change: transform;
+}
+
+.topbar-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-marquee {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* =========================
+   Hero grid animation
+========================= */
+
+@keyframes heroGridMove {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 80px 80px;
+  }
+}
+
+.hero-moving-grid {
+  animation: heroGridMove 20s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-moving-grid {
+    animation: none;
+    transform: none !important;
+  }
 }

@@ -1,6 +1,20 @@
-/** @type {import('next').NextConfig} */
+/** @type {import("next").NextConfig} */
+
 const nextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "http",
+        hostname: "psc.technocitysolutions.com",
+        pathname: "/public/images/**",
+      },
+      {
+        protocol: "https",
+        hostname: "psc.technocitysolutions.com",
+        pathname: "/public/images/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
