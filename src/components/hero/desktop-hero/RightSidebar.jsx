@@ -58,15 +58,42 @@ export default function RightSidebar() {
           rounded-[26px]
           border
           border-[#dce7f4]
-          bg-gradient-to-b
-          from-[#fbfdff]
-          via-white
-          to-[#f8fbff]
-          shadow-[0_18px_45px_rgba(22,79,165,0.08)]
+          bg-white
+          shadow-[0_18px_50px_rgba(15,58,110,0.10)]
+
           lg:flex
           lg:flex-col
         "
       >
+        {/* ================================================
+            PREMIUM BACKGROUND
+        ================================================ */}
+
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute
+            inset-0
+            bg-gradient-to-b
+            from-[#fbfdff]
+            via-white
+            to-[#f7faff]
+          "
+        />
+
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute
+            inset-0
+            opacity-[0.025]
+            [background-image:linear-gradient(to_right,#164fa5_1px,transparent_1px),linear-gradient(to_bottom,#164fa5_1px,transparent_1px)]
+            [background-size:26px_26px]
+          "
+        />
+
         {/* TOP GLOW */}
 
         <div
@@ -74,13 +101,13 @@ export default function RightSidebar() {
           className="
             pointer-events-none
             absolute
-            -right-16
-            -top-16
+            -right-14
+            -top-14
             h-44
             w-44
             rounded-full
-            bg-sky-200/20
-            blur-3xl
+            bg-[#00b5e8]/10
+            blur-[60px]
           "
         />
 
@@ -91,17 +118,19 @@ export default function RightSidebar() {
           className="
             pointer-events-none
             absolute
-            -bottom-20
-            -left-16
+            -bottom-16
+            -left-12
             h-44
             w-44
             rounded-full
-            bg-violet-200/15
-            blur-3xl
+            bg-[#7c3aed]/10
+            blur-[65px]
           "
         />
 
-        {/* HEADER */}
+        {/* ================================================
+            HEADER
+        ================================================ */}
 
         <div
           className="
@@ -109,16 +138,29 @@ export default function RightSidebar() {
             z-10
             shrink-0
             overflow-hidden
-            border-b
-            border-[#dce7f4]
             bg-gradient-to-br
-            from-[#f8fbff]
-            via-[#edf6ff]
-            to-[#f5f0ff]
+            from-[#f7fbff]
+            via-[#eef7ff]
+            to-[#f5f1ff]
             px-4
-            py-3
+            py-3.5
           "
         >
+          <div
+            aria-hidden="true"
+            className="
+              pointer-events-none
+              absolute
+              -right-10
+              -top-10
+              h-28
+              w-28
+              rounded-full
+              bg-[#00b5e8]/10
+              blur-[40px]
+            "
+          />
+
           <div
             className="
               relative
@@ -129,6 +171,8 @@ export default function RightSidebar() {
               gap-3
             "
           >
+            {/* HEADER TEXT */}
+
             <div className="min-w-0">
               <div
                 className="
@@ -138,9 +182,11 @@ export default function RightSidebar() {
                   rounded-full
                   border
                   border-[#cfe5f8]
-                  bg-white/75
-                  px-2
-                  py-0.5
+                  bg-white/80
+                  px-2.5
+                  py-1
+                  shadow-sm
+                  backdrop-blur
                 "
               >
                 <Sparkles
@@ -153,7 +199,7 @@ export default function RightSidebar() {
                     text-[7px]
                     font-black
                     uppercase
-                    tracking-[0.14em]
+                    tracking-[0.16em]
                     text-[#017dc0]
                   "
                 >
@@ -163,10 +209,11 @@ export default function RightSidebar() {
 
               <h2
                 className="
-                  mt-1.5
-                  text-[17px]
+                  mt-2
+                  text-[18px]
                   font-black
-                  tracking-[-0.03em]
+                  leading-tight
+                  tracking-[-0.035em]
                   text-[#071f55]
                 "
               >
@@ -175,7 +222,8 @@ export default function RightSidebar() {
 
               <p
                 className="
-                  mt-0.5
+                  mt-1
+                  max-w-[180px]
                   text-[9px]
                   font-medium
                   leading-4
@@ -183,51 +231,70 @@ export default function RightSidebar() {
                 "
               >
                 Everything you need
-                for preparation
+                for smarter preparation
               </p>
             </div>
 
+            {/* HEADER ICON */}
+
             <div
               className="
+                relative
                 flex
-                h-10
-                w-10
+                h-11
+                w-11
+                shrink-0
                 items-center
                 justify-center
-                rounded-[14px]
+                rounded-[15px]
                 bg-gradient-to-br
                 from-[#00b5e8]
                 via-[#017dc0]
                 to-[#6d4ce8]
                 text-white
+                shadow-[0_10px_24px_rgba(22,79,165,0.22)]
               "
             >
+              <div
+                aria-hidden="true"
+                className="
+                  absolute
+                  inset-[4px]
+                  rounded-[12px]
+                  border
+                  border-white/20
+                "
+              />
+
               <GraduationCap
-                size={20}
+                size={21}
+                strokeWidth={1.9}
               />
             </div>
           </div>
         </div>
 
-        {/* CONTENT */}
+        {/* ================================================
+            SCROLLABLE CONTENT
+        ================================================ */}
 
         <div
-          className={`
+          className="
             relative
             z-10
             min-h-0
             flex-1
+            overflow-y-auto
+            overscroll-contain
             px-3
             pb-3
             pt-3
-
-            ${
-              expanded
-                ? "overflow-y-auto"
-                : "overflow-hidden"
-            }
-          `}
+           [scrollbar-width:thin]
+           [scrollbar-color:#9fdcff_#f3f9ff]
+          "
         >
+          {/* ITEMS */}
+
           <div
             className="
               flex
@@ -261,7 +328,9 @@ export default function RightSidebar() {
             )}
           </div>
 
-          {/* EXPLORE MORE */}
+          {/* ================================================
+              EXPLORE MORE
+          ================================================ */}
 
           {hasMore && (
             <button
@@ -275,24 +344,32 @@ export default function RightSidebar() {
                 )
               }
               className="
-                mt-2.5
+                group
+                mt-3
                 flex
                 w-full
                 items-center
                 justify-center
                 gap-2
-                rounded-[12px]
+                rounded-[13px]
                 border
-                border-[#d8e8f5]
-                bg-white/80
+                border-[#d5e5f3]
+                bg-gradient-to-r
+                from-white
+                to-[#f6faff]
                 px-4
-                py-2
+                py-2.5
                 text-[10px]
-                font-bold
+                font-black
                 text-[#164fa5]
+                shadow-[0_5px_16px_rgba(15,58,110,0.05)]
                 transition-all
                 duration-300
+
+                hover:-translate-y-0.5
+                hover:border-[#bfd8ed]
                 hover:bg-[#f4f9ff]
+                hover:shadow-[0_8px_20px_rgba(15,58,110,0.08)]
               "
             >
               <span>
@@ -301,25 +378,43 @@ export default function RightSidebar() {
                   : "Explore More"}
               </span>
 
-              {expanded ? (
-                <ChevronUp
-                  size={12}
-                />
-              ) : (
-                <ChevronDown
-                  size={12}
-                />
-              )}
+              <span
+                className="
+                  flex
+                  h-6
+                  w-6
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-[#eef6ff]
+                  transition-transform
+                  duration-300
+
+                  group-hover:bg-[#e4f1ff]
+                "
+              >
+                {expanded ? (
+                  <ChevronUp
+                    size={12}
+                  />
+                ) : (
+                  <ChevronDown
+                    size={12}
+                  />
+                )}
+              </span>
             </button>
           )}
 
-          {/* STUDY MATERIALS */}
+          {/* ================================================
+              STUDY MATERIALS
+          ================================================ */}
 
           <div
             className="
               mt-3
               border-t
-              border-[#e5edf5]
+              border-[#e4edf6]
               pt-3
             "
           >
@@ -328,9 +423,31 @@ export default function RightSidebar() {
 
           <div className="h-1" />
         </div>
+
+        {/* ================================================
+            BOTTOM FADE
+        ================================================ */}
+
+        <div
+          aria-hidden="true"
+          className="
+            pointer-events-none
+            absolute
+            bottom-0
+            left-0
+            right-0
+            z-20
+            h-5
+            bg-gradient-to-t
+            from-white/90
+            to-transparent
+          "
+        />
       </aside>
 
-      {/* MAIN COURSE SELECTOR */}
+      {/* ================================================
+          MAIN COURSE SELECTOR
+      ================================================ */}
 
       <MainCoursesModal
         open={Boolean(
@@ -341,7 +458,9 @@ export default function RightSidebar() {
           ""
         }
         onClose={() =>
-          setSelectedItem(null)
+          setSelectedItem(
+            null
+          )
         }
       />
     </>

@@ -1,7 +1,12 @@
 import AiVideosIntro from "./AiVideosIntro";
 import AiVideoGrid from "./AiVideoGrid";
 
-export default function AiShortVideos() {
+export default function AiShortVideos({
+  cid,
+  uid = 0,
+  examName = "Government Exams",
+  governmentExamsSlug = "",
+}) {
   return (
     <section
       className="
@@ -14,9 +19,18 @@ export default function AiShortVideos() {
         lg:px-8
       "
     >
-      <AiVideosIntro />
+      <AiVideosIntro
+        examName={examName}
+        governmentExamsSlug={
+          governmentExamsSlug
+        }
+      />
 
-      <AiVideoGrid />
+      <AiVideoGrid
+        cid={cid}
+        uid={uid}
+        examName={examName}
+      />
     </section>
   );
 }

@@ -32,7 +32,7 @@ import AiVideosList from "./components/AiVideosList";
             max-w-[1450px]
             px-4
             sm:px-6
-            lg:px-8 mt-20
+            lg:px-8 mt-10
           "
         >
           {/* HEADER */}

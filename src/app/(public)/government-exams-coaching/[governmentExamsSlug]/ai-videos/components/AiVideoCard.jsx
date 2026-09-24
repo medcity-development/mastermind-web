@@ -13,18 +13,43 @@ export default function AiVideoCard({
     return null;
   }
 
+  /* =========================================================
+     SAFE DATA
+  ========================================================= */
+
   const title =
     item?.title ||
     "AI Learning Video";
 
   const description =
-    item?.description || "";
+    item?.description ||
+    "";
+
+  /* =========================================================
+     VIDEO URL
+
+     Supports:
+     normalized helper -> videoUrl
+     raw API           -> link
+  ========================================================= */
 
   const videoUrl =
-    item?.link || "";
+    String(
+      item?.videoUrl ||
+        item?.link ||
+        ""
+    ).trim();
+
+  /* =========================================================
+     THUMBNAIL
+  ========================================================= */
 
   const thumbnailUrl =
-    item?.thumbnailUrl || "";
+    item?.thumbnailUrl ||
+    "";
+
+  const canPlay =
+    Boolean(videoUrl);
 
   return (
     <article
@@ -41,14 +66,15 @@ export default function AiVideoCard({
         shadow-[0_10px_30px_rgba(22,79,165,0.06)]
         transition-all
         duration-300
+
         hover:-translate-y-1
         hover:border-[#075fc8]/20
         hover:shadow-[0_20px_45px_rgba(22,79,165,0.13)]
       "
     >
-      {/* =========================================
+      {/* =================================================
           THUMBNAIL
-      ========================================= */}
+      ================================================= */}
 
       <div
         className="
@@ -62,10 +88,11 @@ export default function AiVideoCard({
       >
         {thumbnailUrl ? (
           <Image
-            src={thumbnailUrl}
+            src={
+              thumbnailUrl
+            }
             alt={title}
             fill
-            priority={false}
             sizes="
               (max-width: 640px) 100vw,
               (max-width: 1024px) 50vw,
@@ -78,6 +105,7 @@ export default function AiVideoCard({
               transition-transform
               duration-500
               ease-out
+
               group-hover:scale-[1.02]
             "
             unoptimized
@@ -118,9 +146,7 @@ export default function AiVideoCard({
           </div>
         )}
 
-        {/* =========================================
-            SUBTLE BOTTOM OVERLAY
-        ========================================= */}
+        {/* OVERLAY */}
 
         <div
           aria-hidden="true"
@@ -137,9 +163,7 @@ export default function AiVideoCard({
           "
         />
 
-        {/* =========================================
-            AI VIDEO BADGE
-        ========================================= */}
+        {/* BADGE */}
 
         <div
           className="
@@ -177,13 +201,15 @@ export default function AiVideoCard({
           </span>
         </div>
 
-        {/* =========================================
-            CENTER PLAY BUTTON
-        ========================================= */}
+        {/* =================================================
+            CENTER PLAY
+        ================================================= */}
 
-        {videoUrl ? (
+        {canPlay && (
           <a
-            href={videoUrl}
+            href={
+              videoUrl
+            }
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Watch ${title}`}
@@ -208,6 +234,7 @@ export default function AiVideoCard({
               backdrop-blur-sm
               transition-all
               duration-300
+
               hover:scale-110
               hover:bg-white
             "
@@ -218,12 +245,12 @@ export default function AiVideoCard({
               className="ml-1"
             />
           </a>
-        ) : null}
+        )}
       </div>
 
-      {/* =========================================
+      {/* =================================================
           CONTENT
-      ========================================= */}
+      ================================================= */}
 
       <div
         className="
@@ -259,28 +286,31 @@ export default function AiVideoCard({
         </h3>
 
         {description &&
-        description !== title ? (
-          <p
-            className="
-              mt-2
-              line-clamp-2
-              text-[12px]
-              leading-5
-              text-slate-500
-            "
-          >
-            {description}
-          </p>
-        ) : null}
+          description !==
+            title && (
+            <p
+              className="
+                mt-2
+                line-clamp-2
+                text-[12px]
+                leading-5
+                text-slate-500
+              "
+            >
+              {description}
+            </p>
+          )}
 
-        {/* =========================================
+        {/* =================================================
             WATCH BUTTON
-        ========================================= */}
+        ================================================= */}
 
         <div className="mt-auto pt-5">
-          {videoUrl ? (
+          {canPlay ? (
             <a
-              href={videoUrl}
+              href={
+                videoUrl
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="
@@ -302,6 +332,7 @@ export default function AiVideoCard({
                 shadow-[0_8px_20px_rgba(49,84,238,0.18)]
                 transition-all
                 duration-300
+
                 hover:-translate-y-0.5
                 hover:shadow-[0_12px_25px_rgba(49,84,238,0.28)]
               "
@@ -332,6 +363,7 @@ export default function AiVideoCard({
                   bg-white/15
                   transition-transform
                   duration-300
+
                   group-hover/button:translate-x-0.5
                 "
               >

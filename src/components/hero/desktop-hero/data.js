@@ -23,24 +23,30 @@ export const exploreItems = [
     icon: "📄",
     path: "previous-questions",
   },
-  {
-    title: "PSC Bulletin CA",
-    subtitle: "Daily Current Affairs Practice",
-    icon: "📢",
-    path: "psc-bulletin-ca",
+   {
+    title: "Exam Notifications",
+    subtitle: "Latest Updates",
+    icon: "📰",
+    path: "notifications",
   },
-  {
-    title: "Monthly Quiz",
-    subtitle: "Test Your Knowledge",
-    icon: "🧠",
-    path: "current-affairs-quiz",
-  },
-  {
-    title: "SCERT Tests",
-    subtitle: "Practice Based on SCERT",
-    icon: "🎓",
-    path: "scert-tests",
-  },
+  // {
+  //   title: "PSC Bulletin CA",
+  //   subtitle: "Daily Current Affairs Practice",
+  //   icon: "📢",
+  //   path: "psc-bulletin-ca",
+  // },
+  // {
+  //   title: "Monthly Quiz",
+  //   subtitle: "Test Your Knowledge",
+  //   icon: "🧠",
+  //   path: "current-affairs-quiz",
+  // },
+  // {
+  //   title: "SCERT Tests",
+  //   subtitle: "Practice Based on SCERT",
+  //   icon: "🎓",
+  //   path: "scert-tests",
+  // },
 ];
 
 export const leftMenu = [

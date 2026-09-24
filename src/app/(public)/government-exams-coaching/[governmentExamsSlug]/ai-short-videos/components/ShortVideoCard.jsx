@@ -10,17 +10,76 @@ import {
 export default function ShortVideoCard({
   video,
 }) {
-  const handlePlay = () => {
-    if (!video?.videoUrl) {
+  /* =========================================================
+     SAFE VALUES
+  ========================================================= */
+
+  const title =
+    video?.title ||
+    video?.name ||
+    "AI Learning Video";
+
+  const description =
+    video?.description ||
+    video?.caption ||
+    "";
+
+  /* =========================================================
+     THUMBNAIL
+
+     Supports:
+     - normalized helper field
+     - raw API field
+  ========================================================= */
+
+  const thumbnail =
+    video?.thumbnailUrl ||
+    video?.thumbnail_url ||
+    video?.thumbnail ||
+    "";
+
+  /* =========================================================
+     VIDEO URL
+
+     IMPORTANT:
+     Your API returns:
+     link: "https://player.vimeo.com/..."
+
+     So `link` must be supported directly.
+  ========================================================= */
+
+  const videoUrl =
+    String(
+      video?.videoUrl ||
+        video?.video_url ||
+        video?.link ||
+        video?.url ||
+        ""
+    ).trim();
+
+  const canPlay =
+    videoUrl.length > 0;
+
+  /* =========================================================
+     PLAY
+  ========================================================= */
+
+  function handlePlay() {
+    if (!videoUrl) {
+      console.warn(
+        "Video URL missing:",
+        video
+      );
+
       return;
     }
 
     window.open(
-      video.videoUrl,
+      videoUrl,
       "_blank",
       "noopener,noreferrer"
     );
-  };
+  }
 
   return (
     <article
@@ -34,7 +93,7 @@ export default function ShortVideoCard({
         border-[#164fa5]/10
         bg-white
         shadow-[0_8px_24px_rgba(11,33,108,0.07)]
-        transition
+        transition-all
         duration-300
 
         sm:rounded-[20px]
@@ -45,11 +104,14 @@ export default function ShortVideoCard({
     >
       <button
         type="button"
-        onClick={handlePlay}
-        aria-label={`Play ${
-          video?.title ||
-          "AI learning video"
-        }`}
+        onClick={
+          handlePlay
+        }
+        aria-label={
+          canPlay
+            ? `Play ${title}`
+            : `${title} is unavailable`
+        }
         className="
           relative
           block
@@ -65,15 +127,12 @@ export default function ShortVideoCard({
       >
         {/* =================================================
             THUMBNAIL
-        ================================================== */}
+        ================================================= */}
 
-        {video?.thumbnail ? (
+        {thumbnail ? (
           <Image
-            src={video.thumbnail}
-            alt={
-              video?.title ||
-              "Mastermind AI short video"
-            }
+            src={thumbnail}
+            alt={title}
             fill
             sizes="
               (max-width: 639px) 100vw,
@@ -87,7 +146,6 @@ export default function ShortVideoCard({
               transition-transform
               duration-500
               ease-out
-
               group-hover:scale-[1.035]
             "
           />
@@ -105,8 +163,8 @@ export default function ShortVideoCard({
         )}
 
         {/* =================================================
-            OVERLAY
-        ================================================== */}
+            DARK OVERLAY
+        ================================================= */}
 
         <div
           aria-hidden="true"
@@ -116,14 +174,14 @@ export default function ShortVideoCard({
             inset-0
             bg-gradient-to-t
             from-[#07174f]/95
-            via-[#07174f]/15
+            via-[#07174f]/20
             to-transparent
           "
         />
 
         {/* =================================================
             BADGE
-        ================================================== */}
+        ================================================= */}
 
         <div
           className="
@@ -168,10 +226,10 @@ export default function ShortVideoCard({
 
         {/* =================================================
             PLAY BUTTON
-        ================================================== */}
+        ================================================= */}
 
         <div
-          className="
+          className={`
             absolute
             left-1/2
             top-1/2
@@ -186,22 +244,28 @@ export default function ShortVideoCard({
             rounded-full
             border
             border-white/25
-            bg-black/40
             text-white
             shadow-[0_8px_24px_rgba(0,0,0,0.18)]
             backdrop-blur-md
-            transition
+            transition-all
             duration-300
 
             sm:h-12
             sm:w-12
 
-            lg:h-13
-            lg:w-13
-
-            group-hover:scale-110
-            group-hover:bg-white/30
-          "
+            ${
+              canPlay
+                ? `
+                    bg-black/40
+                    group-hover:scale-110
+                    group-hover:bg-white/30
+                  `
+                : `
+                    bg-black/25
+                    opacity-50
+                  `
+            }
+          `}
         >
           <Play
             size={20}
@@ -209,7 +273,6 @@ export default function ShortVideoCard({
             strokeWidth={0}
             className="
               ml-0.5
-
               sm:h-[23px]
               sm:w-[23px]
             "
@@ -218,7 +281,7 @@ export default function ShortVideoCard({
 
         {/* =================================================
             CONTENT
-        ================================================== */}
+        ================================================= */}
 
         <div
           className="
@@ -244,11 +307,10 @@ export default function ShortVideoCard({
               md:text-[13px]
             "
           >
-            {video?.title ||
-              "AI Learning Video"}
+            {title}
           </h3>
 
-          {video?.description && (
+          {description && (
             <p
               className="
                 mt-1
@@ -262,7 +324,20 @@ export default function ShortVideoCard({
                 md:text-[10px]
               "
             >
-              {video.description}
+              {description}
+            </p>
+          )}
+
+          {!canPlay && (
+            <p
+              className="
+                mt-1.5
+                text-[9px]
+                font-semibold
+                text-white/55
+              "
+            >
+              Video unavailable
             </p>
           )}
         </div>
