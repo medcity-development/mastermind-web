@@ -12,7 +12,7 @@ export default function AboutHero() {
         overflow-hidden
         bg-[#eef8ff]
         pb-16
-        pt-44
+        pt-24
       "  data-aos="fade-right"
     >
       {/* soft center glow */}

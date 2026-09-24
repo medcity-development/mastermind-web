@@ -12,7 +12,7 @@ export default function LoginLayout() {
         bg-[#f8fbff]
         px-3
         pb-5
-        pt-[86px]
+        pt-5
 
         sm:px-5
 

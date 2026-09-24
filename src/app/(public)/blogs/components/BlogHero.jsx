@@ -5,7 +5,7 @@ export default function BlogHero() {
     <section
       className="
         relative
-        mt-24
+        mt-5
         overflow-hidden
         rounded-[28px]
         border

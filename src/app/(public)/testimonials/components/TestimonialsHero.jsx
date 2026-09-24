@@ -16,12 +16,8 @@ export default function TestimonialsHero() {
         isolate
         overflow-hidden
         bg-[#f8fcff]
-        pb-14
-        pt-16
-        sm:pb-16
-        sm:pt-20
-        lg:pb-20
-        lg:pt-24
+        pb-12
+        pt-10
       "
     >
       {/* =====================================================

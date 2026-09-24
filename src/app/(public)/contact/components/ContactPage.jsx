@@ -18,7 +18,7 @@ export default function ContactPage() {
           sm:px-6
           sm:py-8
           lg:px-8
-          xl:px-10 mt-24
+          xl:px-10 mt-5
         "
       >
         <ContactHero />
