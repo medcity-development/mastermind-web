@@ -5,32 +5,34 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-function createSlug(value = "") {
-  return String(value)
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+import {
+  createSlug,
+} from "@/lib/pscSlug";
 
 export default function SubExamCard({
   exam,
-  cid = 1,
   iconPath = "",
   levelSlug,
+  governmentExamsSlug,
 }) {
   if (!exam) {
     return null;
   }
 
-  const examId =
-    exam?.id;
+  /* =========================================
+     EXAM NAME
+  ========================================= */
 
   const examName =
     exam?.exam_name ||
     exam?.exam ||
     exam?.name ||
-    "Kerala PSC Exam";
+    exam?.title ||
+    "Exam";
+
+  /* =========================================
+     SEO SLUG
+  ========================================= */
 
   const examSlug =
     createSlug(examName);
@@ -42,22 +44,28 @@ export default function SubExamCard({
   const imageUrl =
     exam?.icon &&
     iconPath
-      ? `${iconPath.replace(
-          /\/$/,
+      ? `${String(
+          iconPath
+        ).replace(
+          /\/+$/,
           ""
         )}/${exam.icon}`
       : null;
 
   /* =========================================
-     DETAILS PAGE URL
+     SEO URL
+
+     NO cid
+     NO subId
+     NO examId
+     NO type
   ========================================= */
 
   const href =
-  `/government-exams-coaching/kerala-psc/${levelSlug}/${examSlug}` +
-  `?cid=${cid}` +
-  `&examId=${examId}` +
-  `&subId=${exam?.sub_id || ""}` +
-  `&type=${exam?.type || "mock"}`;
+    `/government-exams-coaching/` +
+    `${governmentExamsSlug}/` +
+    `${levelSlug}/` +
+    `${examSlug}`;
 
   return (
     <article
@@ -186,6 +194,7 @@ export default function SubExamCard({
           >
             <Link
               href={href}
+              aria-label={`Explore ${examName}`}
               className="
                 flex
                 items-center

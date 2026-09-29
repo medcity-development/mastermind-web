@@ -1,42 +1,68 @@
-// app/layout.js
-
-import { Poppins } from "next/font/google";
-
 import "./globals.css";
-import "aos/dist/aos.css";
 
+import {
+  Poppins,
+} from "next/font/google";
 
 import AOSProvider from "@/components/AOSProvider";
-import Footer from "@/components/footer/Footer";
-import Navbar from "@/components/navbar/Navbar";
 
 const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
+  subsets: [
+    "latin",
+  ],
+
+  weight: [
+    "300",
+    "400",
+    "500",
+    "600",
+    "700",
+    "800",
+  ],
+
+  variable:
+    "--font-poppins",
+
+  display:
+    "swap",
 });
 
 export const metadata = {
-  metadataBase: new URL("https://mastermindacademy.in"),
+  metadataBase:
+    new URL(
+      "https://mastermindacademy.in"
+    ),
 
   title: {
-    default: "MasterMind Academy",
-    template: "%s | MasterMind Academy",
+    default:
+      "MasterMind Academy",
+
+    template:
+      "%s | MasterMind Academy",
   },
 
   description:
-    "MasterMind Academy is a competitive exam preparation platform for Kerala PSC, SSC, RRB and other government exams.",
+    "MasterMind Academy - Kerala PSC, SSC and RRB competitive exam coaching.",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({
+  children,
+}) {
   return (
-    <html lang="en">
-      <body className={`${poppins.className} antialiased`}>
+    <html
+      lang="en"
+      className={
+        poppins.variable
+      }
+    >
+      <body
+        className="
+          font-sans
+          antialiased
+        "
+      >
         <AOSProvider>
-          <Navbar />
-
           {children}
-          <Footer />
         </AOSProvider>
       </body>
     </html>

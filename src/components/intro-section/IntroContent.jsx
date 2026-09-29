@@ -194,7 +194,7 @@ export default function IntroContent() {
         "
       >
         <Link
-          href="/register"
+          href="/login"
           className="
             group
             inline-flex
@@ -235,12 +235,12 @@ export default function IntroContent() {
             text-[12px]
             font-semibold
             text-[#164fa5]
-            underline
+            border border-blue-200
             decoration-[#00b5e8]/40
             decoration-2
             underline-offset-4
             transition-colors
-            hover:text-[#017cc0]
+            hover:text-[#017cc0] h-12 inline-flex items-center justify-center gap-2 rounded-full px-6
           "
         >
           Learn More

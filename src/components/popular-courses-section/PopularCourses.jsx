@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useState,
+} from "react";
+
+import Link from "next/link";
 
 import {
   ArrowRight,
@@ -15,50 +19,106 @@ import MainCoursesModal from "@/components/main-course-modal/MainCoursesModal";
 
 const courses = [
   {
-    title: "Kerala PSC\nDegree Level",
+    title:
+      "Kerala PSC\nDegree Level",
+
     description:
       "Complete preparation for Kerala PSC Degree Level Exams.",
-    classes: "120+ Classes",
-    icon: Shield,
+
+    classes:
+      "120+ Classes",
+
+    icon:
+      Shield,
+
     gradient:
       "from-[#0756de] to-[#3679ef]",
+
+    href:
+      "/government-exams-coaching/kerala-psc/degree-level-exams",
   },
-  {
-    title: "Kerala PSC\n10th Level",
+
+    {
+    title:
+      "Kerala PSC\n12th Level",
+
     description:
-      "Complete preparation for Kerala PSC 10th Level Exams.",
-    classes: "100+ Classes",
-    icon: GraduationCap,
-    gradient:
-      "from-[#5439d9] to-[#9559f4]",
-  },
-  {
-    title: "SSC\nExams",
-    description:
-      "SSC CGL, CHSL, MTS & other SSC Examinations preparation.",
-    classes: "150+ Classes",
-    icon: BookOpen,
-    gradient:
-      "from-[#178b48] to-[#37bd78]",
-  },
-  {
-    title: "RRB\nExams",
-    description:
-      "RRB NTPC, Group D & other RRB Examinations preparation.",
-    classes: "120+ Classes",
-    icon: TrainFront,
-    gradient:
-      "from-[#ed7800] to-[#ffa537]",
-  },
-  {
-    title: "Combo\nCourses",
-    description:
-      "Special combined course for multiple competitive exams.",
-    classes: "200+ Classes",
-    icon: Layers3,
+      "Complete preparation for Kerala PSC 12th Level Exams.",
+
+    classes:
+      "200+ Classes",
+
+    icon:
+      Layers3,
+
     gradient:
       "from-[#df2752] to-[#fb517b]",
+
+    href:
+      "/government-exams-coaching/kerala-psc/12th-level-exams",
   },
+
+  {
+    title:
+      "Kerala PSC\n10th Level",
+
+    description:
+      "Complete preparation for Kerala PSC 10th Level Exams.",
+
+    classes:
+      "100+ Classes",
+
+    icon:
+      GraduationCap,
+
+    gradient:
+      "from-[#5439d9] to-[#9559f4]",
+
+    href:
+      "/government-exams-coaching/kerala-psc/10th-level-exams",
+  },
+
+  {
+    title:
+      "SSC\nExams",
+
+    description:
+      "SSC CGL, CHSL, MTS & other SSC Examinations preparation.",
+
+    classes:
+      "150+ Classes",
+
+    icon:
+      BookOpen,
+
+    gradient:
+      "from-[#178b48] to-[#37bd78]",
+
+    href:
+      "/government-exams-coaching/rrb-ssc/ssc-exams",
+  },
+
+  {
+    title:
+      "RRB\nExams",
+
+    description:
+      "RRB NTPC, Group D & other RRB Examinations preparation.",
+
+    classes:
+      "120+ Classes",
+
+    icon:
+      TrainFront,
+
+    gradient:
+      "from-[#ed7800] to-[#ffa537]",
+
+    href:
+      "/government-exams-coaching/rrb-ssc/rrb-exams",
+  },
+
+
 ];
 
 export default function PopularCourses() {
@@ -82,7 +142,8 @@ export default function PopularCourses() {
             xl:px-20
           "
         >
-          {/* Header */}
+          {/* HEADER */}
+
           <div
             className="
               mb-5
@@ -115,18 +176,17 @@ export default function PopularCourses() {
                 "
               >
                 Our{" "}
+
                 <span className="text-blue-600">
                   Popular Courses
                 </span>
               </h2>
             </div>
 
-            {/* Desktop View All */}
-            <button
-              type="button"
-              onClick={() =>
-                setShowMainCourses(true)
-              }
+            {/* DESKTOP VIEW ALL */}
+
+            <Link href="/login" aria-label="Get a plan"
+              
               className="
                 hidden
                 items-center
@@ -147,13 +207,16 @@ export default function PopularCourses() {
                 sm:flex
               "
             >
-              View All Courses
+              subscribe now
 
-              <ArrowRight size={16} />
-            </button>
+              <ArrowRight
+                size={16}
+              />
+            </Link>
           </div>
 
-          {/* Course grid */}
+          {/* COURSE GRID */}
+
           <div
             className="
               grid
@@ -164,13 +227,25 @@ export default function PopularCourses() {
             "
           >
             {courses.map(
-              (course, index) => {
+              (
+                course,
+                index
+              ) => {
                 const Icon =
                   course.icon;
 
                 return (
-                  <div
-                    key={course.title}
+                  <Link
+                    key={
+                      course.title
+                    }
+                    href={
+                      course.href
+                    }
+                    aria-label={`View ${course.title.replace(
+                      "\n",
+                      " "
+                    )}`}
                     className={`
                       group
                       relative
@@ -186,19 +261,20 @@ export default function PopularCourses() {
                       shadow-md
                       transition-all
                       duration-300
-
                       hover:-translate-y-1
                       hover:shadow-xl
 
                       ${
                         index ===
-                        courses.length - 1
+                        courses.length -
+                          1
                           ? "sm:col-span-2 xl:col-span-1"
                           : ""
                       }
                     `}
                   >
-                    {/* Icon + title */}
+                    {/* ICON + TITLE */}
+
                     <div
                       className="
                         mb-4
@@ -221,8 +297,12 @@ export default function PopularCourses() {
                         "
                       >
                         <Icon
-                          size={24}
-                          strokeWidth={2.2}
+                          size={
+                            24
+                          }
+                          strokeWidth={
+                            2.2
+                          }
                         />
                       </div>
 
@@ -234,11 +314,14 @@ export default function PopularCourses() {
                           leading-[1.2]
                         "
                       >
-                        {course.title}
+                        {
+                          course.title
+                        }
                       </h3>
                     </div>
 
-                    {/* Description */}
+                    {/* DESCRIPTION */}
+
                     <p
                       className="
                         text-[13px]
@@ -246,10 +329,13 @@ export default function PopularCourses() {
                         text-white/95
                       "
                     >
-                      {course.description}
+                      {
+                        course.description
+                      }
                     </p>
 
-                    {/* Footer */}
+                    {/* FOOTER */}
+
                     <div
                       className="
                         mt-auto
@@ -265,11 +351,12 @@ export default function PopularCourses() {
                           font-bold
                         "
                       >
-                        {course.classes}
+                        {
+                          course.classes
+                        }
                       </span>
 
-                      <button
-                        type="button"
+                      <span
                         className="
                           flex
                           h-9
@@ -283,27 +370,28 @@ export default function PopularCourses() {
                           duration-300
                           group-hover:translate-x-1
                         "
-                        aria-label={`View ${course.title.replace(
-                          "\n",
-                          " "
-                        )}`}
                       >
                         <ArrowRight
-                          size={17}
+                          size={
+                            17
+                          }
                         />
-                      </button>
+                      </span>
                     </div>
-                  </div>
+                  </Link>
                 );
               }
             )}
           </div>
 
-          {/* Mobile View All */}
+          {/* MOBILE VIEW ALL */}
+
           <button
             type="button"
             onClick={() =>
-              setShowMainCourses(true)
+              setShowMainCourses(
+                true
+              )
             }
             className="
               mt-6
@@ -328,16 +416,23 @@ export default function PopularCourses() {
           >
             View All Courses
 
-            <ArrowRight size={16} />
+            <ArrowRight
+              size={16}
+            />
           </button>
         </div>
       </section>
 
-      {/* Main Courses Modal */}
+      {/* MAIN COURSES MODAL */}
+
       <MainCoursesModal
-        open={showMainCourses}
+        open={
+          showMainCourses
+        }
         onClose={() =>
-          setShowMainCourses(false)
+          setShowMainCourses(
+            false
+          )
         }
       />
     </>

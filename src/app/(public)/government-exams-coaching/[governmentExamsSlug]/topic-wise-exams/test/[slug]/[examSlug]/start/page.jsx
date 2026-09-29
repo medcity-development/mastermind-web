@@ -12,7 +12,7 @@ import {
 
 import {
   createSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 import ExamClient from "./components/ExamClient";
 

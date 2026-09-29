@@ -14,7 +14,7 @@ export default function AboutHeroActions() {
       "
     >
       <Link
-        href="/main-courses"
+        href="/government-exams-coaching/kerala-psc"
         className="
           group
           inline-flex
@@ -38,7 +38,7 @@ export default function AboutHeroActions() {
           hover:shadow-[0_16px_32px_rgba(22,79,165,0.28)]
         "
       >
-        Explore Our Courses
+        Explore Kerala PSC Courses
 
         <ArrowRight
           size={13}
@@ -52,7 +52,7 @@ export default function AboutHeroActions() {
       </Link>
 
       <Link
-        href="/contact"
+        href="/government-exams-coaching/rrb-ssc"
         className="
           inline-flex
           h-[44px]
@@ -75,7 +75,7 @@ export default function AboutHeroActions() {
           hover:bg-white
         "
       >
-        Contact Us
+        Check RRB Courses
       </Link>
     </div>
   );

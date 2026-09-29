@@ -89,7 +89,7 @@ export default function HeroTopBar() {
         "
       >
         <FeaturePill
-          href="/#mobile-app"
+          href="https://play.google.com/store/apps/details?id=com.master.mind&pli=1"
           icon={
             <Smartphone
               size={15}

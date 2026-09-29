@@ -10,38 +10,85 @@ export async function POST(
   request
 ) {
   try {
-    const body =
-      await request.json();
+    /* =====================================================
+       READ BODY SAFELY
+
+       Allows:
+       - empty body
+       - { uid: 21 }
+       - guest uid = 0
+    ===================================================== */
+
+    let body = {};
+
+    try {
+      const text =
+        await request.text();
+
+      body = text
+        ? JSON.parse(text)
+        : {};
+    } catch (error) {
+      console.warn(
+        "AI videos request body invalid or empty:",
+        error
+      );
+
+      body = {};
+    }
+
+    /* =====================================================
+       USER ID
+    ===================================================== */
 
     const uid =
       Number(
         body?.uid ?? 0
-      );
+      ) || 0;
+
+    /* =====================================================
+       FETCH AI VIDEOS
+    ===================================================== */
 
     const result =
       await getAiVideos({
         uid,
       });
 
-    return NextResponse.json({
-      status:
-        result.status,
+    /* =====================================================
+       RESPONSE
+    ===================================================== */
 
-      data:
-        result.data,
+    return NextResponse.json(
+      {
+        status:
+          result?.status ??
+          false,
 
-      videos:
-        result.data,
+        data:
+          result?.data ??
+          [],
 
-      total:
-        result.total,
+        videos:
+          result?.data ??
+          [],
 
-      thumbnailPath:
-        result.thumbnailPath,
+        total:
+          result?.total ??
+          0,
 
-      message:
-        result.message,
-    });
+        thumbnailPath:
+          result?.thumbnailPath ??
+          "",
+
+        message:
+          result?.message ??
+          "",
+      },
+      {
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error(
       "AI videos API:",
@@ -54,7 +101,9 @@ export async function POST(
         data: [],
         videos: [],
         total: 0,
+        thumbnailPath: "",
         message:
+          error?.message ||
           "Unable to load AI videos.",
       },
       {

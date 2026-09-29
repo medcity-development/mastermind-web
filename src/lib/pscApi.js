@@ -1,8 +1,10 @@
+
 import "server-only";
 
-/* =========================================================
-   API CONFIG
-========================================================= */
+import {
+  createSlug,
+  normalizeCourseSlug,
+} from "@/lib/pscSlug";
 
 function getApiConfig() {
   const apiBaseUrl =
@@ -24,23 +26,21 @@ function getApiConfig() {
   }
 
   return {
-    apiBaseUrl: String(
-      apiBaseUrl
-    )
-      .trim()
-      .replace(/\/+$/, ""),
+    apiBaseUrl:
+      String(apiBaseUrl)
+        .trim()
+        .replace(/\/+$/, ""),
 
-    apiKey: String(
-      apiKey
-    ).trim(),
+    apiKey:
+      String(apiKey)
+        .trim(),
   };
 }
 
-/* =========================================================
-   VALIDATE CID
-========================================================= */
 
-function requireCid(cid) {
+function requireCid(
+  cid
+) {
   if (
     cid === undefined ||
     cid === null ||
@@ -54,21 +54,32 @@ function requireCid(cid) {
   return String(cid);
 }
 
-/* =========================================================
-   COMMON POST REQUEST
-========================================================= */
-
 async function postRequest({
   endpoint,
   fields = {},
-  revalidate = 3600,
   cache,
-}) {
+  revalidate = 3600,
+} = {}) {
   const {
     apiBaseUrl,
     apiKey,
   } = getApiConfig();
 
+  if (!endpoint) {
+    throw new Error(
+      "API endpoint is required."
+    );
+  }
+
+    const cleanEndpoint =
+    String(endpoint)
+      .trim()
+      .replace(/^\/+/, "");
+
+  const url =
+    `${apiBaseUrl}/${cleanEndpoint}`;
+
+  
   const formData =
     new FormData();
 
@@ -96,10 +107,22 @@ async function postRequest({
     }
   );
 
+ 
   const fetchOptions = {
     method: "POST",
-    body: formData,
+
+    body:
+      formData,
+
+    headers: {
+      Accept:
+        "application/json",
+    },
+
+    redirect:
+      "follow",
   };
+
 
   if (cache) {
     fetchOptions.cache =
@@ -110,195 +133,346 @@ async function postRequest({
     };
   }
 
-  const response =
-    await fetch(
-      `${apiBaseUrl}/${endpoint}`,
-      fetchOptions
-    );
 
-  const text =
-    await response.text();
-
-  let result = {};
+  let response;
 
   try {
-    result =
-      text
-        ? JSON.parse(text)
-        : {};
+    response =
+      await fetch(
+        url,
+        fetchOptions
+      );
   } catch (error) {
     console.error(
-      "PSC API INVALID JSON:",
+      "PSC API FETCH ERROR:",
       {
-        endpoint,
+        endpoint:
+          cleanEndpoint,
 
-        status:
-          response.status,
-
-        contentType:
-          response.headers.get(
-            "content-type"
-          ),
+        url,
 
         fields,
 
-        responseText:
-          text.slice(
-            0,
-            1000
-          ),
+        error,
       }
     );
 
     throw new Error(
-      `${endpoint} returned invalid JSON.`
+      `${cleanEndpoint} request failed.`
     );
   }
 
+
+  const text =
+    await response.text();
+
+  const contentType =
+    response.headers.get(
+      "content-type"
+    ) || "";
+
+ 
+  if (!text.trim()) {
+    console.error(
+      "PSC API EMPTY RESPONSE:",
+      {
+        endpoint:
+          cleanEndpoint,
+
+        requestUrl:
+          url,
+
+        responseUrl:
+          response.url,
+
+        status:
+          response.status,
+
+        contentType,
+
+        fields,
+      }
+    );
+
+    throw new Error(
+      `${cleanEndpoint} returned an empty response.`
+    );
+  }
+
+  
+  let result;
+
+  try {
+    result =
+      JSON.parse(text);
+  } catch (error) {
+    const preview =
+      text.slice(
+        0,
+        1500
+      );
+
+    console.error(
+      "PSC API INVALID JSON:",
+      {
+        endpoint:
+          cleanEndpoint,
+
+        requestUrl:
+          url,
+
+        responseUrl:
+          response.url,
+
+        status:
+          response.status,
+
+        statusText:
+          response.statusText,
+
+        redirected:
+          response.redirected,
+
+        contentType,
+
+        fields,
+
+        responseText:
+          preview,
+      }
+    );
+
+    const normalizedText =
+      text
+        .trim()
+        .toLowerCase();
+
+    const isHtml =
+      normalizedText.startsWith(
+        "<!doctype"
+      ) ||
+      normalizedText.startsWith(
+        "<html"
+      );
+
+    if (isHtml) {
+      throw new Error(
+        `${cleanEndpoint} returned HTML instead of JSON.`
+      );
+    }
+
+    throw new Error(
+      `${cleanEndpoint} returned invalid JSON.`
+    );
+  }
+
+ 
   if (!response.ok) {
+    console.error(
+      "PSC API HTTP ERROR:",
+      {
+        endpoint:
+          cleanEndpoint,
+
+        status:
+          response.status,
+
+        result,
+      }
+    );
+
     throw new Error(
       result?.message ||
-        `${endpoint} failed with status ${response.status}`
+        `${cleanEndpoint} failed with status ${response.status}.`
     );
   }
 
   return result;
 }
 
-/* =========================================================
-   GET MAIN COURSES
-========================================================= */
 
 export async function getMainCourses() {
-  const result =
-    await postRequest({
-      endpoint:
-        "getCourses",
-    });
+  try {
+    const result =
+      await postRequest({
+        endpoint:
+          "getCourses",
 
-  return {
-    status:
-      result?.status !==
-      false,
+        revalidate:
+          3600,
+      });
 
-    filePath:
-      String(
-        result?.file_path ??
-          result?.icon_path ??
-          ""
-      ),
+    return {
+      status:
+        result?.status !==
+        false,
 
-    courses:
-      Array.isArray(
-        result?.data
-      )
-        ? result.data
-        : [],
+      filePath:
+        String(
+          result?.file_path ??
+            result?.icon_path ??
+            ""
+        ),
 
-    raw:
-      result,
-  };
+      courses:
+        Array.isArray(
+          result?.data
+        )
+          ? result.data
+          : [],
+
+      message:
+        result?.message ??
+        "",
+
+      raw:
+        result,
+    };
+  } catch (error) {
+    console.error(
+      "getMainCourses:",
+      error
+    );
+
+    return {
+      status: false,
+
+      filePath: "",
+
+      courses: [],
+
+      message:
+        error?.message ||
+        "Unable to load main courses.",
+
+      raw: null,
+    };
+  }
 }
 
-/* =========================================================
-   GET HOME RESPONSES
-========================================================= */
 
 export async function getHomeResponses({
   cid,
   uid = 0,
 } = {}) {
-  const safeCid =
-    requireCid(cid);
+  try {
+    const safeCid =
+      requireCid(cid);
 
-  const result =
-    await postRequest({
-      endpoint:
-        "getHomeResponses",
+    const result =
+      await postRequest({
+        endpoint:
+          "getHomeResponses",
 
-      fields: {
-        uid,
-        cid:
-          safeCid,
-      },
-    });
+        fields: {
+          uid:
+            String(
+              uid ?? 0
+            ),
 
-  return {
-    status:
-      result?.status !==
-      false,
+          cid:
+            safeCid,
+        },
 
-    gridIconPath:
-      String(
-        result?.grid_icon_path ??
-          ""
-      ),
+        revalidate:
+          3600,
+      });
 
-    categoryIconPath:
-      String(
-        result?.category_icon_path ??
-          ""
-      ),
+    return {
+      status:
+        result?.status !==
+        false,
 
-    subcategoryIconPath:
-      String(
-        result?.subcategory_icon_path ??
-          ""
-      ),
+      gridIconPath:
+        String(
+          result?.grid_icon_path ??
+            ""
+        ),
 
-    sliderImagePath:
-      String(
-        result?.slider_image_path ??
-          ""
-      ),
+      categoryIconPath:
+        String(
+          result?.category_icon_path ??
+            ""
+        ),
 
-    subjectIconPath:
-      String(
-        result?.subject_icon_path ??
-          ""
-      ),
+      subcategoryIconPath:
+        String(
+          result?.subcategory_icon_path ??
+            ""
+        ),
 
-    packageIconPath:
-      String(
-        result?.package_icon_path ??
-          ""
-      ),
+      sliderImagePath:
+        String(
+          result?.slider_image_path ??
+            ""
+        ),
 
-    subexamIconPath:
-      String(
-        result?.subexam_icon_path ??
-          ""
-      ),
+      subjectIconPath:
+        String(
+          result?.subject_icon_path ??
+            ""
+        ),
 
-    rankfilePath:
-      String(
-        result?.rankfile_path ??
-          ""
-      ),
+      packageIconPath:
+        String(
+          result?.package_icon_path ??
+            ""
+        ),
 
-    grid:
-      Array.isArray(
-        result?.grid
-      )
-        ? result.grid
-        : [],
+      subexamIconPath:
+        String(
+          result?.subexam_icon_path ??
+            ""
+        ),
 
-    raw:
-      result,
-  };
+      rankfilePath:
+        String(
+          result?.rankfile_path ??
+            ""
+        ),
+
+      grid:
+        Array.isArray(
+          result?.grid
+        )
+          ? result.grid
+          : [],
+
+      message:
+        result?.message ??
+        "",
+
+      raw:
+        result,
+    };
+  } catch (error) {
+    console.error(
+      "getHomeResponses:",
+      error
+    );
+
+    return {
+      status: false,
+
+      gridIconPath: "",
+      categoryIconPath: "",
+      subcategoryIconPath: "",
+      sliderImagePath: "",
+      subjectIconPath: "",
+      packageIconPath: "",
+      subexamIconPath: "",
+      rankfilePath: "",
+
+      grid: [],
+
+      message:
+        error?.message ||
+        "Unable to load home responses.",
+
+      raw: null,
+    };
+  }
 }
-
-/* =========================================================
-   GET SUB CATEGORIES
-
-   Dynamic by cid
-
-   cid = 1
-   -> Kerala PSC categories
-
-   cid = 2
-   -> RRB / SSC categories
-========================================================= */
 
 export async function getSubCategories({
   cid,
@@ -317,25 +491,46 @@ export async function getSubCategories({
           cid:
             safeCid,
 
-          uid,
+          uid:
+            String(
+              uid ?? 0
+            ),
         },
 
         cache:
           "no-store",
       });
 
-    const categories =
+   
+    const rawCategories =
       Array.isArray(
         result?.data
       )
-        ? result.data.filter(
-            (item) =>
-              String(
-                item?.status ??
-                  "1"
-              ) === "1"
+        ? result.data
+        : Array.isArray(
+            result?.categories
           )
-        : [];
+          ? result.categories
+          : [];
+
+
+    const categories =
+      rawCategories.filter(
+        (item) => {
+          const status =
+            String(
+              item?.status ??
+                "1"
+            )
+              .trim()
+              .toLowerCase();
+
+          return (
+            status === "1" ||
+            status === "active"
+          );
+        }
+      );
 
     return {
       status:
@@ -346,6 +541,7 @@ export async function getSubCategories({
         String(
           result?.file_path ??
             result?.filePath ??
+            result?.icon_path ??
             ""
         ),
 
@@ -366,42 +562,20 @@ export async function getSubCategories({
 
     return {
       status: false,
+
       filePath: "",
+
       categories: [],
+
       message:
         error?.message ||
         "Unable to load exam categories.",
+
+      raw: null,
     };
   }
 }
-/* =========================================================
-   GET SUB EXAMS
 
-   Fully dynamic:
-
-   cid
-   -> Main course ID
-
-   subId
-   -> Selected category / level ID
-
-   uid
-   -> User ID, default 0
-
-   Examples:
-
-   cid = 1
-   subId = 3
-   -> Kerala PSC
-   -> 10th Level exams
-
-   cid = 2
-   subId = 4
-   -> RRB & SSC
-   -> corresponding exams
-
-   No course ID is hardcoded here.
-========================================================= */
 
 export async function getSubExams({
   cid,
@@ -409,44 +583,29 @@ export async function getSubExams({
   subId,
 } = {}) {
   try {
-    /* =====================================================
-       VALIDATE CID
-    ===================================================== */
-
     const safeCid =
       requireCid(cid);
 
-    /* =====================================================
-       VALIDATE SUB CATEGORY
-    ===================================================== */
-
-    if (
+       if (
       subId === undefined ||
       subId === null ||
       subId === ""
     ) {
       return {
         status: false,
+
         iconPath: "",
+
         exams: [],
+
         message:
           "Sub category ID is required.",
+
+        raw: null,
       };
     }
 
-    /* =====================================================
-       REQUEST
-
-       IMPORTANT:
-
-       Backend expects:
-       sub_id
-
-       not:
-       subId
-    ===================================================== */
-
-    const result =
+       const result =
       await postRequest({
         endpoint:
           "getSubExamsList",
@@ -455,32 +614,55 @@ export async function getSubExams({
           cid:
             safeCid,
 
-          uid,
+          uid:
+            String(
+              uid ?? 0
+            ),
 
+          /*
+           * IMPORTANT:
+           * backend expects sub_id,
+           * not subId.
+           */
           sub_id:
-            subId,
+            String(
+              subId
+            ),
         },
 
         cache:
           "no-store",
       });
 
-    /* =====================================================
-       NORMALIZE RESPONSE
-    ===================================================== */
-
-    const exams =
+   
+    const rawExams =
       Array.isArray(
         result?.data
       )
-        ? result.data.filter(
-            (item) =>
-              String(
-                item?.status ??
-                  "1"
-              ) === "1"
+        ? result.data
+        : Array.isArray(
+            result?.exams
           )
-        : [];
+          ? result.exams
+          : [];
+
+       const exams =
+      rawExams.filter(
+        (item) => {
+          const status =
+            String(
+              item?.status ??
+                "1"
+            )
+              .trim()
+              .toLowerCase();
+
+          return (
+            status === "1" ||
+            status === "active"
+          );
+        }
+      );
 
     return {
       status:
@@ -491,6 +673,7 @@ export async function getSubExams({
         String(
           result?.icon_path ??
             result?.file_path ??
+            result?.filePath ??
             ""
         ),
 
@@ -519,6 +702,8 @@ export async function getSubExams({
       message:
         error?.message ||
         "Unable to load sub exams.",
+
+      raw: null,
     };
   }
 }
@@ -529,161 +714,55 @@ export async function getMockExamSubCategories({
   subId = 2,
 } = {}) {
   try {
-    /* =====================================================
-       VALIDATE
-    ===================================================== */
+    const safeCid =
+      requireCid(cid);
 
     if (
-      cid === undefined ||
-      cid === null ||
-      cid === ""
+      subId === undefined ||
+      subId === null ||
+      subId === ""
     ) {
       return {
         status: false,
+
         categories: [],
+
         message:
-          "cid is required.",
+          "subId is required.",
+
+        raw: null,
       };
     }
 
-    const apiKey =
-      process.env.PSC_API_KEY;
+       const result =
+      await postRequest({
+        endpoint:
+          "getMockExamSubcategories",
 
-    if (!apiKey) {
-      return {
-        status: false,
-        categories: [],
-        message:
-          "PSC_API_KEY is missing.",
-      };
-    }
+        fields: {
+          cid:
+            safeCid,
 
-    /*
-     * This endpoint was confirmed
-     * separately in Postman.
-     */
-
-    const apiUrl =
-      "http://psc.technocitysolutions.com/public/api/getMockExamSubcategories";
-
-    /* =====================================================
-       FORM DATA
-    ===================================================== */
-
-    const formData =
-      new FormData();
-
-    formData.append(
-      "api",
-      apiKey
-    );
-
-    formData.append(
-      "cid",
-      String(cid)
-    );
-
-    formData.append(
-      "uid",
-      String(uid)
-    );
-
-    /*
-     * Backend field is:
-     *
-     * subid
-     *
-     * not subId.
-     */
-
-    formData.append(
-      "subid",
-      String(subId)
-    );
-
-    /* =====================================================
-       REQUEST
-    ===================================================== */
-
-    const response =
-      await fetch(
-        apiUrl,
-        {
-          method: "POST",
-
-          body:
-            formData,
-
-          cache:
-            "no-store",
-        }
-      );
-
-    const text =
-      await response.text();
-
-    /* =====================================================
-       PARSE
-    ===================================================== */
-
-    let result;
-
-    try {
-      result =
-        text
-          ? JSON.parse(
-              text
-            )
-          : {};
-    } catch (error) {
-      console.error(
-        "MOCK CATEGORY INVALID JSON:",
-        {
-          status:
-            response.status,
-
-          responseText:
-            text.slice(
-              0,
-              1000
+          uid:
+            String(
+              uid ?? 0
             ),
-        }
-      );
 
-      return {
-        status: false,
-        categories: [],
-        message:
-          "Mock category API returned invalid JSON.",
-      };
-    }
+          /*
+           * Backend expects:
+           * subid
+           */
+          subid:
+            String(
+              subId
+            ),
+        },
 
-    /* =====================================================
-       HTTP ERROR
-    ===================================================== */
+        cache:
+          "no-store",
+      });
 
-    if (!response.ok) {
-      console.error(
-        "MOCK CATEGORY API ERROR:",
-        result
-      );
-
-      return {
-        status: false,
-
-        categories: [],
-
-        message:
-          result?.message ||
-          `Mock category API failed with ${response.status}`,
-      };
-    }
-
-    /* =====================================================
-       NORMALIZE DATA
-    ===================================================== */
-
-    const categories =
+       const categories =
       Array.isArray(
         result?.data
       )
@@ -718,13 +797,13 @@ export async function getMockExamSubCategories({
 
     return {
       status:
-        result?.status ===
-        true,
+        result?.status !==
+        false,
 
       categories,
 
       message:
-        result?.message ||
+        result?.message ??
         "",
 
       raw:
@@ -744,36 +823,11 @@ export async function getMockExamSubCategories({
       message:
         error?.message ||
         "Unable to load mock exam categories.",
+
+      raw: null,
     };
   }
 }
-
-/* =========================================================
-   GET EXAM NOTIFICATIONS
-
-   Fully dynamic by cid.
-
-   cid = 1
-   -> Kerala PSC
-
-   cid = 2
-   -> RRB & SSC
-
-   Future courses also work automatically
-   if the backend supports that cid.
-========================================================= */
-
-/* =========================================================
-   GET EXAM NOTIFICATIONS
-
-   Dynamic by cid
-
-   cid = 1
-   -> Kerala PSC
-
-   cid = 2
-   -> RRB & SSC
-========================================================= */
 
 export async function getExamNotifications({
   cid,
@@ -790,10 +844,18 @@ export async function getExamNotifications({
           "getPscNotificationsCid",
 
         fields: {
-          uid,
+          uid:
+            String(
+              uid ?? 0
+            ),
+
           cid:
             safeCid,
-          offset,
+
+          offset:
+            String(
+              offset ?? 0
+            ),
         },
 
         cache:
@@ -839,93 +901,21 @@ export async function getExamNotifications({
 
     return {
       status: false,
+
       nextOffset: null,
+
       filePath: "",
+
       notifications: [],
+
       message:
         error?.message ||
         "Unable to load notifications.",
+
+      raw: null,
     };
   }
 }
-
-/* =========================================================
-   CREATE SLUG
-========================================================= */
-
-export function createSlug(
-  value = ""
-) {
-  return String(
-    value ?? ""
-  )
-    .toLowerCase()
-    .trim()
-    .replace(
-      /&/g,
-      " and "
-    )
-    .replace(
-      /[^a-z0-9]+/g,
-      "-"
-    )
-    .replace(
-      /^-+|-+$/g,
-      ""
-    );
-}
-
-/* =========================================================
-   NORMALIZE COURSE SLUG
-========================================================= */
-
-export function normalizeCourseSlug(
-  value = ""
-) {
-  return createSlug(
-    String(
-      value ?? ""
-    ).replace(
-      /-coaching$/i,
-      ""
-    )
-  );
-}
-/* =========================================================
-   GET EXAM SYLLABUS
-
-   Dynamic by cid
-
-   cid = 1
-   -> Kerala PSC
-
-   cid = 2
-   -> RRB & SSC
-========================================================= */
-
-/* =========================================================
-   GET EXAM SYLLABUS
-
-   Dynamic by cid
-
-   cid = 1
-   -> Kerala PSC
-
-   cid = 2
-   -> RRB & SSC
-========================================================= */
-
-/* =========================================================
-   GET EXAM SYLLABUS
-
-   Dynamic by cid
-
-   cid = 1
-   -> Kerala PSC
-
-   cid = 2
-   -> RRB & SSC
-========================================================= */
 
 export async function getExamSyllabus({
   cid,
@@ -941,7 +931,11 @@ export async function getExamSyllabus({
           "getExamSyllabusCid",
 
         fields: {
-          uid,
+          uid:
+            String(
+              uid ?? 0
+            ),
+
           cid:
             safeCid,
         },
@@ -992,6 +986,13 @@ export async function getExamSyllabus({
       message:
         error?.message ||
         "Unable to load syllabus.",
+
+      raw: null,
     };
   }
 }
+
+export {
+  createSlug,
+  normalizeCourseSlug,
+};

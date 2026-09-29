@@ -12,14 +12,11 @@ import {
 
 import SubExamCard from "./SubExamCard";
 
-/* =========================================================
-   SUB EXAM LIST
-========================================================= */
-
 export default function SubExamList({
-  cid = "1",
+  cid,
   subId,
   levelSlug,
+  governmentExamsSlug,
 }) {
   const [
     exams,
@@ -72,22 +69,24 @@ export default function SubExamList({
         setLoading(true);
         setError("");
 
-        const url =
-          `/api/sub-exams` +
-          `?cid=${encodeURIComponent(
-            cid
-          )}` +
-          `&subId=${encodeURIComponent(
-            subId
-          )}` +
-          `&uid=0`;
+        const params =
+          new URLSearchParams({
+            cid:
+              String(cid),
+
+            subId:
+              String(subId),
+
+            uid: "0",
+          });
 
         const response =
           await fetch(
-            url,
+            `/api/sub-exams?${params.toString()}`,
             {
               method: "GET",
-              cache: "no-store",
+              cache:
+                "no-store",
             }
           );
 
@@ -127,16 +126,6 @@ export default function SubExamList({
             ? result.data
             : [];
 
-        console.log(
-          "SUB EXAMS RESPONSE:",
-          result
-        );
-
-        console.log(
-          "SUB EXAMS LIST:",
-          examList
-        );
-
         setExams(
           examList
         );
@@ -158,6 +147,7 @@ export default function SubExamList({
         );
 
         setExams([]);
+
         setIconPath("");
 
         setError(
@@ -181,10 +171,6 @@ export default function SubExamList({
     subId,
     retryCount,
   ]);
-
-  /* =======================================================
-     UI
-  ======================================================= */
 
   return (
     <section
@@ -315,9 +301,7 @@ export default function SubExamList({
           )}
       </div>
 
-      {/* ===================================================
-          LOADING STATE
-      =================================================== */}
+      {/* LOADING */}
 
       {loading && (
         <div
@@ -385,9 +369,7 @@ export default function SubExamList({
         </div>
       )}
 
-      {/* ===================================================
-          EXAM CARDS
-      =================================================== */}
+      {/* EXAM CARDS */}
 
       {!loading &&
         !error &&
@@ -406,21 +388,21 @@ export default function SubExamList({
           >
             {exams.map(
               (exam) => (
-                <SubExamCard
-                key={exam.id}
-                exam={exam}
-                cid={cid}
-                iconPath={iconPath}
-                levelSlug={levelSlug}
-              />
+               <SubExamCard
+  key={exam.id}
+  exam={exam}
+  iconPath={iconPath}
+  levelSlug={levelSlug}
+  governmentExamsSlug={
+    governmentExamsSlug
+  }
+/>
               )
             )}
           </div>
         )}
 
-      {/* ===================================================
-          EMPTY STATE
-      =================================================== */}
+      {/* EMPTY */}
 
       {!loading &&
         !error &&
@@ -483,9 +465,7 @@ export default function SubExamList({
           </div>
         )}
 
-      {/* ===================================================
-          ERROR STATE
-      =================================================== */}
+      {/* ERROR */}
 
       {!loading &&
         error && (

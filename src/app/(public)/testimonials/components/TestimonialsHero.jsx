@@ -215,7 +215,7 @@ export default function TestimonialsHero() {
 
           {/* CTA */}
           <Link
-            href="#student-stories"
+            href="#testimonial-card-wrapper-heading"
             className="
               group
               mt-6

@@ -1,4 +1,3 @@
-// src/app/(public)/government-exams-coaching/[governmentExamsSlug]/page.jsx
 
 import {
   notFound,
@@ -26,8 +25,8 @@ import CompetitiveExamPacks from "./competitive-exam-packs/CompetitiveExamPacks"
 
 import LatestUpdatesSection from "./latest-updates/components/LatestUpdatesSection";
 
-import KPSCFAQ from "./faq/KPSCFAQ";
 import RecommendedCoursesSection from "./recommeded-courses/components/RecommendedCoursesSection";
+import GovernmentExamFAQ from "./faq/KPSCFAQ";
 
 /* =========================================================
    RESOLVE API COURSE
@@ -453,20 +452,9 @@ export default async function GovernmentExamPage({
         ================================================= */}
 
         <div className="mt-5">
-          <KPSCFAQ
-            cid={
-              cid
-            }
-            governmentExamsSlug={
-              governmentExamsSlug
-            }
-            examName={
-              examName
-            }
-            shortName={
-              shortName
-            }
-          />
+         <GovernmentExamFAQ
+        config={config}
+      />
         </div>
       </div>
     </main>

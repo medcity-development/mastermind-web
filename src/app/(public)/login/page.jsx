@@ -1,9 +1,13 @@
-import LoginFAQ from "./components/LoginFAQ";
-import LoginLayout from "./components/LoginLayout";
+import LoginPage from "./components/LoginPage";
 
-export default function LoginPage() {
-  return <><LoginLayout />
-  <LoginFAQ />
-  </>
-  ;
+export const metadata = {
+  title:
+    "Login | MasterMind Academy",
+
+  description:
+    "Login to your MasterMind Academy account and continue your learning journey.",
+};
+
+export default function Page() {
+  return <LoginPage />;
 }

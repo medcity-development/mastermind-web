@@ -240,7 +240,7 @@ export default function AboutStorySection() {
             </p>
 
             <Link
-              href="/main-courses"
+              href="/contact"
               className="
                 group
                 mt-6
@@ -255,7 +255,7 @@ export default function AboutStorySection() {
                 via-[#098acb]
                 to-[#00aee7]
                 px-6
-                text-[10px]
+                text-[12px]
                 font-bold
                 text-white
                 shadow-[0_12px_26px_rgba(23,100,217,0.2)]
@@ -265,7 +265,7 @@ export default function AboutStorySection() {
                 hover:shadow-[0_16px_34px_rgba(23,100,217,0.26)]
               "
             >
-              Explore Our Courses
+              Connect With Us
 
               <ArrowRight
                 size={13}
@@ -490,11 +490,11 @@ export default function AboutStorySection() {
                 rounded-[16px]
                 border
                 border-white/90
-                bg-white/75
+                bg-purple-200
                 px-4
                 py-3
                 shadow-[0_10px_28px_rgba(8,31,92,0.05)]
-                backdrop-blur
+                
               "
             >
               <div
@@ -514,7 +514,7 @@ export default function AboutStorySection() {
 
               <span
                 className="
-                  text-[10px]
+                  text-[12px] md:text-[14px]
                   font-semibold
                   text-[#2e4167]
                 "

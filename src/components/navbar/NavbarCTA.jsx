@@ -63,7 +63,7 @@ export default function NavbarCTA({
 
         {/* REGISTER */}
 
-        <Link
+        {/* <Link
   href="/register"
   className="
     group
@@ -119,7 +119,7 @@ export default function NavbarCTA({
   <span>
     Register
   </span>
-</Link>
+</Link> */}
       </div>
     );
   }
@@ -186,8 +186,8 @@ export default function NavbarCTA({
         Login
       </Link>
 
-      {/* REGISTER */}
-
+    
+{/* 
       <Link
         href="/register"
         className="
@@ -233,7 +233,7 @@ export default function NavbarCTA({
           xl:text-[13px]
         "
       >
-        {/* SOFT GLOW */}
+       
 
         <span
           aria-hidden="true"
@@ -255,7 +255,7 @@ export default function NavbarCTA({
           "
         />
 
-        {/* SUBTLE SHINE */}
+       
 
         <span
           aria-hidden="true"
@@ -279,7 +279,7 @@ export default function NavbarCTA({
           "
         />
 
-        {/* ICON CAPSULE */}
+       
 
         <span
           className="
@@ -336,7 +336,7 @@ export default function NavbarCTA({
             group-hover:translate-x-1
           "
         />
-      </Link>
+      </Link> */}
     </div>
   );
 }

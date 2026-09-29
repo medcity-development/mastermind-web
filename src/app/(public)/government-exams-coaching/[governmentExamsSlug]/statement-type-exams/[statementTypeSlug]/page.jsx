@@ -21,7 +21,7 @@ import StatementExamList from "./components/StatementExamList";
 
 import {
   createSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 /* =========================================================
    FORMAT SLUG

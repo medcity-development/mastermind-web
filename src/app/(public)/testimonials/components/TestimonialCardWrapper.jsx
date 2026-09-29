@@ -264,9 +264,9 @@ export default function TestimonialCardWrapper() {
               sm:py-2
               sm:text-[10px]
 
-              lg:text-[11px]
+              lg:text-[11px] scroll-mt-32
             "
-          >
+          id="testimonial-card-wrapper-heading">
             Student Stories
           </span>
 

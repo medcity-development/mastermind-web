@@ -397,7 +397,7 @@ export default function WhyChooseMasterMind() {
               "
             >
               <Link
-                href="/main-courses"
+                href="#"
                 className="
                   group
                   inline-flex
@@ -418,7 +418,7 @@ export default function WhyChooseMasterMind() {
                   hover:shadow-[0_14px_30px_rgba(4,49,110,0.2)]
                 "
               >
-                Explore Our Courses
+                Download Our Mobile App
 
                 <ArrowRight
                   size={13}

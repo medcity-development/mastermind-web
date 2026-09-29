@@ -9,6 +9,10 @@ import {
   createSlug,
 } from "@/lib/pscSlug";
 
+/* =========================================================
+   BUILD IMAGE URL
+========================================================= */
+
 function buildImageUrl(
   filePath,
   image
@@ -21,13 +25,17 @@ function buildImageUrl(
   }
 
   const cleanPath =
-    String(filePath).replace(
+    String(
+      filePath
+    ).replace(
       /\/+$/,
       ""
     );
 
   const cleanImage =
-    String(image).replace(
+    String(
+      image
+    ).replace(
       /^\/+/,
       ""
     );
@@ -35,34 +43,46 @@ function buildImageUrl(
   return `${cleanPath}/${cleanImage}`;
 }
 
+/* =========================================================
+   CARD
+========================================================= */
+
 export default function ExamCategoryCard({
   item,
   filePath,
-  courseId,
+  governmentExamsSlug,
 }) {
+  if (!item) {
+    return null;
+  }
+
   const title =
     item?.name ||
     "Exam";
 
   const slug =
-    createSlug(title);
+    createSlug(
+      title
+    );
 
-  /*
-   * Example:
-   *
-   * courseId = 1
-   * item.id   = 3
-   *
-   * /government-exams-coaching/kerala-psc/10th-level-exams?cid=1&subId=3
-   */
+  /* =========================================
+     SEO URL
+
+     Example:
+     /government-exams-coaching/
+       kerala-psc/
+       degree-level-exams
+  ========================================= */
+
   const href =
-    `/government-exams-coaching/kerala-psc/${slug}` +
-    `?cid=${encodeURIComponent(
-      courseId
-    )}` +
-    `&subId=${encodeURIComponent(
-      item?.id
-    )}`;
+    governmentExamsSlug &&
+    slug
+      ? `/government-exams-coaching/${governmentExamsSlug}/${slug}`
+      : "#";
+
+  /* =========================================
+     IMAGE
+  ========================================= */
 
   const imageUrl =
     buildImageUrl(
@@ -71,12 +91,31 @@ export default function ExamCategoryCard({
         item?.icon
     );
 
+  /* =========================================
+     INVALID ROUTE GUARD
+  ========================================= */
+
+  if (
+    !governmentExamsSlug ||
+    !slug
+  ) {
+    console.warn(
+      "ExamCategoryCard: route information missing",
+      {
+        governmentExamsSlug,
+        slug,
+        item,
+      }
+    );
+  }
+
   return (
     <Link
       href={href}
       data-category-id={
         item?.id
       }
+      aria-label={`Explore ${title}`}
       className="
         group
         relative
@@ -96,6 +135,7 @@ export default function ExamCategoryCard({
       "
     >
       {/* IMAGE */}
+
       {imageUrl && (
         <Image
           src={imageUrl}
@@ -116,6 +156,7 @@ export default function ExamCategoryCard({
       )}
 
       {/* DARK OVERLAY */}
+
       <div
         aria-hidden="true"
         className="
@@ -129,6 +170,7 @@ export default function ExamCategoryCard({
       />
 
       {/* BLUE TINT */}
+
       <div
         aria-hidden="true"
         className="
@@ -141,6 +183,7 @@ export default function ExamCategoryCard({
       />
 
       {/* CONTENT */}
+
       <div
         className="
           absolute

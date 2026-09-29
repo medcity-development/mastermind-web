@@ -8,7 +8,7 @@ import {
 
 import {
   createSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 export default function StatementTypeCard({
   item,

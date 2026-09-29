@@ -2,27 +2,208 @@ import {
   notFound,
 } from "next/navigation";
 
+import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
+  getSubCategories,
+} from "@/lib/pscApi";
+
+import {
+  createSlug,
+} from "@/lib/pscSlug";
+
 import SubExamHero from "./SubExamHero";
 import SubExamList from "./SubExamList";
 
 /* =========================================================
-   FORMAT SLUG
+   CATEGORY NAME
 ========================================================= */
 
-function formatSlug(
-  slug = ""
+function getCategoryName(
+  item
 ) {
-  return String(slug)
-    .split("-")
-    .filter(Boolean)
-    .map(
-      (word) =>
-        word
-          .charAt(0)
-          .toUpperCase() +
-        word.slice(1)
+  return (
+    item?.name ||
+    item?.subcourse ||
+    item?.sub_category ||
+    item?.subcategory ||
+    item?.sub_category_name ||
+    item?.subcategory_name ||
+    item?.exam_name ||
+    item?.title ||
+    ""
+  );
+}
+
+/* =========================================================
+   CATEGORY ID
+========================================================= */
+
+function getCategoryId(
+  item
+) {
+  return (
+    item?.id ??
+    item?.sub_id ??
+    item?.subId ??
+    item?.subcategory_id ??
+    item?.sub_category_id ??
+    null
+  );
+}
+
+/* =========================================================
+   RESOLVE EXAM LEVEL
+========================================================= */
+
+async function resolveExamLevel({
+  governmentExamsSlug,
+  levelSlug,
+}) {
+  /* =======================================================
+     GOVERNMENT CONFIG
+  ======================================================= */
+
+  const governmentConfig =
+    getGovernmentExamConfig(
+      governmentExamsSlug
+    );
+
+  if (!governmentConfig) {
+    return null;
+  }
+
+  const cid =
+    String(
+      governmentConfig.cid
+    );
+
+  /* =======================================================
+     FETCH ALL LEVELS
+  ======================================================= */
+
+  const result =
+    await getSubCategories({
+      cid,
+      uid: 0,
+    });
+
+  if (
+    !result?.status &&
+    !result?.categories?.length
+  ) {
+    console.error(
+      "Unable to resolve exam level:",
+      result?.message
+    );
+
+    return null;
+  }
+
+  const categories =
+    Array.isArray(
+      result?.categories
     )
-    .join(" ");
+      ? result.categories
+      : [];
+
+  /* =======================================================
+     MATCH SEO SLUG
+  ======================================================= */
+
+  const normalizedLevelSlug =
+    String(
+      levelSlug
+    )
+      .trim()
+      .toLowerCase();
+
+  const category =
+    categories.find(
+      (item) => {
+        const name =
+          getCategoryName(
+            item
+          );
+
+        if (!name) {
+          return false;
+        }
+
+        return (
+          createSlug(
+            name
+          ) ===
+          normalizedLevelSlug
+        );
+      }
+    ) || null;
+
+  if (!category) {
+    console.error(
+      "Exam level slug not found:",
+      {
+        cid,
+        levelSlug,
+        available:
+          categories.map(
+            (item) => ({
+              id:
+                getCategoryId(
+                  item
+                ),
+
+              name:
+                getCategoryName(
+                  item
+                ),
+
+              slug:
+                createSlug(
+                  getCategoryName(
+                    item
+                  )
+                ),
+            })
+          ),
+      }
+    );
+
+    return null;
+  }
+
+  const subId =
+    getCategoryId(
+      category
+    );
+
+  if (
+    subId === null ||
+    subId === undefined ||
+    subId === ""
+  ) {
+    return null;
+  }
+
+  return {
+    governmentConfig,
+
+    category,
+
+    cid,
+
+    subId:
+      String(
+        subId
+      ),
+
+    title:
+      getCategoryName(
+        category
+      ),
+  };
 }
 
 /* =========================================================
@@ -32,18 +213,47 @@ function formatSlug(
 export async function generateMetadata({
   params,
 }) {
-  const { slug } =
-    await params;
+  const {
+    governmentExamsSlug,
+    slug,
+  } = await params;
 
-  const title =
-    formatSlug(slug);
+  const resolved =
+    await resolveExamLevel({
+      governmentExamsSlug,
+
+      levelSlug:
+        slug,
+    });
+
+  if (!resolved) {
+    return {
+      title:
+        "Exam Level | MasterMind Academy",
+
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const {
+    governmentConfig,
+    title,
+  } = resolved;
 
   return {
     title:
-      `${title} | Kerala PSC Coaching`,
+      `${title} | ${governmentConfig.name} Coaching | MasterMind Academy`,
 
     description:
-      `Explore ${title} exams, preparation materials and learning resources for Kerala PSC.`,
+      `Explore ${title} for ${governmentConfig.name}. Access mock tests, previous questions and exam preparation resources.`,
+
+    alternates: {
+      canonical:
+        `/government-exams-coaching/${governmentExamsSlug}/${slug}`,
+    },
   };
 }
 
@@ -53,37 +263,37 @@ export async function generateMetadata({
 
 export default async function ExamLevelPage({
   params,
-  searchParams,
 }) {
-  const { slug } =
-    await params;
-
-  const search =
-    await searchParams;
-
-  const cid =
-    search?.cid || "1";
-
-  const subId =
-    search?.subId;
-
-  /* =======================================================
-     VALIDATION
-  ======================================================= */
+  const {
+    governmentExamsSlug,
+    slug,
+  } = await params;
 
   if (
-    !slug ||
-    !subId
+    !governmentExamsSlug ||
+    !slug
   ) {
     notFound();
   }
 
-  const title =
-    formatSlug(slug);
+  const resolved =
+    await resolveExamLevel({
+      governmentExamsSlug,
 
-  /* =======================================================
-     PAGE
-  ======================================================= */
+      levelSlug:
+        slug,
+    });
+
+  if (!resolved) {
+    notFound();
+  }
+
+  const {
+    governmentConfig,
+    cid,
+    subId,
+    title,
+  } = resolved;
 
   return (
     <main
@@ -91,8 +301,7 @@ export default async function ExamLevelPage({
         min-h-screen
         bg-[#f4f9ff]
         pb-12
-        pt-[100px]
-        lg:pt-[115px]
+        pt-10
       "
     >
       <div
@@ -105,18 +314,25 @@ export default async function ExamLevelPage({
           lg:px-8
         "
       >
-        {/* HERO */}
-
         <SubExamHero
-          title={title}
+          title={
+            title
+          }
         />
 
-        {/* SUB EXAMS */}
-
         <SubExamList
-          cid={cid}
-          subId={subId}
-          levelSlug={slug}
+          cid={
+            cid
+          }
+          subId={
+            subId
+          }
+          levelSlug={
+            slug
+          }
+          governmentExamsSlug={
+            governmentConfig.slug
+          }
         />
       </div>
     </main>

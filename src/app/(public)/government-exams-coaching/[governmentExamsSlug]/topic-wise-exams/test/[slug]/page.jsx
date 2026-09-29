@@ -19,7 +19,7 @@ import {
 import {
   createSlug,
   formatSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 import PremiumExamButton from "./components/PremiumExamButton";
 

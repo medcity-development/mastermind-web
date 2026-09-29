@@ -3,77 +3,312 @@ import {
 } from "next/navigation";
 
 import {
+  createSlug,
+} from "@/lib/pscSlug";
+
+import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
+  resolveSubCategory,
+} from "@/lib/subCategoriesHelper";
+
+import {
+  getSubExams,
+} from "@/lib/pscApi";
+
+import {
   getSubExamDetails,
 } from "@/lib/subExamDetailsHelper";
 
 import ExamDetailsHero from "./components/ExamDetailsHero";
 import ExamDetailsTabs from "./components/ExamDetailsTabs";
 
-export default async function SubExamDetailsPage({
-  params,
-  searchParams,
-}) {
-  const {
-    slug,
-  } = await params;
+/* =========================================================
+   GET EXAM NAME
+========================================================= */
 
-  const search =
-    await searchParams;
+function getExamName(
+  exam
+) {
+  return (
+    exam?.exam_name ||
+    exam?.exam ||
+    exam?.name ||
+    exam?.title ||
+    ""
+  );
+}
+
+/* =========================================================
+   RESOLVE EXAM FROM SEO SLUG
+========================================================= */
+
+async function resolveExam({
+  governmentExamsSlug,
+  levelSlug,
+  examSlug,
+}) {
+  /* =======================================================
+     GOVERNMENT EXAM CONFIG
+
+     kerala-psc → cid 1
+     rrb-ssc    → cid 2
+  ======================================================= */
+
+  const governmentConfig =
+    getGovernmentExamConfig(
+      governmentExamsSlug
+    );
+
+  if (!governmentConfig) {
+    return null;
+  }
 
   const cid =
     String(
-      search?.cid || "1"
+      governmentConfig.cid
     );
 
-  const examId =
-    search?.examId
-      ? String(
-          search.examId
-        )
-      : "";
+  /* =======================================================
+     LEVEL SLUG → SUB CATEGORY ID
+  ======================================================= */
+
+  const level =
+    await resolveSubCategory({
+      cid,
+      uid: 0,
+      levelSlug,
+    });
+
+  if (!level) {
+    return null;
+  }
 
   const subId =
-    search?.subId
+    String(
+      level.subId
+    );
+
+  /* =======================================================
+     LOAD SUB EXAMS
+  ======================================================= */
+
+  const result =
+    await getSubExams({
+      cid,
+      uid: 0,
+      subId,
+    });
+
+  const exams =
+    Array.isArray(
+      result?.exams
+    )
+      ? result.exams
+      : [];
+
+  /* =======================================================
+     FIND EXAM BY SEO SLUG
+  ======================================================= */
+
+  const selectedExam =
+    exams.find(
+      (exam) => {
+        const name =
+          getExamName(
+            exam
+          );
+
+        if (!name) {
+          return false;
+        }
+
+        return (
+          createSlug(name) ===
+          String(
+            examSlug
+          ).toLowerCase()
+        );
+      }
+    ) || null;
+
+  if (!selectedExam) {
+    return null;
+  }
+
+  const examId =
+    selectedExam?.id
       ? String(
-          search.subId
+          selectedExam.id
         )
       : "";
 
-  const type =
-    search?.type ||
-    "mock";
+  if (!examId) {
+    return null;
+  }
 
-  console.log(
-    "DETAIL PAGE PARAMS:",
-    {
-      slug,
-      cid,
-      examId,
-      subId,
-      type,
-    }
-  );
+  return {
+    governmentConfig,
+    level,
+    selectedExam,
+    cid,
+    subId,
+    examId,
+  };
+}
+
+/* =========================================================
+   METADATA
+========================================================= */
+
+export async function generateMetadata({
+  params,
+}) {
+  const {
+    governmentExamsSlug,
+    slug,
+    examSlug,
+  } = await params;
+
+  const resolved =
+    await resolveExam({
+      governmentExamsSlug,
+
+      levelSlug:
+        slug,
+
+      examSlug,
+    });
+
+  if (!resolved) {
+    return {
+      title:
+        "Exam | MasterMind Academy",
+
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const {
+    governmentConfig,
+    level,
+    selectedExam,
+  } = resolved;
+
+  const examName =
+    getExamName(
+      selectedExam
+    );
+
+  const canonical =
+    `/government-exams-coaching/` +
+    `${governmentExamsSlug}/` +
+    `${slug}/` +
+    `${examSlug}`;
+
+  return {
+    title:
+      `${examName} | ${governmentConfig.name} | MasterMind Academy`,
+
+    description:
+      `Prepare for ${examName} under ${level.name}. Access mock tests, video classes, previous questions and exam preparation resources.`,
+
+    alternates: {
+      canonical,
+    },
+  };
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+export default async function SubExamDetailsPage({
+  params,
+}) {
+  const {
+    governmentExamsSlug,
+    slug,
+    examSlug,
+  } = await params;
 
   if (
+    !governmentExamsSlug ||
     !slug ||
-    !examId
+    !examSlug
   ) {
     notFound();
   }
 
+  /* =======================================================
+     SEO SLUG → API IDS
+  ======================================================= */
+
+  const resolved =
+    await resolveExam({
+      governmentExamsSlug,
+
+      levelSlug:
+        slug,
+
+      examSlug,
+    });
+
+  if (!resolved) {
+    notFound();
+  }
+
+  const {
+    selectedExam,
+    cid,
+    subId,
+    examId,
+  } = resolved;
+
+  /* =======================================================
+     EXAM TYPE
+
+     Keep API value when available.
+  ======================================================= */
+
+  const type =
+    selectedExam?.type ||
+    "mock";
+
+  /* =======================================================
+     GET DETAILS
+  ======================================================= */
+
   const result =
     await getSubExamDetails({
       uid: 0,
+
       cid,
+
       subExamId:
         examId,
+
       type,
+
       offset: 0,
     });
 
+  /*
+   Prefer the detailed API object.
+
+   If data is unavailable but the exam was
+   already resolved from getSubExams(),
+   keep the resolved exam available.
+  */
+
   const exam =
     result?.data ||
-    null;
+    selectedExam;
 
   if (!exam) {
     notFound();
@@ -99,15 +334,24 @@ export default async function SubExamDetailsPage({
         "
       >
         <ExamDetailsHero
-          exam={exam}
+          exam={
+            exam
+          }
           levelSlug={
             slug
+          }
+          governmentExamsSlug={
+            governmentExamsSlug
           }
         />
 
         <ExamDetailsTabs
-          cid={cid}
-          uid={0}
+          cid={
+            cid
+          }
+          uid={
+            0
+          }
           examId={
             examId
           }

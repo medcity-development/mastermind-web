@@ -233,8 +233,7 @@ export default async function SubCategoryPage({
         min-h-screen
         bg-[#f4f9ff]
         pb-14
-        pt-[100px]
-        lg:pt-[115px]
+        pt-10
       "
     >
       <div

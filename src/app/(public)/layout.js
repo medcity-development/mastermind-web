@@ -1,19 +1,20 @@
+// src/app/(public)/layout.js
 
-
+import Navbar from "@/components/navbar/Navbar";
+import Footer from "@/components/footer/Footer";
 
 export default function PublicLayout({
   children,
 }) {
   return (
-    <div
-      className="
-        min-h-screen
-        bg-[#f4f9ff]
-      "
-    >
-   
+    <>
+      <Navbar />
 
-      {children}
-    </div>
+      <main>
+        {children}
+      </main>
+
+      <Footer />
+    </>
   );
 }

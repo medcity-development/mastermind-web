@@ -25,7 +25,7 @@ import {
 
 import {
   createSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 /* =========================================================
    FORMAT SLUG

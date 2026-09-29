@@ -10,7 +10,7 @@ import PremiumStatementExamButton from "./PremiumStatementExamButton";
 
 import {
   createSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 export default function StatementExamCard({
   exam,

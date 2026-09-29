@@ -22,7 +22,7 @@ import {
 import {
   createSlug,
   formatSlug,
-} from "@/lib/slugHelper";
+} from "@/lib/pscSlug";
 
 export async function generateMetadata({
   params,

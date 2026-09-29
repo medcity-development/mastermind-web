@@ -1,47 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useState,
+} from "react";
+
 import {
   ChevronDown,
   CircleHelp,
 } from "lucide-react";
 
-const faqs = [
-  {
-    question:
-      "What is the best way to prepare for Kerala PSC exams?",
-    answer:
-      "Start with the official Kerala PSC syllabus and build a structured study plan. Focus on SCERT topics, current affairs, previous question papers, topic-wise practice and regular mock tests to improve both accuracy and speed.",
-  },
-  {
-    question:
-      "Which Kerala PSC exams can I prepare for here?",
-    answer:
-      "You can prepare for major Kerala PSC exam categories including 10th Level, 12th Level, Degree Level and Kerala PSC Nursing exams, along with their related subjects and preparation resources.",
-  },
-  {
-    question:
-      "Are mock tests and previous questions useful for Kerala PSC preparation?",
-    answer:
-      "Yes. Previous questions help you understand frequently tested topics and exam patterns, while mock tests help improve time management, accuracy and confidence before the actual examination.",
-  },
-  {
-    question:
-      "How can I stay updated with Kerala PSC current affairs and notifications?",
-    answer:
-      "Use the Current Affairs, PSC Alerts and PSC Bulletin sections regularly to follow important updates, exam-related notifications and current affairs relevant to Kerala PSC preparation.",
-  },
-];
+export default function GovernmentExamFAQ({
+  config,
+  faq: faqOverride,
+}) {
+  const [
+    openIndex,
+    setOpenIndex,
+  ] = useState(0);
 
-export default function KPSCFAQ() {
-  const [openIndex, setOpenIndex] =
-    useState(0);
+  /* =========================================================
+     FAQ CONFIG
 
-  const handleToggle = (index) => {
-    setOpenIndex((current) =>
-      current === index ? -1 : index
+     Priority:
+     1. faq prop override
+     2. config.faq
+  ========================================================= */
+
+  const faqConfig =
+    faqOverride ||
+    config?.faq ||
+    null;
+
+  const faqs =
+    Array.isArray(
+      faqConfig?.items
+    )
+      ? faqConfig.items
+      : [];
+
+  /* =========================================================
+     EMPTY
+  ========================================================= */
+
+  if (!faqs.length) {
+    return null;
+  }
+
+  /* =========================================================
+     TEXT CONTENT
+  ========================================================= */
+
+  const examName =
+    config?.name ||
+    "Government Exam";
+
+  const eyebrow =
+    faqConfig?.eyebrow ||
+    `${examName} FAQs`;
+
+  const titlePrefix =
+    faqConfig?.titlePrefix ||
+    "Frequently Asked";
+
+  const titleHighlight =
+    faqConfig?.titleHighlight ||
+    "Questions";
+
+  const description =
+    faqConfig?.description ||
+    `Find quick answers about ${examName} preparation, exams and learning resources.`;
+
+  /* =========================================================
+     TOGGLE
+  ========================================================= */
+
+  const handleToggle = (
+    index
+  ) => {
+    setOpenIndex(
+      (current) =>
+        current === index
+          ? -1
+          : index
     );
   };
+
+  /* =========================================================
+     UI
+  ========================================================= */
 
   return (
     <section
@@ -55,7 +101,8 @@ export default function KPSCFAQ() {
         lg:py-16
       "
     >
-      {/* Decorative glows */}
+      {/* DECORATIVE GLOW - LEFT */}
+
       <div
         aria-hidden="true"
         className="
@@ -70,6 +117,8 @@ export default function KPSCFAQ() {
           blur-[90px]
         "
       />
+
+      {/* DECORATIVE GLOW - RIGHT */}
 
       <div
         aria-hidden="true"
@@ -98,7 +147,10 @@ export default function KPSCFAQ() {
           lg:px-8
         "
       >
-        {/* Heading */}
+        {/* =================================================
+            HEADING
+        ================================================== */}
+
         <div
           data-aos="fade-up"
           className="
@@ -124,7 +176,10 @@ export default function KPSCFAQ() {
             "
           >
             <CircleHelp
-              className="h-5 w-5"
+              className="
+                h-5
+                w-5
+              "
             />
           </div>
 
@@ -138,7 +193,7 @@ export default function KPSCFAQ() {
               text-[#087ee9]
             "
           >
-            Kerala PSC FAQs
+            {eyebrow}
           </p>
 
           <h2
@@ -152,7 +207,8 @@ export default function KPSCFAQ() {
               lg:text-4xl
             "
           >
-            Frequently Asked{" "}
+            {titlePrefix}{" "}
+
             <span
               className="
                 bg-gradient-to-r
@@ -162,7 +218,7 @@ export default function KPSCFAQ() {
                 text-transparent
               "
             >
-              Questions
+              {titleHighlight}
             </span>
           </h2>
 
@@ -177,75 +233,162 @@ export default function KPSCFAQ() {
               sm:text-[15px]
             "
           >
-            Find quick answers about Kerala
-            PSC preparation, exams and
-            learning resources.
+            {description}
           </p>
         </div>
 
-        {/* FAQ */}
-        <div className="space-y-3">
-          {faqs.map((faq, index) => {
-            const isOpen =
-              openIndex === index;
+        {/* =================================================
+            FAQ LIST
+        ================================================== */}
 
-            return (
-              <article
-                key={faq.question}
-                data-aos="fade-up"
-                data-aos-delay={
-                  index * 50
-                }
-                className={`
-                  overflow-hidden
-                  rounded-[18px]
-                  border
-                  bg-white
-                  transition-all
-                  duration-300
+        <div
+          className="
+            space-y-3
+          "
+        >
+          {faqs.map(
+            (
+              faq,
+              index
+            ) => {
+              const isOpen =
+                openIndex ===
+                index;
 
-                  ${
-                    isOpen
-                      ? `
-                        border-[#087ee9]/20
-                        shadow-[0_14px_35px_rgba(8,126,233,0.08)]
-                      `
-                      : `
-                        border-[#e1ebf5]
-                        shadow-[0_6px_18px_rgba(15,58,110,0.04)]
-                      `
+              const question =
+                faq?.question ||
+                "";
+
+              const answer =
+                faq?.answer ||
+                "";
+
+              if (!question) {
+                return null;
+              }
+
+              return (
+                <article
+                  key={
+                    `${question}-${index}`
                   }
-                `}
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleToggle(index)
+                  data-aos="fade-up"
+                  data-aos-delay={
+                    index * 50
                   }
-                  aria-expanded={isOpen}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    justify-between
-                    gap-4
-                    px-4
-                    py-4
-                    text-left
-                    sm:px-5
-                    sm:py-5
-                  "
+                  className={`
+                    overflow-hidden
+                    rounded-[18px]
+                    border
+                    bg-white
+                    transition-all
+                    duration-300
+
+                    ${
+                      isOpen
+                        ? `
+                            border-[#087ee9]/20
+                            shadow-[0_14px_35px_rgba(8,126,233,0.08)]
+                          `
+                        : `
+                            border-[#e1ebf5]
+                            shadow-[0_6px_18px_rgba(15,58,110,0.04)]
+                          `
+                    }
+                  `}
                 >
-                  <div
+                  {/* QUESTION */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleToggle(
+                        index
+                      )
+                    }
+                    aria-expanded={
+                      isOpen
+                    }
                     className="
                       flex
-                      min-w-0
+                      w-full
                       items-center
-                      gap-3
-                      sm:gap-4
+                      justify-between
+                      gap-4
+                      px-4
+                      py-4
+                      text-left
+                      sm:px-5
+                      sm:py-5
                     "
                   >
-                    {/* Number */}
+                    <div
+                      className="
+                        flex
+                        min-w-0
+                        items-center
+                        gap-3
+                        sm:gap-4
+                      "
+                    >
+                      {/* NUMBER */}
+
+                      <span
+                        className={`
+                          flex
+                          h-9
+                          w-9
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-xl
+                          text-[11px]
+                          font-black
+                          transition-all
+                          duration-300
+
+                          ${
+                            isOpen
+                              ? `
+                                  bg-gradient-to-br
+                                  from-[#087ee9]
+                                  to-[#5b42e8]
+                                  text-white
+                                  shadow-[0_6px_15px_rgba(8,126,233,0.22)]
+                                `
+                              : `
+                                  bg-[#edf6ff]
+                                  text-[#087ee9]
+                                `
+                          }
+                        `}
+                      >
+                        {String(
+                          index + 1
+                        ).padStart(
+                          2,
+                          "0"
+                        )}
+                      </span>
+
+                      {/* QUESTION TEXT */}
+
+                      <h3
+                        className="
+                          text-[13px]
+                          font-extrabold
+                          leading-5
+                          text-[#0b216c]
+                          sm:text-[15px]
+                          sm:leading-6
+                        "
+                      >
+                        {question}
+                      </h3>
+                    </div>
+
+                    {/* ARROW */}
+
                     <span
                       className={`
                         flex
@@ -254,130 +397,89 @@ export default function KPSCFAQ() {
                         shrink-0
                         items-center
                         justify-center
-                        rounded-xl
-                        text-[11px]
-                        font-black
+                        rounded-full
                         transition-all
                         duration-300
 
                         ${
                           isOpen
                             ? `
-                              bg-gradient-to-br
-                              from-[#087ee9]
-                              to-[#5b42e8]
-                              text-white
-                              shadow-[0_6px_15px_rgba(8,126,233,0.22)]
-                            `
+                                rotate-180
+                                bg-[#087ee9]
+                                text-white
+                              `
                             : `
-                              bg-[#edf6ff]
-                              text-[#087ee9]
-                            `
+                                bg-[#f1f6fb]
+                                text-[#637797]
+                              `
                         }
                       `}
                     >
-                      {String(
-                        index + 1
-                      ).padStart(2, "0")}
+                      <ChevronDown
+                        className="
+                          h-4
+                          w-4
+                        "
+                      />
                     </span>
+                  </button>
 
-                    <h3
-                      className="
-                        text-[13px]
-                        font-extrabold
-                        leading-5
-                        text-[#0b216c]
-                        sm:text-[15px]
-                        sm:leading-6
-                      "
-                    >
-                      {faq.question}
-                    </h3>
-                  </div>
+                  {/* ANSWER */}
 
-                  {/* Arrow */}
-                  <span
+                  <div
                     className={`
-                      flex
-                      h-9
-                      w-9
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-full
+                      grid
                       transition-all
                       duration-300
+                      ease-in-out
 
                       ${
                         isOpen
                           ? `
-                            rotate-180
-                            bg-[#087ee9]
-                            text-white
-                          `
+                              grid-rows-[1fr]
+                              opacity-100
+                            `
                           : `
-                            bg-[#f1f6fb]
-                            text-[#637797]
-                          `
+                              grid-rows-[0fr]
+                              opacity-0
+                            `
                       }
                     `}
                   >
-                    <ChevronDown
-                      className="h-4 w-4"
-                    />
-                  </span>
-                </button>
-
-                {/* Answer */}
-                <div
-                  className={`
-                    grid
-                    transition-all
-                    duration-300
-                    ease-in-out
-
-                    ${
-                      isOpen
-                        ? `
-                          grid-rows-[1fr]
-                          opacity-100
-                        `
-                        : `
-                          grid-rows-[0fr]
-                          opacity-0
-                        `
-                    }
-                  `}
-                >
-                  <div className="overflow-hidden">
                     <div
                       className="
-                        border-t
-                        border-[#edf2f8]
-                        px-4
-                        pb-5
-                        pt-4
-                        sm:ml-[52px]
-                        sm:px-5
+                        overflow-hidden
                       "
                     >
-                      <p
+                      <div
                         className="
-                          text-[12px]
-                          leading-6
-                          text-[#667ca0]
-                          sm:text-[14px]
-                          sm:leading-7
+                          border-t
+                          border-[#edf2f8]
+                          px-4
+                          pb-5
+                          pt-4
+                          sm:ml-[52px]
+                          sm:px-5
                         "
                       >
-                        {faq.answer}
-                      </p>
+                        <p
+                          className="
+                            text-[12px]
+                            leading-6
+                            text-[#667ca0]
+                            sm:text-[14px]
+                            sm:leading-7
+                          "
+                        >
+                          {answer}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            );
-          })}
+                </article>
+              );
+            }
+          )}
         </div>
       </div>
     </section>
