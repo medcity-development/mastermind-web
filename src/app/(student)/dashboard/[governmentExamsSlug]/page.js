@@ -8,7 +8,7 @@ import {
 
 import DashboardHero from "../common-components/DashboardHero";
 import DashboardStats from "../common-components/DashboardStats";
-import DashboardQuickActions from "../common-components/DashboardQuickActions";
+import LearningToolsGrid from "./learning-tools-grid/LearningToolsGrid";
 
 export default async function DashboardPage({
   params,
@@ -52,7 +52,7 @@ export default async function DashboardPage({
           config={config}
         />
 
-        <DashboardQuickActions
+        <LearningToolsGrid
           config={config}
           uid={uid}
         />
