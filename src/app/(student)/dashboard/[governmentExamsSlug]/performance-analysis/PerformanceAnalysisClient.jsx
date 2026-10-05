@@ -11,7 +11,7 @@ import PerformanceSummaryGrid from "./components/PerformanceSummaryGrid";
 import AccuracyGrid from "./components/AccuracyGrid";
 import ExamHistorySection from "./components/ExamHistorySection";
 
-import ScoreTrendChart from "./components/score-trend/ScoreTrendChart";
+import ScoreTrendChart from "./score-trend/ScoreTrendChart";
 
 export default function PerformanceAnalysisClient({
   cid,

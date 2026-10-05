@@ -5,11 +5,11 @@ import {
   getPackagesList,
 } from "@/lib/packagesHelper";
 
-import PackageHero from "./PackageHero";
-import PackagePriceSection from "./PackagePriceSection";
-import PackageIncludesSection from "./PackageIncludesSection";
-import PackageCoursesSection from "./PackageCoursesSection";
-import PackageFAQ from "./PackageFAQ";
+import PackageHero from "../../competitive-exam-packs/[slug]/PackageHero";
+import PackagePriceSection from "../../competitive-exam-packs/[slug]/PackagePriceSection";
+import PackageIncludesSection from "../../competitive-exam-packs/[slug]/PackageIncludesSection";
+import PackageCoursesSection from "../../competitive-exam-packs/[slug]/PackageCoursesSection";
+import PackageFAQ from "../../competitive-exam-packs/[slug]/PackageFAQ";
 
 /* =========================================================
    METADATA
