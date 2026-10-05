@@ -17,6 +17,30 @@ export default function DashboardShell({
     setSidebarOpen,
   ] = useState(false);
 
+  /* =========================================================
+     OPEN MOBILE SIDEBAR
+  ========================================================= */
+
+  function handleOpenSidebar() {
+    setSidebarOpen(
+      true
+    );
+  }
+
+  /* =========================================================
+     CLOSE MOBILE SIDEBAR
+  ========================================================= */
+
+  function handleCloseSidebar() {
+    setSidebarOpen(
+      false
+    );
+  }
+
+  /* =========================================================
+     RENDER
+  ========================================================= */
+
   return (
     <div
       className="
@@ -24,31 +48,46 @@ export default function DashboardShell({
         bg-[#f4f7fc]
       "
     >
+      {/* =====================================================
+          SIDEBAR
+      ===================================================== */}
+
       <DashboardSidebar
         config={config}
+        user={user}
         mobileOpen={
           sidebarOpen
         }
-        onMobileClose={() =>
-          setSidebarOpen(false)
+        onMobileClose={
+          handleCloseSidebar
         }
       />
+
+      {/* =====================================================
+          MAIN CONTENT AREA
+      ===================================================== */}
 
       <div
         className="
           min-h-screen
+
           transition-all
           duration-300
 
           xl:pl-[270px]
         "
       >
+        {/* HEADER */}
+
         <DashboardHeader
+          config={config}
           user={user}
-          onMenuClick={() =>
-            setSidebarOpen(true)
+          onMenuClick={
+            handleOpenSidebar
           }
         />
+
+        {/* PAGE CONTENT */}
 
         <main
           className="

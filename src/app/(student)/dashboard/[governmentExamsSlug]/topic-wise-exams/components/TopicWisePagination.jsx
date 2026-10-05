@@ -9,10 +9,13 @@ import {
    CREATE PAGINATION URL
 ========================================================= */
 
-function createPageHref(page) {
+function createPageHref({
+  page,
+  governmentExamsSlug,
+}) {
   return {
     pathname:
-      "/dashboard/${governmentExamsSlug}/topic-wise-exams",
+      `/dashboard/${governmentExamsSlug}/topic-wise-exams`,
 
     query: {
       page:
@@ -79,6 +82,7 @@ function getVisiblePages(
 export default function TopicWisePagination({
   currentPage = 1,
   totalPages = 1,
+  governmentExamsSlug,
 }) {
   if (totalPages <= 1) {
     return null;
@@ -114,7 +118,11 @@ export default function TopicWisePagination({
       {hasPrevious ? (
         <Link
           href={createPageHref(
-            currentPage - 1
+            {
+              page:
+                currentPage - 1,
+              governmentExamsSlug,
+            }
           )}
           scroll
           className="
@@ -180,6 +188,9 @@ export default function TopicWisePagination({
             currentPage={
               currentPage
             }
+            governmentExamsSlug={
+              governmentExamsSlug
+            }
           />
 
           {pages[0] > 2 ? (
@@ -206,6 +217,9 @@ export default function TopicWisePagination({
             page={page}
             currentPage={
               currentPage
+            }
+            governmentExamsSlug={
+              governmentExamsSlug
             }
           />
         )
@@ -240,6 +254,9 @@ export default function TopicWisePagination({
             currentPage={
               currentPage
             }
+            governmentExamsSlug={
+              governmentExamsSlug
+            }
           />
         </>
       ) : null}
@@ -249,7 +266,11 @@ export default function TopicWisePagination({
       {hasNext ? (
         <Link
           href={createPageHref(
-            currentPage + 1
+            {
+              page:
+                currentPage + 1,
+              governmentExamsSlug,
+            }
           )}
           scroll
           className="
@@ -316,6 +337,7 @@ export default function TopicWisePagination({
 function PageButton({
   page,
   currentPage,
+  governmentExamsSlug,
 }) {
   const active =
     Number(page) ===
@@ -351,7 +373,10 @@ function PageButton({
   return (
     <Link
       href={createPageHref(
-        page
+        {
+          page,
+          governmentExamsSlug,
+        }
       )}
       scroll
       className="

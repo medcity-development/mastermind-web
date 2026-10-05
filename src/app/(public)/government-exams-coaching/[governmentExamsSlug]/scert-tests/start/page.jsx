@@ -7,7 +7,7 @@ import {
     getScertQuestions,
   } from "@/lib/scertHelper";
   
-  import ScertExamClient from "../../../start/components/ScertExamClient";
+  import ScertExamClient from "./components/ScertExamClient";
   
   export const metadata = {
     title:
@@ -54,7 +54,7 @@ import {
     ======================================================= */
   
     if (
-      !testSlug ||
+
       !examId ||
       !classId
     ) {

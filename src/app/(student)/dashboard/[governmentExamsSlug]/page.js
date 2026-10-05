@@ -6,9 +6,14 @@ import {
   getGovernmentExamConfig,
 } from "@/lib/governmentExamConfig";
 
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
 import DashboardHero from "../common-components/DashboardHero";
 import DashboardStats from "../common-components/DashboardStats";
 import LearningToolsGrid from "./learning-tools-grid/LearningToolsGrid";
+import ExamCategorySection from "./exam-category-section/ExamCategorySection";
 
 export default async function DashboardPage({
   params,
@@ -26,7 +31,19 @@ export default async function DashboardPage({
     notFound();
   }
 
-  const uid = 37515;
+  const session =
+    await getStudentSession();
+
+  const uid =
+    session?.uid;
+
+  const course = {
+    id:
+      config.cid,
+
+    exam:
+      config.name,
+  };
 
   return (
     <main
@@ -55,6 +72,14 @@ export default async function DashboardPage({
         <LearningToolsGrid
           config={config}
           uid={uid}
+        />
+
+        <ExamCategorySection
+          course={course}
+          uid={uid}
+          governmentExamsSlug={
+            config.slug
+          }
         />
       </div>
     </main>

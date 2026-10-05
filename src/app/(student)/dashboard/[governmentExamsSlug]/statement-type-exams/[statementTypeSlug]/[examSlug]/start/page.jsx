@@ -40,8 +40,8 @@ export default async function StatementTypeExamStartPage({
   /* =======================================================
      MAIN COURSE
 
-     kerala-psc -> cid 1
-     rrb-ssc    -> cid 2
+     cid comes from the private
+     dashboard exam config.
   ======================================================= */
 
   const config =

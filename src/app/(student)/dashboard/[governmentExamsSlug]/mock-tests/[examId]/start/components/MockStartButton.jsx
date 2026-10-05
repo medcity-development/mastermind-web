@@ -7,10 +7,8 @@ import {
 
 export default function MockStartButton({
   examId,
-  uid,
-  cid,
-  title = "",
   governmentExamsSlug,
+  examTitle = "",
 }) {
   if (
     !examId ||
@@ -26,7 +24,6 @@ export default function MockStartButton({
     <div
       className="
         mt-6
-
         flex
         justify-end
       "
@@ -36,18 +33,13 @@ export default function MockStartButton({
           pathname:
             startPath,
 
-          query: {
-            uid:
-              String(uid ?? 0),
-
-            cid:
-              String(cid ?? 0),
-
-            title:
-              String(
-                title ?? ""
-              ),
-          },
+          query:
+            examTitle
+              ? {
+                title:
+                  examTitle,
+              }
+              : {},
         }}
         className="
           group

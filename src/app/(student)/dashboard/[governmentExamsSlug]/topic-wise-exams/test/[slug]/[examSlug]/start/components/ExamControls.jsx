@@ -1,11 +1,15 @@
 import {
     CheckCircle2,
     Pause,
+    Play,
   } from "lucide-react";
   
-  export default function ExamControls({
+export default function ExamControls({
     onPause,
     onFinish,
+    saving = false,
+    submitted = false,
+    paused = false,
   }) {
     return (
       <section
@@ -63,6 +67,7 @@ import {
             <button
               type="button"
               onClick={onPause}
+              disabled={saving || submitted}
               className="
                 inline-flex
                 min-w-[145px]
@@ -80,18 +85,31 @@ import {
                 text-amber-700
                 transition
                 hover:bg-amber-100
+                disabled:cursor-not-allowed
+                disabled:opacity-60
               "
             >
-              <Pause
-                size={17}
-              />
+              {paused ? (
+                <Play
+                  size={17}
+                />
+              ) : (
+                <Pause
+                  size={17}
+                />
+              )}
   
-              Pause Exam
+              {saving
+                ? "Saving..."
+                : paused
+                  ? "Resume Exam"
+                  : "Pause Exam"}
             </button>
   
             <button
               type="button"
               onClick={onFinish}
+              disabled={saving || submitted}
               className="
                 inline-flex
                 min-w-[145px]
@@ -109,13 +127,17 @@ import {
                 font-bold
                 text-white
                 shadow-[0_8px_20px_rgba(7,95,200,0.18)]
+                disabled:cursor-not-allowed
+                disabled:opacity-60
               "
             >
               <CheckCircle2
                 size={17}
               />
   
-              Finish Exam
+              {saving
+                ? "Saving..."
+                : submitted ? "Submitted" : "Submit Exam"}
             </button>
           </div>
         </div>

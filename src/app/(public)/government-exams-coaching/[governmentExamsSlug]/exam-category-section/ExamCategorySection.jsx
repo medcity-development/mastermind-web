@@ -134,7 +134,7 @@ export default function ExamCategorySection({
           if (!response.ok) {
             throw new Error(
               result?.message ||
-                "Unable to load exam categories."
+              "Unable to load exam categories."
             );
           }
 
@@ -152,7 +152,7 @@ export default function ExamCategorySection({
           setFilePath(
             String(
               result?.file_path ??
-                ""
+              ""
             )
           );
         } catch (error) {
@@ -173,7 +173,7 @@ export default function ExamCategorySection({
 
           setError(
             error?.message ||
-              "Unable to load exam categories."
+            "Unable to load exam categories."
           );
         } finally {
           setLoading(false);
@@ -383,7 +383,7 @@ export default function ExamCategorySection({
               hover:shadow-[0_10px_24px_rgba(22,79,165,0.18)]
             "
           >
-            View All Exams
+            choose an exam
 
             <ArrowRight
               className="
@@ -414,7 +414,7 @@ export default function ExamCategorySection({
 
           {loading &&
             categories.length ===
-              0 &&
+            0 &&
             Array.from({
               length: 4,
             }).map(
@@ -461,7 +461,7 @@ export default function ExamCategorySection({
           {!loading &&
             !error &&
             categories.length ===
-              0 && (
+            0 && (
               <div
                 className="
                   col-span-full
@@ -486,7 +486,7 @@ export default function ExamCategorySection({
           {!loading &&
             error &&
             categories.length ===
-              0 && (
+            0 && (
               <div
                 className="
                   col-span-full

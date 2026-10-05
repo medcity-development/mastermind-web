@@ -6,12 +6,14 @@ import {
   export default function ExamPause({
     onPause,
     saving = false,
+    paused = false,
+    disabled = false,
   }) {
     return (
       <button
         type="button"
         onClick={onPause}
-        disabled={saving}
+        disabled={saving || disabled}
         className="
           inline-flex
           min-h-[46px]
@@ -49,7 +51,7 @@ import {
   
         {saving
           ? "Saving..."
-          : "Pause Exam"}
+          : paused ? "Resume Exam" : "Pause Exam"}
       </button>
     );
   }

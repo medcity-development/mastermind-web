@@ -1,5 +1,6 @@
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -7,11 +8,18 @@ import {
 } from "@/lib/governmentExamConfig";
 
 import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
+import {
   getMockExamSubCategories,
 } from "@/lib/pscApi";
 
 import MockTestHero from "./components/MockTestHero";
 import MockTestContent from "./components/MockTestContent";
+
+export const dynamic =
+  "force-dynamic";
 
 /* =========================================================
    METADATA
@@ -58,6 +66,10 @@ export default async function MockTestsPage({
     governmentExamsSlug,
   } = await params;
 
+  /* =======================================================
+     CONFIG
+  ======================================================= */
+
   const config =
     getGovernmentExamConfig(
       governmentExamsSlug
@@ -67,38 +79,87 @@ export default async function MockTestsPage({
     notFound();
   }
 
-  const {
-    cid,
-    name,
-    shortName,
-  } = config;
+  const cid =
+    Number(
+      config?.cid
+    );
 
-  /*
-   * TEMPORARY.
-   *
-   * Replace this later with the logged-in
-   * student's uid from your auth/session.
-   */
-  const uid = 37515;
+  if (
+    !Number.isFinite(cid) ||
+    cid <= 0
+  ) {
+    notFound();
+  }
+
+  const name =
+    config?.name || "";
+
+  const shortName =
+    config?.shortName ||
+    name;
+
+  /* =======================================================
+     SESSION
+  ======================================================= */
+
+  const session =
+    await getStudentSession();
+
+  const uid =
+    Number(
+      session?.uid
+    );
+
+  if (
+    !Number.isFinite(uid) ||
+    uid <= 0
+  ) {
+    const redirectPath =
+      `/dashboard/${governmentExamsSlug}/mock-tests`;
+
+    redirect(
+      `/login?redirect=${encodeURIComponent(
+        redirectPath
+      )}`
+    );
+  }
 
   /* =======================================================
      CATEGORIES
   ======================================================= */
 
-  let categoryResult = null;
+  let categoryResult = {
+    status: false,
+    categories: [],
+    message: "",
+  };
 
   try {
     categoryResult =
       await getMockExamSubCategories({
         cid,
         uid,
+
+        /*
+         * Your existing backend request
+         * uses subid=2 for this category API.
+         */
         subId: 2,
       });
   } catch (error) {
     console.error(
-      `Unable to load ${name} mock categories:`,
+      "MOCK CATEGORY PAGE ERROR:",
       error
     );
+
+    categoryResult = {
+      status: false,
+      categories: [],
+
+      message:
+        error?.message ||
+        "Unable to load mock tests.",
+    };
   }
 
   const categories =
@@ -112,61 +173,35 @@ export default async function MockTestsPage({
      HERO
   ======================================================= */
 
-  const isKeralaPsc =
-    Number(cid) === 1;
+  const heroContent = {
+    eyebrow:
+      `${name} Practice Zone`,
 
-  const heroContent =
-    isKeralaPsc
-      ? {
-          eyebrow:
-            `${name} Practice Zone`,
+    headingPrefix:
+      "Practice Smarter With",
 
-          headingPrefix:
-            "Practice Smarter With",
+    headingHighlight:
+      `${name} Mock Tests`,
 
-          headingHighlight:
-            `${name} Mock Tests`,
+    description:
+      `Practice exam-focused ${name} mock tests, improve speed and accuracy, and prepare confidently for upcoming competitive exams.`,
 
-          description:
-            `Practice exam-focused ${name} mock tests, improve speed and accuracy, and prepare confidently for upcoming exams.`,
+    panelEyebrow:
+      "Ready to Practice?",
 
-          panelEyebrow:
-            "Ready to Practice?",
+    panelTitle:
+      "Choose Your Exam",
 
-          panelTitle:
-            "Choose Your Level",
+    panelDescription:
+      `Choose an available ${name} exam category and start practicing.`,
 
-          panelDescription:
-            `Select your ${name} exam level and start practicing.`,
+    featureText:
+      `Practice consistently and track your performance across ${name} mock exams.`,
+  };
 
-          featureText:
-            `Practice consistently and track your performance across ${name} mock exams.`,
-        }
-      : {
-          eyebrow:
-            `${name} Practice Zone`,
-
-          headingPrefix:
-            "Practice Smarter With",
-
-          headingHighlight:
-            `${name} Mock Tests`,
-
-          description:
-            `Practice exam-focused ${name} mock tests, improve your speed and accuracy, and prepare confidently for competitive exams.`,
-
-          panelEyebrow:
-            "Ready to Practice?",
-
-          panelTitle:
-            "Choose Your Exam",
-
-          panelDescription:
-            `Choose an available ${name} category and start practicing.`,
-
-          featureText:
-            `Practice consistently and track your performance across ${name} mock exams.`,
-        };
+  /* =======================================================
+     UI
+  ======================================================= */
 
   return (
     <main
@@ -189,20 +224,43 @@ export default async function MockTestsPage({
         "
       >
         <MockTestHero
-          examName={name}
-          shortName={shortName}
-          heroContent={heroContent}
+          examName={
+            name
+          }
+          shortName={
+            shortName
+          }
+          heroContent={
+            heroContent
+          }
         />
 
         <MockTestContent
-          cid={cid}
-          uid={uid}
-          examName={name}
-          shortName={shortName}
+          cid={
+            cid
+          }
+          uid={
+            uid
+          }
+          examName={
+            name
+          }
+          shortName={
+            shortName
+          }
           governmentExamsSlug={
             governmentExamsSlug
           }
-          categories={categories}
+          categories={
+            categories
+          }
+          initialError={
+            categoryResult?.status ===
+            false
+              ? categoryResult?.message ||
+                ""
+              : ""
+          }
         />
       </div>
     </main>

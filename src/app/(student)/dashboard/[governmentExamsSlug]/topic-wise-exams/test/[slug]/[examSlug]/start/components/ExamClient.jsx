@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -16,6 +17,124 @@ import ExamControls from "./ExamControls";
 const QUESTIONS_PER_PAGE =
   10;
 
+function formatExamArray(values) {
+  return `[${values.join(", ")}]`;
+}
+
+function getCorrectAnswer(question) {
+  return (
+    question?.answerkey ||
+    question?.answer ||
+    question?.correct_answer ||
+    question?.correctAnswer ||
+    question?.right_answer ||
+    question?.ans ||
+    ""
+  );
+}
+
+function getAttemptId(result) {
+  return (
+    result?.pauseid ??
+    result?.pause_id ??
+    result?.id ??
+    result?.last_id ??
+    result?.lastid ??
+    result?.insert_id ??
+    result?.data?.pauseid ??
+    result?.data?.pause_id ??
+    result?.data?.id ??
+    result?.data?.last_id ??
+    result?.data?.lastid ??
+    result?.data?.insert_id ??
+    (Array.isArray(result?.data)
+      ? result.data[0]?.id
+      : null) ??
+    null
+  );
+}
+
+function saveAttemptHistory({
+  cid,
+  uid,
+  attemptId,
+  examId,
+  examType,
+  status,
+  title,
+}) {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return;
+  }
+
+  const key =
+    `exam_attempt_history_${uid}_${cid}`;
+
+  const current =
+    JSON.parse(
+      window.localStorage.getItem(
+        key
+      ) || "[]"
+    );
+
+  const next = [
+    {
+      attemptId,
+      examId,
+      examType,
+      status,
+      title,
+      updatedAt:
+        new Date().toISOString(),
+    },
+    ...current.filter(
+      (item) =>
+        String(item.attemptId) !==
+        String(attemptId)
+    ),
+  ];
+
+  window.localStorage.setItem(
+    key,
+    JSON.stringify(
+      next.slice(0, 50)
+    )
+  );
+}
+
+async function sendAttemptRequest({
+  endpoint,
+  payload,
+  throwOnError = true,
+}) {
+  const response =
+    await fetch(endpoint, {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body:
+        JSON.stringify(payload),
+    });
+
+  if (
+    !response.ok &&
+    throwOnError
+  ) {
+    throw new Error(
+      "Unable to save exam attempt."
+    );
+  }
+
+  return response.json();
+}
+
 export default function ExamClient({
   exam,
   questions = [],
@@ -27,6 +146,10 @@ export default function ExamClient({
   examSlug,
   governmentExamsSlug,
 }) {
+  const [submitted, setSubmitted] = useState(false);
+  const requestRef = useRef(false);
+  const timeoutRef = useRef(false);
+
   /* =====================================================
      PAGE
   ===================================================== */
@@ -44,6 +167,36 @@ export default function ExamClient({
     answers,
     setAnswers,
   ] = useState({});
+
+  const [
+    pauseId,
+    setPauseId,
+  ] = useState(null);
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    saveMessage,
+    setSaveMessage,
+  ] = useState("");
+
+  const [
+    saveError,
+    setSaveError,
+  ] = useState("");
+
+  const [
+    analytics,
+    setAnalytics,
+  ] = useState(null);
+
+  const [
+    isPaused,
+    setIsPaused,
+  ] = useState(false);
 
   /* =====================================================
      EXAM DURATION
@@ -70,7 +223,13 @@ export default function ExamClient({
   const [
     endTime,
     setEndTime,
-  ] = useState(null);
+  ] = useState(() =>
+    durationSeconds > 0
+      ? Date.now() +
+        durationSeconds *
+          1000
+      : null
+  );
 
   const [
     timeLeft,
@@ -78,38 +237,6 @@ export default function ExamClient({
   ] = useState(
     durationSeconds
   );
-
-  /*
-    Start timer once the
-    exam component mounts.
-  */
-
-  useEffect(() => {
-    if (
-      durationSeconds <= 0
-    ) {
-      setTimeLeft(0);
-      setEndTime(null);
-
-      return;
-    }
-
-    const nextEndTime =
-      Date.now() +
-      durationSeconds *
-        1000;
-
-    setEndTime(
-      nextEndTime
-    );
-
-    setTimeLeft(
-      durationSeconds
-    );
-  }, [
-    exam?.id,
-    durationSeconds,
-  ]);
 
   /*
     Timer is calculated from
@@ -120,7 +247,12 @@ export default function ExamClient({
   */
 
   useEffect(() => {
-    if (!endTime) {
+    if (
+      !endTime ||
+      submitted ||
+      saving ||
+      isPaused
+    ) {
       return;
     }
 
@@ -153,7 +285,12 @@ export default function ExamClient({
         timer
       );
     };
-  }, [endTime]);
+  }, [
+    endTime,
+    submitted,
+    saving,
+    isPaused,
+  ]);
 
   /* =====================================================
      PAGINATION
@@ -206,7 +343,10 @@ export default function ExamClient({
     questionId,
     answer
   ) {
-    if (isTimeOver) {
+    if (
+      submitted || saving || isTimeOver ||
+      isPaused
+    ) {
       return;
     }
 
@@ -264,20 +404,358 @@ export default function ExamClient({
   }
 
   /* =====================================================
-     PAUSE
+     ATTEMPT PAYLOAD
   ===================================================== */
 
-  function handlePause() {
-    return null;
+  function buildAttemptPayload(
+    examStatus
+  ) {
+    const answerArray =
+      questions.map(
+        (question) =>
+          getCorrectAnswer(
+            question
+          ) || 0
+      );
+
+    const userAnswers =
+      questions.map(
+        (question) =>
+          answers[question.id] ||
+          0
+      );
+
+    const totalCorrect =
+      userAnswers.filter(
+        (answer, index) =>
+          answer !== 0 &&
+          String(answer) ===
+            String(
+              answerArray[index]
+            )
+      ).length;
+
+    const totalAttempted =
+      userAnswers.filter(
+        (answer) =>
+          answer !== 0
+      ).length;
+
+    const totalWrong =
+      Math.max(
+        0,
+        totalAttempted -
+          totalCorrect
+      );
+
+    const totalMark =
+      Number(
+        exam?.total_mark
+      ) ||
+      questions.length ||
+      0;
+
+    const minusMark =
+      Number(
+        exam?.minus_mark ??
+          exam?.negative_mark
+      ) || 0;
+
+    const pausedTime = timeLeft;
+
+    return {
+      cid:
+        String(cid),
+      uid:
+        String(uid),
+
+      exam_status:
+        examStatus,
+
+      lastposition:
+        examType || "twe",
+
+      exam_id:
+        String(
+          exam?.id
+        ),
+
+      exam_type:
+        examType || "twe",
+
+      total_questions:
+        String(
+          questions.length
+        ),
+
+      paused_time:
+        String(pausedTime),
+
+      total_mark:
+        String(totalMark),
+
+      user_score:
+        examStatus === "pause"
+          ? "0"
+          : String(totalCorrect),
+
+      minus_mark:
+        examStatus === "pause"
+          ? "0"
+          : String(minusMark),
+
+      answer_array:
+        formatExamArray(
+          answerArray
+        ),
+
+      user_answers:
+        formatExamArray(
+          userAnswers
+        ),
+
+      total_wrong:
+        examStatus === "pause"
+          ? ""
+          : String(totalWrong),
+
+      total_correct:
+        examStatus === "pause"
+          ? ""
+          : String(totalCorrect),
+
+      total_attempted:
+        examStatus === "pause"
+          ? ""
+          : String(totalAttempted),
+    };
   }
 
   /* =====================================================
-     FINISH
+     SAVE ATTEMPT
   ===================================================== */
 
-  function handleFinish() {
-    return null;
+  async function saveAttempt(
+    examStatus
+  ) {
+    if (requestRef.current || submitted) {
+      return;
+    }
+
+    if (
+      !uid ||
+      !cid ||
+      !exam?.id
+    ) {
+      setSaveError(
+        "Unable to save attempt. Session or exam data is missing."
+      );
+
+      return;
+    }
+
+    try {
+      requestRef.current = true;
+      setSaving(true);
+      setSaveError("");
+      setSaveMessage("");
+
+      const payload =
+        buildAttemptPayload(
+          examStatus
+        );
+
+      const shouldUpdate =
+        Boolean(pauseId);
+
+      const endpoint =
+        shouldUpdate
+          ? "/api/exam-attempt/update"
+          : "/api/exam-attempt/create";
+
+      const result =
+        await sendAttemptRequest({
+          endpoint,
+          payload:
+            shouldUpdate
+              ? {
+                  ...payload,
+                  pauseid:
+                    pauseId,
+                }
+              : payload,
+        });
+
+      if (
+        result?.status === false
+      ) {
+        setSaveError(
+          result?.message ||
+            result?.msg ||
+            "Backend did not save this attempt."
+        );
+
+        return;
+      }
+
+      const nextPauseId =
+        pauseId || getAttemptId(result);
+
+      if (!nextPauseId && examStatus === "pause") throw new Error("The service did not return an attempt ID. Please retry.");
+
+      if (nextPauseId) {
+        setPauseId(
+          nextPauseId
+        );
+
+        try { saveAttemptHistory({
+          cid,
+          uid,
+          attemptId:
+            nextPauseId,
+          examId:
+            exam?.id,
+          examType:
+            examType || "twe",
+          status:
+            examStatus,
+          title:
+            exam?.exam_name ||
+            exam?.exam ||
+            "Topic Wise Exam",
+        }); } catch { /* Saving history locally is optional. */ }
+      }
+
+      if (
+        examStatus ===
+        "completed"
+      ) {
+        setSubmitted(true);
+        try { localStorage.removeItem(draftKey); } catch {}
+        try {
+          const analyticsResponse =
+            await sendAttemptRequest({
+              endpoint:
+                "/api/exam-attempt/analytics",
+
+              throwOnError:
+                false,
+
+              payload: {
+                cid,
+                uid,
+                exam_id:
+                  exam?.id,
+                exam_type:
+                  examType || "twe",
+              },
+            });
+
+          const detailResponse =
+            nextPauseId
+              ? await sendAttemptRequest({
+                  endpoint:
+                    "/api/exam-attempt/analytics-details",
+
+                  throwOnError:
+                    false,
+
+                  payload: {
+                    cid,
+                    uid,
+                    id:
+                      nextPauseId,
+                    exam_type:
+                      examType || "twe",
+                  },
+                })
+              : null;
+
+          setAnalytics({
+            analytics:
+              analyticsResponse,
+            details:
+              detailResponse,
+          });
+        } catch (analyticsError) {
+          console.error(
+            "TOPIC RESULT LOAD ERROR:",
+            analyticsError
+          );
+        }
+      } else {
+        setIsPaused(true);
+        try { localStorage.setItem(draftKey, JSON.stringify({ answers, pauseId: nextPauseId, timeLeft, currentPage })); } catch {}
+      }
+
+      setSaveError("");
+
+      setSaveMessage(
+        examStatus ===
+          "completed"
+          ? "Exam submitted successfully."
+          : "Exam paused successfully."
+      );
+    } catch (error) {
+      console.error(
+        "TOPIC EXAM SAVE ERROR:",
+        error
+      );
+
+      setSaveError(
+        error?.message ||
+          "Unable to save attempt."
+      );
+    } finally {
+      requestRef.current = false;
+      setSaving(false);
+    }
   }
+
+  function handlePause() {
+    if (submitted || requestRef.current) return;
+    if (isPaused) {
+      // This runs only from the Resume button event.
+      // eslint-disable-next-line react-hooks/purity
+      setEndTime(Date.now() + timeLeft * 1000);
+      setIsPaused(false);
+      setSaveMessage(
+        "Exam resumed."
+      );
+      setSaveError("");
+      return;
+    }
+
+    saveAttempt("pause");
+  }
+
+  function handleFinish() {
+
+    saveAttempt(
+      "completed"
+    );
+  }
+
+  const draftKey = `exam_draft_${uid}_${cid}_${examType}_${exam?.id}`;
+  useEffect(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
+      if (!draft) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAnswers(draft.answers || {});
+      setPauseId(draft.pauseId);
+      setTimeLeft(draft.timeLeft);
+      setCurrentPage(draft.currentPage || 1);
+      setIsPaused(true);
+    } catch {}
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!isTimeOver || submitted || saving || timeoutRef.current) return;
+    timeoutRef.current = true;
+    // Submission is an external persistence operation when the timer expires.
+    saveAttempt("completed");
+  });
 
   /* =====================================================
      UI
@@ -406,7 +884,8 @@ export default function ExamClient({
               handleAnswer
             }
             disabled={
-              isTimeOver
+              submitted || saving || isTimeOver ||
+              isPaused
             }
             imagePath={
               imagePath
@@ -433,17 +912,175 @@ export default function ExamClient({
 
           {/* ALWAYS VISIBLE */}
 
-          <ExamControls
+          <ExamControls submitted={submitted}
             onPause={
               handlePause
             }
             onFinish={
               handleFinish
             }
+            saving={
+              saving
+            }
+            paused={
+              isPaused
+            }
           />
+
+          {saveMessage ? (
+            <div
+              className="
+                mt-4
+                rounded-[14px]
+                border
+                border-emerald-200
+                bg-emerald-50
+                px-4
+                py-3
+                text-sm
+                font-bold
+                text-emerald-700
+              "
+            >
+              {saveMessage}
+            </div>
+          ) : null}
+
+          {saveError ? (
+            <div
+              className="
+                mt-4
+                rounded-[14px]
+                border
+                border-red-200
+                bg-red-50
+                px-4
+                py-3
+                text-sm
+                font-bold
+                text-red-700
+              "
+            >
+              {saveError}
+            </div>
+          ) : null}
+
+          {analytics ? (
+            <div
+              className="
+                mt-4
+                rounded-[18px]
+                border
+                border-[#dce8f7]
+                bg-white
+                p-5
+                text-sm
+                text-slate-700
+                shadow-sm
+              "
+            >
+              <p
+                className="
+                  font-black
+                  text-[#071f55]
+                "
+              >
+                Exam Result
+              </p>
+
+              <div
+                className="
+                  mt-3
+                  grid
+                  gap-3
+                  sm:grid-cols-4
+                "
+              >
+                <ResultStat
+                  label="Attempted"
+                  value={
+                    analytics
+                      ?.details
+                      ?.details?.[0]
+                      ?.total_attempted ??
+                    answeredCount
+                  }
+                />
+                <ResultStat
+                  label="Correct"
+                  value={
+                    analytics
+                      ?.details
+                      ?.details?.[0]
+                      ?.total_correct ??
+                    "-"
+                  }
+                />
+                <ResultStat
+                  label="Wrong"
+                  value={
+                    analytics
+                      ?.details
+                      ?.details?.[0]
+                      ?.total_wrong ??
+                    "-"
+                  }
+                />
+                <ResultStat
+                  label="Score"
+                  value={
+                    analytics
+                      ?.details
+                      ?.details?.[0]
+                      ?.user_score ??
+                    "-"
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </main>
 
     </>
+  );
+}
+
+function ResultStat({
+  label,
+  value,
+}) {
+  return (
+    <div
+      className="
+        rounded-[14px]
+        border
+        border-[#dce8f7]
+        bg-[#f8fbff]
+        p-4
+      "
+    >
+      <p
+        className="
+          text-[10px]
+          font-black
+          uppercase
+          tracking-[0.12em]
+          text-slate-400
+        "
+      >
+        {label}
+      </p>
+      <p
+        className="
+          mt-1
+          text-xl
+          font-black
+          text-[#071f55]
+        "
+      >
+        {value}
+      </p>
+    </div>
   );
 }

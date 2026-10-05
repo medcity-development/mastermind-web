@@ -5,6 +5,10 @@ import {
   useState,
 } from "react";
 
+import {
+  AlertCircle,
+} from "lucide-react";
+
 import MockTestHeader from "./MockTestHeader";
 import MockTestInstructions from "./MockTestInstructions";
 import MockStartButton from "./MockStartButton";
@@ -13,10 +17,10 @@ export default function MockTestDetails({
   examId,
   uid,
   cid,
-  examTitle = "",
-  examName,
-  shortName,
+  examName = "",
+  shortName = "",
   governmentExamsSlug,
+  examTitle = "",
 }) {
   const [
     exam,
@@ -71,13 +75,31 @@ export default function MockTestDetails({
             }
           );
 
-        const result =
-          await response.json();
+        const raw =
+          await response.text();
 
-        if (!response.ok) {
+        let result;
+
+        try {
+          result =
+            raw
+              ? JSON.parse(raw)
+              : {};
+        } catch {
+          throw new Error(
+            "Mock test details API returned invalid JSON."
+          );
+        }
+
+        if (
+          !response.ok ||
+          result?.status ===
+          false
+        ) {
           throw new Error(
             result?.message ||
-              "Unable to load mock test."
+            result?.msg ||
+            "Unable to load mock test."
           );
         }
 
@@ -86,9 +108,12 @@ export default function MockTestDetails({
             result?.exam
           )
             ? result.exam[0] ??
-              null
-            : result?.exam ??
-              null;
+            null
+            : result?.exam &&
+              typeof result.exam ===
+              "object"
+              ? result.exam
+              : null;
 
         const instructionData =
           Array.isArray(
@@ -97,6 +122,12 @@ export default function MockTestDetails({
             ? result.data
             : [];
 
+        if (!examData) {
+          throw new Error(
+            "Mock test details were not returned."
+          );
+        }
+
         setExam(
           examData
         );
@@ -104,22 +135,24 @@ export default function MockTestDetails({
         setInstructions(
           instructionData
         );
-      } catch (error) {
+      } catch (
+      loadError
+      ) {
         if (
-          error?.name ===
+          loadError?.name ===
           "AbortError"
         ) {
           return;
         }
 
         console.error(
-          "Dashboard mock test details:",
-          error
+          "MOCK TEST DETAILS:",
+          loadError
         );
 
         setError(
-          error?.message ||
-            "Unable to load mock test."
+          loadError?.message ||
+          "Unable to load mock test."
         );
       } finally {
         if (
@@ -131,7 +164,13 @@ export default function MockTestDetails({
       }
     }
 
-    loadDetails();
+    if (
+      examId &&
+      uid &&
+      cid
+    ) {
+      loadDetails();
+    }
 
     return () => {
       controller.abort();
@@ -144,25 +183,14 @@ export default function MockTestDetails({
 
   if (loading) {
     return (
-      <div className="space-y-5">
-        <div
-          className="
-            h-[250px]
-            animate-pulse
-            rounded-[26px]
-            bg-slate-200
-          "
-        />
-
-        <div
-          className="
-            h-[200px]
-            animate-pulse
-            rounded-[24px]
-            bg-white
-          "
-        />
-      </div>
+      <div
+        className="
+          h-[300px]
+          animate-pulse
+          rounded-[26px]
+          bg-slate-200
+        "
+      />
     );
   }
 
@@ -179,9 +207,18 @@ export default function MockTestDetails({
           text-center
         "
       >
+        <AlertCircle
+          size={26}
+          className="
+            mx-auto
+            text-red-500
+          "
+        />
+
         <p
           className="
-            text-[13px]
+            mt-3
+            text-sm
             font-bold
             text-red-600
           "
@@ -192,6 +229,18 @@ export default function MockTestDetails({
     );
   }
 
+  const resolvedExamTitle =
+    String(
+      exam?.exam_name ??
+      exam?.examName ??
+      exam?.exam_title ??
+      exam?.examTitle ??
+      exam?.title ??
+      exam?.name ??
+      examTitle ??
+      ""
+    ).trim();
+
   const completeExam = {
     ...(exam || {}),
 
@@ -200,21 +249,32 @@ export default function MockTestDetails({
       examId,
 
     exam_name:
-      exam?.exam_name ||
-      examTitle ||
-      "",
+      resolvedExamTitle,
   };
 
   return (
     <>
       <MockTestHeader
-        exam={completeExam}
-        examName={examName}
+        exam={
+          completeExam
+        }
+        examName={
+          examName
+        }
+        shortName={
+          shortName
+        }
       />
 
-      <div className="mt-6">
+      <div
+        className="
+          mt-6
+        "
+      >
         <MockTestInstructions
-          exam={completeExam}
+          exam={
+            completeExam
+          }
           instructions={
             instructions
           }
@@ -222,16 +282,17 @@ export default function MockTestDetails({
       </div>
 
       <MockStartButton
-  examId={examId}
-  uid={uid}
-  cid={cid}
-  title={
-    completeExam?.exam_name
-  }
-  governmentExamsSlug={
-    governmentExamsSlug
-  }
-/>
+        examId={
+          examId
+        }
+        governmentExamsSlug={
+          governmentExamsSlug
+        }
+        examTitle={
+          completeExam?.exam_name ||
+          ""
+        }
+      />
     </>
   );
 }

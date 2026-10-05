@@ -58,6 +58,8 @@ export default function ExamClient({
 
     submitted,
     saving,
+    paused,
+    saveError,
 
     correctCount,
     wrongCount,
@@ -192,6 +194,8 @@ export default function ExamClient({
             HERO
         ================================================= */}
 
+        {saveError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{saveError}</p>}
+        {paused && <p role="status" className="rounded-xl bg-amber-50 p-4">Exam paused. Your answers and remaining time are saved.</p>}
         <ExamHero
           exam={exam}
           totalQuestions={
@@ -340,8 +344,7 @@ export default function ExamClient({
             ACTIONS
         ================================================= */}
 
-        {!submitted &&
-          !timerFinished && (
+        {!submitted && (
             <div
               className="
                 flex
@@ -354,7 +357,7 @@ export default function ExamClient({
             >
               {/* PAUSE */}
 
-              <ExamPause
+              <ExamPause paused={paused} disabled={timerFinished}
                 onPause={
                   handleExamPause
                 }
@@ -417,8 +420,7 @@ export default function ExamClient({
                   text-red-500
                 "
               >
-                Your exam is being
-                submitted automatically.
+                {saveError ? "Automatic submission failed. Use Submit to retry." : "Your exam is being submitted automatically."}
               </p>
             </div>
           )}

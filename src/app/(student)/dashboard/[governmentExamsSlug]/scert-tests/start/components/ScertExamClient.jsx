@@ -1,5 +1,7 @@
 "use client";
 
+import { getAttemptId, getResultArray, parseAnswers } from "@/lib/examAttemptData";
+
 import {
   useCallback,
   useEffect,
@@ -38,6 +40,9 @@ export default function ScertExamClient({
   initialPauseId = null,
   governmentExamsSlug,
 }) {
+  const draftKey = `exam_draft_${uid}_${cid}_${examType}_${exam?.id}`;
+  const [restoring, setRestoring] = useState(true);
+
   const router =
     useRouter();
 
@@ -130,6 +135,37 @@ export default function ScertExamClient({
 
   const submitInProgressRef =
     useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function restore() {
+      try {
+        let draft = null;
+        try { draft = JSON.parse(localStorage.getItem(draftKey) || "null"); } catch {}
+        if (mode === "resume" && initialPauseId) {
+          const response = await fetch("/api/exam-attempt/analytics-details", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cid, id: initialPauseId, exam_type: examType }),
+          });
+          const result = await response.json();
+          if (!response.ok || result.status === false) throw new Error(result.message || "Unable to restore exam.");
+          const row = getResultArray(result)[0];
+          if (!row) throw new Error("Saved exam answers were not returned. Please reopen the test.");
+          const values = parseAnswers(row.user_answers);
+          draft = { answers: Object.fromEntries(questions.map((q, i) => [String(q.id), values[i]]).filter(([, value]) => value && String(value) !== "0")), remainingSeconds: Number(row.paused_time), pauseId: initialPauseId, currentPage: 1 };
+        }
+        if (!cancelled && draft) {
+          setAnswers(draft.answers || {});
+          setPauseId(draft.pauseId);
+          setRemainingSeconds(Math.max(0, Math.min(fullDurationSeconds, Number(draft.remainingSeconds) || 0)));
+          setCurrentPage(draft.currentPage || 1);
+        }
+      } catch (error) { if (!cancelled) { setSaveError(error.message); setPaused(true); } }
+      finally { if (!cancelled) setRestoring(false); }
+    }
+    restore();
+    return () => { cancelled = true; };
+  }, [draftKey, mode, initialPauseId, cid, examType, questions, fullDurationSeconds]);
 
   /* =========================================================
      PAGINATION
@@ -363,8 +399,10 @@ export default function ScertExamClient({
               resultStats.correct
             ),
 
-          minus_mark:
-            "",
+          minus_mark: exam?.minus_mark ?? exam?.negative_mark ?? 0,
+          total_correct: resultStats.correct,
+          total_wrong: resultStats.wrong,
+          total_attempted: resultStats.attempted,
 
           answer_array:
             formatBackendArray(
@@ -384,7 +422,7 @@ export default function ScertExamClient({
         exam,
         examType,
         totalQuestions,
-        resultStats.correct,
+        resultStats,
         correctAnswers,
         userAnswersArray,
       ]
@@ -480,25 +518,19 @@ export default function ScertExamClient({
           );
         }
 
-        const newPauseId =
-          result?.pauseid ||
-          result?.pause_id ||
-          result?.id ||
-          null;
-
-        if (
-          newPauseId &&
-          !pauseId
-        ) {
-          setPauseId(
-            newPauseId
-          );
-        }
+        const newPauseId = pauseId || getAttemptId(result);
+        if (!newPauseId && status === "pause") throw new Error("The service did not return an attempt ID. Please retry.");
+        if (newPauseId) setPauseId(newPauseId);
+        try {
+          if (status === "pause") localStorage.setItem(draftKey, JSON.stringify({ answers, remainingSeconds: pausedTime, currentPage, pauseId: newPauseId }));
+          else localStorage.removeItem(draftKey);
+        } catch {}
 
         return result;
       },
       [
         createAttemptPayload,
+        draftKey, answers, currentPage,
         pauseId,
         resultStats,
       ]
@@ -708,6 +740,7 @@ export default function ScertExamClient({
 
   useEffect(() => {
     if (
+      restoring || saving || showPauseModal || showFinishModal ||
       paused ||
       submitted ||
       remainingSeconds <= 0
@@ -735,6 +768,7 @@ export default function ScertExamClient({
       );
     };
   }, [
+    restoring, saving, showPauseModal, showFinishModal,
     paused,
     submitted,
     remainingSeconds,
@@ -746,6 +780,7 @@ export default function ScertExamClient({
 
   useEffect(() => {
     if (
+      restoring || saving ||
       remainingSeconds !==
         0 ||
       submitted ||
@@ -762,7 +797,7 @@ export default function ScertExamClient({
         "timeout",
     });
   }, [
-    remainingSeconds,
+    restoring, saving, remainingSeconds,
     submitted,
     completeExam,
   ]);
@@ -840,6 +875,8 @@ export default function ScertExamClient({
             totalPages
           }
         />
+
+        {submitted && <div role="status" className="mt-5 rounded-xl bg-green-50 p-5 text-green-900">Exam submitted. Correct: {resultStats.correct} ? Wrong: {resultStats.wrong} ? Unanswered: {totalQuestions - resultStats.attempted}</div>}
 
         {/* =====================================================
             SAVE ERROR
@@ -957,7 +994,7 @@ export default function ScertExamClient({
               handleAnswer
             }
             disabled={
-              saving ||
+              restoring || remainingSeconds <= 0 || saving ||
               submitted ||
               paused
             }
@@ -981,7 +1018,7 @@ export default function ScertExamClient({
               handlePageChange
             }
             disabled={
-              saving ||
+              restoring || remainingSeconds <= 0 || saving ||
               submitted ||
               paused
             }
@@ -993,7 +1030,7 @@ export default function ScertExamClient({
 
           <ScertExamActions
             saving={
-              saving
+              saving || restoring
             }
             submitted={
               submitted

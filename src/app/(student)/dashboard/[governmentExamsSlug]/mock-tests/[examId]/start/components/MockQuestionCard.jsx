@@ -6,6 +6,7 @@ export default function MockQuestionCard({
   selectedAnswer,
   imagePath = "",
   onAnswer,
+  disabled = false,
 }) {
   if (!question) {
     return null;
@@ -235,10 +236,12 @@ export default function MockQuestionCard({
                     }
                     type="button"
                     onClick={() =>
+                      !disabled &&
                       onAnswer?.(
-                        option.key
-                      )
+                          option.key
+                        )
                     }
+                    disabled={disabled}
                     className={`
                       group
 
@@ -259,6 +262,8 @@ export default function MockQuestionCard({
 
                       transition-all
                       duration-200
+                      disabled:cursor-not-allowed
+                      disabled:opacity-70
 
                       ${
                         selected

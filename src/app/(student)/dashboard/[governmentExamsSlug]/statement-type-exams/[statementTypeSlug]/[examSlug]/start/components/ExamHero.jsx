@@ -17,6 +17,7 @@ export default function ExamHero({
   durationMinutes,
   statementTypeSlug,
   examSlug,
+  governmentExamsSlug,
 }) {
   const isTimeOver =
     durationMinutes > 0 &&

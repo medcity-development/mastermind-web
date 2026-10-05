@@ -7,9 +7,6 @@ import {
 
 export default function MockStartButton({
   examId,
-  uid,
-  cid,
-  title = "",
   governmentExamsSlug,
 }) {
   if (
@@ -31,24 +28,12 @@ export default function MockStartButton({
       "
     >
       <Link
-        href={{
-          pathname:
-            startPath,
-
-          query: {
-            uid:
-              String(uid),
-
-            cid:
-              String(cid),
-
-            title,
-          },
-        }}
+        href={startPath}
         className="
           group
+
           inline-flex
-          min-w-[180px]
+          min-w-[185px]
           items-center
           justify-center
           gap-2.5
@@ -58,7 +43,7 @@ export default function MockStartButton({
           bg-gradient-to-r
           from-[#0b216c]
           via-[#164fa5]
-          to-[#017cc0]
+          to-[#017dc0]
 
           px-7
           py-4
@@ -79,18 +64,26 @@ export default function MockStartButton({
         <span
           className="
             flex
-            h-7
-            w-7
+            h-8
+            w-8
             items-center
             justify-center
 
             rounded-full
 
+            border
+            border-white/10
+
             bg-white/15
+
+            transition-transform
+            duration-300
+
+            group-hover:scale-105
           "
         >
           <Play
-            size={12}
+            size={13}
             fill="currentColor"
           />
         </span>
@@ -101,6 +94,8 @@ export default function MockStartButton({
           size={15}
           className="
             transition-transform
+            duration-300
+
             group-hover:translate-x-1
           "
         />

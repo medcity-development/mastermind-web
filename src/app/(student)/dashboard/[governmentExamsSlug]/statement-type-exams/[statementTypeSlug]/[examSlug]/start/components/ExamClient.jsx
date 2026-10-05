@@ -1,5 +1,7 @@
 "use client";
 
+import { getAttemptId } from "@/lib/examAttemptData";
+
 import {
   useEffect,
   useMemo,
@@ -165,13 +167,12 @@ export default function ExamClient({
   ] = useState("");
 
   const [
-    attemptCreated,
-    setAttemptCreated,
-  ] = useState(
-    Boolean(
-      initialAttemptCreated
-    )
-  );
+    pauseId,
+    setPauseId,
+  ] = useState(null);
+
+  const requestRef = useRef(false);
+  const draftKey = `exam_draft_${uid}_${cid}_${examType}_${exam?.id}`;
 
   const timeOverHandled =
     useRef(false);
@@ -204,7 +205,13 @@ export default function ExamClient({
   const [
     endTime,
     setEndTime,
-  ] = useState(null);
+  ] = useState(() =>
+    durationSeconds > 0
+      ? Date.now() +
+        durationSeconds *
+          1000
+      : null
+  );
 
   const [
     timeLeft,
@@ -214,34 +221,17 @@ export default function ExamClient({
   );
 
   useEffect(() => {
-    timeOverHandled.current =
-      false;
-
-    if (
-      durationSeconds <= 0
-    ) {
-      setEndTime(null);
-      setTimeLeft(0);
-
-      return;
-    }
-
-    const deadline =
-      Date.now() +
-      durationSeconds *
-        1000;
-
-    setEndTime(
-      deadline
-    );
-
-    setTimeLeft(
-      durationSeconds
-    );
-  }, [
-    examId,
-    durationSeconds,
-  ]);
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
+      if (!draft) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAnswers(draft.answers || {});
+      setPauseId(draft.pauseId);
+      setTimeLeft(draft.timeLeft);
+      setEndTime(Date.now() + draft.timeLeft * 1000);
+      setCurrentPage(draft.currentPage || 1);
+    } catch {}
+  }, [draftKey]);
 
   useEffect(() => {
     if (!endTime) {
@@ -368,7 +358,7 @@ export default function ExamClient({
   function handlePage(
     page
   ) {
-    if (saving) {
+    if (requestRef.current) {
       return;
     }
 
@@ -541,6 +531,7 @@ export default function ExamClient({
     }
 
     try {
+      requestRef.current = true;
       setSaving(true);
       setSaveError("");
 
@@ -590,8 +581,7 @@ export default function ExamClient({
           ) ||
           questions.length,
 
-        paused_time:
-          elapsedSeconds,
+        paused_time: timeLeft,
 
         total_mark:
           Number(
@@ -604,8 +594,12 @@ export default function ExamClient({
         minus_mark:
           0,
 
-        answer_array:
-          answerArray,
+        answer_array: questions.map(getCorrectAnswer),
+        user_answers: answerArray.map((item) => item.answer || 0),
+        total_correct: correctAnswerArray.length,
+        total_wrong: wrongAnswerArray.length,
+        total_attempted: correctAnswerArray.length + wrongAnswerArray.length,
+        ...(pauseId ? { pauseid: pauseId } : {}),
 
         correct_answer_array:
           correctAnswerArray,
@@ -626,7 +620,7 @@ export default function ExamClient({
       ----------------------------------------------------- */
 
       if (
-        !attemptCreated
+        !pauseId
       ) {
         result =
           await sendAttemptRequest({
@@ -636,9 +630,9 @@ export default function ExamClient({
             payload,
           });
 
-        setAttemptCreated(
-          true
-        );
+        const id = getAttemptId(result);
+        if (!id && examStatus === "pause") throw new Error("Missing saved attempt ID. Please retry.");
+        setPauseId(id);
       }
 
       /* -----------------------------------------------------
@@ -659,6 +653,11 @@ export default function ExamClient({
         "STATEMENT EXAM SAVE RESULT:",
         result
       );
+
+      try {
+        if (examStatus === "pause") localStorage.setItem(draftKey, JSON.stringify({ answers, pauseId: pauseId || getAttemptId(result), timeLeft, currentPage }));
+        else localStorage.removeItem(draftKey);
+      } catch {}
 
       /* -----------------------------------------------------
          AFTER PAUSE
@@ -698,6 +697,7 @@ export default function ExamClient({
           "Unable to save exam."
       );
     } finally {
+      requestRef.current = false;
       setSaving(false);
     }
   }
@@ -787,6 +787,9 @@ export default function ExamClient({
             }
             examSlug={
               examSlug
+            }
+            governmentExamsSlug={
+              governmentExamsSlug
             }
           />
 

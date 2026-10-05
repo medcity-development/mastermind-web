@@ -71,7 +71,7 @@ async function postRequest({
     );
   }
 
-    const cleanEndpoint =
+  const cleanEndpoint =
     String(endpoint)
       .trim()
       .replace(/^\/+/, "");
@@ -79,7 +79,7 @@ async function postRequest({
   const url =
     `${apiBaseUrl}/${cleanEndpoint}`;
 
-  
+
   const formData =
     new FormData();
 
@@ -107,7 +107,7 @@ async function postRequest({
     }
   );
 
- 
+
   const fetchOptions = {
     method: "POST",
 
@@ -171,7 +171,7 @@ async function postRequest({
       "content-type"
     ) || "";
 
- 
+
   if (!text.trim()) {
     console.error(
       "PSC API EMPTY RESPONSE:",
@@ -199,7 +199,7 @@ async function postRequest({
     );
   }
 
-  
+
   let result;
 
   try {
@@ -266,7 +266,7 @@ async function postRequest({
     );
   }
 
- 
+
   if (!response.ok) {
     console.error(
       "PSC API HTTP ERROR:",
@@ -283,7 +283,7 @@ async function postRequest({
 
     throw new Error(
       result?.message ||
-        `${cleanEndpoint} failed with status ${response.status}.`
+      `${cleanEndpoint} failed with status ${response.status}.`
     );
   }
 
@@ -310,8 +310,8 @@ export async function getMainCourses() {
       filePath:
         String(
           result?.file_path ??
-            result?.icon_path ??
-            ""
+          result?.icon_path ??
+          ""
         ),
 
       courses:
@@ -386,49 +386,49 @@ export async function getHomeResponses({
       gridIconPath:
         String(
           result?.grid_icon_path ??
-            ""
+          ""
         ),
 
       categoryIconPath:
         String(
           result?.category_icon_path ??
-            ""
+          ""
         ),
 
       subcategoryIconPath:
         String(
           result?.subcategory_icon_path ??
-            ""
+          ""
         ),
 
       sliderImagePath:
         String(
           result?.slider_image_path ??
-            ""
+          ""
         ),
 
       subjectIconPath:
         String(
           result?.subject_icon_path ??
-            ""
+          ""
         ),
 
       packageIconPath:
         String(
           result?.package_icon_path ??
-            ""
+          ""
         ),
 
       subexamIconPath:
         String(
           result?.subexam_icon_path ??
-            ""
+          ""
         ),
 
       rankfilePath:
         String(
           result?.rankfile_path ??
-            ""
+          ""
         ),
 
       grid:
@@ -501,15 +501,15 @@ export async function getSubCategories({
           "no-store",
       });
 
-   
+
     const rawCategories =
       Array.isArray(
         result?.data
       )
         ? result.data
         : Array.isArray(
-            result?.categories
-          )
+          result?.categories
+        )
           ? result.categories
           : [];
 
@@ -520,7 +520,7 @@ export async function getSubCategories({
           const status =
             String(
               item?.status ??
-                "1"
+              "1"
             )
               .trim()
               .toLowerCase();
@@ -540,9 +540,9 @@ export async function getSubCategories({
       filePath:
         String(
           result?.file_path ??
-            result?.filePath ??
-            result?.icon_path ??
-            ""
+          result?.filePath ??
+          result?.icon_path ??
+          ""
         ),
 
       categories,
@@ -586,7 +586,7 @@ export async function getSubExams({
     const safeCid =
       requireCid(cid);
 
-       if (
+    if (
       subId === undefined ||
       subId === null ||
       subId === ""
@@ -605,7 +605,7 @@ export async function getSubExams({
       };
     }
 
-       const result =
+    const result =
       await postRequest({
         endpoint:
           "getSubExamsList",
@@ -634,25 +634,25 @@ export async function getSubExams({
           "no-store",
       });
 
-   
+
     const rawExams =
       Array.isArray(
         result?.data
       )
         ? result.data
         : Array.isArray(
-            result?.exams
-          )
+          result?.exams
+        )
           ? result.exams
           : [];
 
-       const exams =
+    const exams =
       rawExams.filter(
         (item) => {
           const status =
             String(
               item?.status ??
-                "1"
+              "1"
             )
               .trim()
               .toLowerCase();
@@ -672,9 +672,9 @@ export async function getSubExams({
       iconPath:
         String(
           result?.icon_path ??
-            result?.file_path ??
-            result?.filePath ??
-            ""
+          result?.file_path ??
+          result?.filePath ??
+          ""
         ),
 
       exams,
@@ -734,7 +734,7 @@ export async function getMockExamSubCategories({
       };
     }
 
-       const result =
+    const result =
       await postRequest({
         endpoint:
           "getMockExamSubcategories",
@@ -762,37 +762,37 @@ export async function getMockExamSubCategories({
           "no-store",
       });
 
-       const categories =
+    const categories =
       Array.isArray(
         result?.data
       )
         ? result.data
-            .filter(
-              (item) =>
-                item?.id !==
-                  undefined &&
-                item?.id !==
-                  null &&
+          .filter(
+            (item) =>
+              item?.id !==
+              undefined &&
+              item?.id !==
+              null &&
+              String(
+                item?.subcourse ??
+                ""
+              ).trim()
+          )
+          .map(
+            (item) => ({
+              ...item,
+
+              id:
+                Number(
+                  item.id
+                ),
+
+              subcourse:
                 String(
-                  item?.subcourse ??
-                    ""
-                ).trim()
-            )
-            .map(
-              (item) => ({
-                ...item,
-
-                id:
-                  Number(
-                    item.id
-                  ),
-
-                subcourse:
-                  String(
-                    item.subcourse
-                  ).trim(),
-              })
-            )
+                  item.subcourse
+                ).trim(),
+            })
+          )
         : [];
 
     return {
@@ -875,8 +875,8 @@ export async function getExamNotifications({
       filePath:
         String(
           result?.file_path ??
-            result?.filePath ??
-            ""
+          result?.filePath ??
+          ""
         ),
 
       notifications:
@@ -952,8 +952,8 @@ export async function getExamSyllabus({
       filePath:
         String(
           result?.file_path ??
-            result?.filePath ??
-            ""
+          result?.filePath ??
+          ""
         ),
 
       syllabus:

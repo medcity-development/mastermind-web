@@ -3,12 +3,14 @@
 import {
   Loader2,
   Pause,
+  Play,
 } from "lucide-react";
 
 export default function MockPauseButton({
   onPause,
   saving = false,
   disabled = false,
+  paused = false,
 }) {
   const isDisabled =
     saving || disabled;
@@ -81,6 +83,11 @@ export default function MockPauseButton({
             size={14}
             className="animate-spin"
           />
+        ) : paused ? (
+          <Play
+            size={13}
+            fill="currentColor"
+          />
         ) : (
           <Pause
             size={13}
@@ -91,7 +98,9 @@ export default function MockPauseButton({
 
       {saving
         ? "Please wait..."
-        : "Pause Exam"}
+        : paused
+          ? "Resume Exam"
+          : "Pause Exam"}
     </button>
   );
 }

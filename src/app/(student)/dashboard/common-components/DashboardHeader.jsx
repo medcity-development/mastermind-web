@@ -1,28 +1,49 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 
 import {
   Bell,
   Menu,
   Search,
 } from "lucide-react";
-import Link from "next/link";
+
+/* =========================================================
+   DASHBOARD HEADER
+========================================================= */
 
 export default function DashboardHeader({
   user,
+  config,
   onMenuClick,
 }) {
+  /* =======================================================
+     USER
+  ======================================================= */
+
   const name =
-    user?.name ||
+    String(
+      user?.name ||
+      user?.profile?.name ||
+      "Student"
+    ).trim() ||
     "Student";
 
   const initial =
     name
-      .trim()
       .charAt(0)
       .toUpperCase() ||
     "S";
+
+  const profileHref =
+    config?.slug
+      ? `/dashboard/${config.slug}/profile`
+      : "#";
+
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <header
@@ -50,9 +71,9 @@ export default function DashboardHeader({
           lg:px-8
         "
       >
-        {/* =========================================
+        {/* =================================================
             LEFT
-        ========================================= */}
+        ================================================= */}
 
         <div
           className="
@@ -62,10 +83,13 @@ export default function DashboardHeader({
             gap-3
           "
         >
-          {/* Menu - hidden on XL */}
+          {/* MOBILE MENU */}
+
           <button
             type="button"
-            onClick={onMenuClick}
+            onClick={
+              onMenuClick
+            }
             aria-label="Open dashboard menu"
             className="
               flex
@@ -100,7 +124,8 @@ export default function DashboardHeader({
             />
           </button>
 
-          {/* MasterMind logo */}
+          {/* LOGO */}
+
           <Link
             href="/"
             className="
@@ -109,32 +134,32 @@ export default function DashboardHeader({
               items-center
             "
           >
-           <Image
-  src="/assets/logo-128.png"
-  alt="Master Mind"
-  width={160}
-  height={160}
-  priority
-  className="
-    h-[64px]
-    w-auto
-    object-contain
+            <Image
+              src="/assets/logo-128.png"
+              alt="Master Mind"
+              width={160}
+              height={160}
+              priority
+              className="
+                h-[64px]
+                w-auto
+                object-contain
 
-    transition-transform
-    duration-300
+                transition-transform
+                duration-300
 
-    group-hover:scale-[1.03]
+                group-hover:scale-[1.03]
 
-    sm:h-[72px]
-    lg:h-[76px]
-  "
-/>
+                sm:h-[72px]
+                lg:h-[76px]
+              "
+            />
           </Link>
         </div>
 
-        {/* =========================================
+        {/* =================================================
             SEARCH
-        ========================================= */}
+        ================================================= */}
 
         <div
           className="
@@ -194,9 +219,9 @@ export default function DashboardHeader({
           />
         </div>
 
-        {/* =========================================
+        {/* =================================================
             RIGHT
-        ========================================= */}
+        ================================================= */}
 
         <div
           className="
@@ -206,9 +231,11 @@ export default function DashboardHeader({
             gap-3
           "
         >
-          {/* Notification */}
+          {/* NOTIFICATION */}
+
           <button
             type="button"
+            aria-label="Notifications"
             className="
               relative
 
@@ -259,60 +286,98 @@ export default function DashboardHeader({
             />
           </button>
 
-          {/* Avatar */}
-          <div
+          {/* =================================================
+              PROFILE LINK
+          ================================================= */}
+
+          <Link
+            href={
+              profileHref
+            }
             className="
+              group
+
               flex
-              h-10
-              w-10
-              shrink-0
               items-center
-              justify-center
+              gap-3
 
-              rounded-full
+              rounded-[14px]
 
-              bg-gradient-to-br
-              from-[#7c3aed]
-              via-[#4f46e5]
-              to-[#2563eb]
+              px-1
+              py-1
 
-              text-[12px]
-              font-extrabold
-              text-white
+              transition
 
-              shadow-[0_8px_20px_rgba(79,70,229,0.24)]
+              hover:bg-slate-50
             "
           >
-            {initial}
-          </div>
+            {/* AVATAR */}
 
-          {/* User */}
-          <div
-            className="
-              hidden
-              sm:block
-            "
-          >
-            <p
+            <div
               className="
-                text-[11px]
-                font-bold
-                text-[#071b59]
+                flex
+                h-10
+                w-10
+                shrink-0
+                items-center
+                justify-center
+
+                rounded-full
+
+                bg-gradient-to-br
+                from-[#7c3aed]
+                via-[#4f46e5]
+                to-[#2563eb]
+
+                text-[12px]
+                font-extrabold
+                text-white
+
+                shadow-[0_8px_20px_rgba(79,70,229,0.24)]
+
+                transition-transform
+                duration-200
+
+                group-hover:scale-105
               "
             >
-              Hi, {name} 👋
-            </p>
+              {initial}
+            </div>
 
-            <p
+            {/* USER NAME */}
+
+            <div
               className="
-                mt-0.5
-                text-[9px]
-                text-slate-400
+                hidden
+                min-w-0
+                sm:block
               "
             >
-              Welcome back!
-            </p>
-          </div>
+              <p
+                className="
+                  max-w-[180px]
+                  truncate
+
+                  text-[11px]
+                  font-bold
+                  text-[#071b59]
+                "
+              >
+                Hi, {name} 👋
+              </p>
+
+              <p
+                className="
+                  mt-0.5
+
+                  text-[9px]
+                  text-slate-400
+                "
+              >
+                Welcome back!
+              </p>
+            </div>
+          </Link>
         </div>
       </div>
     </header>

@@ -13,13 +13,55 @@ import {
 
 const QUESTIONS_PER_PAGE = 10;
 
+/* =========================================================
+   NORMALIZE ANSWER
+========================================================= */
+
+function normalizeAnswerValue(
+  value
+) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return "";
+  }
+
+  return String(value)
+    .trim()
+    .toUpperCase();
+}
+
+/* =========================================================
+   CHECK ATTEMPTED ANSWER
+========================================================= */
+
+function isAttemptedAnswer(
+  value
+) {
+  return (
+    value !== undefined &&
+    value !== null &&
+    value !== "" &&
+    value !== 0 &&
+    value !== "0"
+  );
+}
+
+/* =========================================================
+   EXAM CONTROLLER
+========================================================= */
+
 export default function useExamController({
   exam,
   questions = [],
+
   uid,
   cid,
+
   examType,
   lastPosition,
+
   initialPauseId = null,
 }) {
   /* =========================================================
@@ -41,7 +83,7 @@ export default function useExamController({
   ] = useState({});
 
   /* =========================================================
-     SUBMIT STATE
+     SUBMISSION
   ========================================================= */
 
   const [
@@ -74,22 +116,16 @@ export default function useExamController({
       return normalizeQuestions(
         questions
       );
-    }, [questions]);
+    }, [
+      questions,
+    ]);
 
   const totalQuestions =
     normalizedQuestions.length;
 
   /* =========================================================
-     EXAM DURATION
+     DURATION
   ========================================================= */
-
-  /*
-   * Most of your exam APIs use total_minutes.
-   *
-   * Fallback fields are included so this component
-   * also works if another exam endpoint returns
-   * duration / exam_duration.
-   */
 
   const durationMinutes =
     Number(
@@ -115,75 +151,86 @@ export default function useExamController({
   ] = useState(false);
 
   /* =========================================================
-     RESET TIMER WHEN EXAM CHANGES
+     RESET EXAM
   ========================================================= */
 
   useEffect(() => {
+    setCurrentPage(1);
+
+    setAnswers({});
+
+    setSubmitted(false);
+
+    setSaving(false);
+
+    setPauseId(
+      initialPauseId
+    );
+
     setRemainingSeconds(
       totalDurationSeconds
     );
 
-    setTimerFinished(false);
+    setTimerFinished(
+      false
+    );
   }, [
     exam?.id,
+    initialPauseId,
     totalDurationSeconds,
   ]);
 
   /* =========================================================
-     TIMER COUNTDOWN
+     TIMER
   ========================================================= */
 
   useEffect(() => {
-    /*
-     * No duration available.
-     */
-
     if (
-      totalDurationSeconds <= 0
+      totalDurationSeconds <=
+      0
     ) {
       return;
     }
 
-    /*
-     * Stop timer after submit.
-     */
-
     if (submitted) {
       return;
     }
-
-    /*
-     * Timer already ended.
-     */
 
     if (timerFinished) {
       return;
     }
 
     const intervalId =
-      window.setInterval(() => {
-        setRemainingSeconds(
-          (previousSeconds) => {
-            if (
-              previousSeconds <= 1
-            ) {
-              window.clearInterval(
-                intervalId
-              );
+      window.setInterval(
+        () => {
+          setRemainingSeconds(
+            (
+              previousSeconds
+            ) => {
+              if (
+                previousSeconds <=
+                1
+              ) {
+                window.clearInterval(
+                  intervalId
+                );
 
-              setTimerFinished(
-                true
-              );
+                setTimerFinished(
+                  true
+                );
 
-              return 0;
+                return 0;
+              }
+
+              return (
+                previousSeconds -
+                1
+              );
             }
-
-            return (
-              previousSeconds - 1
-            );
-          }
-        );
-      }, 1000);
+          );
+        },
+        1000
+      );
 
     return () => {
       window.clearInterval(
@@ -214,6 +261,7 @@ export default function useExamController({
   const totalPages =
     Math.max(
       1,
+
       Math.ceil(
         totalQuestions /
           QUESTIONS_PER_PAGE
@@ -225,8 +273,11 @@ export default function useExamController({
     QUESTIONS_PER_PAGE;
 
   const endIndex =
-    startIndex +
-    QUESTIONS_PER_PAGE;
+    Math.min(
+      startIndex +
+        QUESTIONS_PER_PAGE,
+      totalQuestions
+    );
 
   const currentQuestions =
     normalizedQuestions.slice(
@@ -235,69 +286,17 @@ export default function useExamController({
     );
 
   /* =========================================================
-     ANSWER COUNTS
-  ========================================================= */
-
-  const answeredCount =
-    Object.keys(
-      answers
-    ).length;
-
-  const unansweredCount =
-    Math.max(
-      totalQuestions -
-        answeredCount,
-      0
-    );
-
-  const progress =
-    totalQuestions > 0
-      ? Math.round(
-          (answeredCount /
-            totalQuestions) *
-            100
-        )
-      : 0;
-
-  /* =========================================================
-     SCORE
-  ========================================================= */
-
-  const correctCount =
-    useMemo(() => {
-      if (!submitted) {
-        return 0;
-      }
-
-      return normalizedQuestions.filter(
-        (question) =>
-          answers[
-            question.id
-          ] ===
-          question.answerkey
-      ).length;
-    }, [
-      submitted,
-      answers,
-      normalizedQuestions,
-    ]);
-
-  const wrongCount =
-    submitted
-      ? answeredCount -
-        correctCount
-      : 0;
-
-  /* =========================================================
-     BACKEND ANSWER ARRAY
+     CORRECT ANSWERS ARRAY
   ========================================================= */
 
   const answerArray =
     useMemo(() => {
       return normalizedQuestions.map(
         (question) =>
-          question.answerkey ??
-          question.answer ??
+          question?.answerkey ??
+          question?.answer ??
+          question?.correct_answer ??
+          question?.correctAnswer ??
           0
       );
     }, [
@@ -305,7 +304,7 @@ export default function useExamController({
     ]);
 
   /* =========================================================
-     USER ANSWER ARRAY
+     USER ANSWERS ARRAY
   ========================================================= */
 
   const userAnswers =
@@ -322,13 +321,155 @@ export default function useExamController({
     ]);
 
   /* =========================================================
+     LIVE STATISTICS
+  ========================================================= */
+
+  const examStats =
+    useMemo(() => {
+      let totalCorrect =
+        0;
+
+      let totalWrong =
+        0;
+
+      let totalAttempted =
+        0;
+
+      normalizedQuestions.forEach(
+        (
+          question
+        ) => {
+          const userAnswer =
+            answers[
+              question.id
+            ];
+
+          if (
+            !isAttemptedAnswer(
+              userAnswer
+            )
+          ) {
+            return;
+          }
+
+          totalAttempted +=
+            1;
+
+          const correctAnswer =
+            question?.answerkey ??
+            question?.answer ??
+            question?.correct_answer ??
+            question?.correctAnswer ??
+            "";
+
+          const normalizedUser =
+            normalizeAnswerValue(
+              userAnswer
+            );
+
+          const normalizedCorrect =
+            normalizeAnswerValue(
+              correctAnswer
+            );
+
+          if (
+            normalizedUser ===
+            normalizedCorrect
+          ) {
+            totalCorrect +=
+              1;
+          } else {
+            totalWrong +=
+              1;
+          }
+        }
+      );
+
+      return {
+        totalCorrect,
+        totalWrong,
+        totalAttempted,
+      };
+    }, [
+      normalizedQuestions,
+      answers,
+    ]);
+
+  /* =========================================================
+     COUNTS
+  ========================================================= */
+
+  const answeredCount =
+    examStats.totalAttempted;
+
+  const unansweredCount =
+    Math.max(
+      totalQuestions -
+        answeredCount,
+      0
+    );
+
+  const progress =
+    totalQuestions > 0
+      ? Math.round(
+          (
+            answeredCount /
+            totalQuestions
+          ) * 100
+        )
+      : 0;
+
+  /* =========================================================
+     RESULT COUNTS
+  ========================================================= */
+
+  const correctCount =
+    submitted
+      ? examStats.totalCorrect
+      : 0;
+
+  const wrongCount =
+    submitted
+      ? examStats.totalWrong
+      : 0;
+
+  /* =========================================================
+     MARK DETAILS
+  ========================================================= */
+
+  const totalMark =
+    exam?.total_mark ??
+    exam?.total_marks ??
+    exam?.mark ??
+    "";
+
+  const minusMark =
+    Number(
+      exam?.minus_mark ??
+        exam?.negative_mark ??
+        exam?.negative_marks ??
+        0
+    ) || 0;
+
+  /* =========================================================
+     SCORE
+  ========================================================= */
+
+  const userScore =
+    examStats.totalCorrect -
+    examStats.totalWrong *
+      minusMark;
+
+  /* =========================================================
      SCROLL
   ========================================================= */
 
   function scrollToTop() {
     window.scrollTo({
       top: 0,
-      behavior: "smooth",
+
+      behavior:
+        "smooth",
     });
   }
 
@@ -344,17 +485,14 @@ export default function useExamController({
       return;
     }
 
-    /*
-     * Don't allow answering when
-     * exam time has finished.
-     */
-
     if (timerFinished) {
       return;
     }
 
     setAnswers(
-      (previous) => ({
+      (
+        previous
+      ) => ({
         ...previous,
 
         [questionId]:
@@ -369,7 +507,9 @@ export default function useExamController({
 
   function handlePreviousPage() {
     setCurrentPage(
-      (previous) =>
+      (
+        previous
+      ) =>
         Math.max(
           previous - 1,
           1
@@ -385,7 +525,9 @@ export default function useExamController({
 
   function handleNextPage() {
     setCurrentPage(
-      (previous) =>
+      (
+        previous
+      ) =>
         Math.min(
           previous + 1,
           totalPages
@@ -402,25 +544,40 @@ export default function useExamController({
   function handlePageChange(
     page
   ) {
-    setCurrentPage(page);
+    const safePage =
+      Math.min(
+        Math.max(
+          Number(page) ||
+            1,
+          1
+        ),
+        totalPages
+      );
+
+    setCurrentPage(
+      safePage
+    );
 
     scrollToTop();
   }
 
   /* =========================================================
-     COMMON BACKEND PAYLOAD
+     COMMON PAYLOAD
   ========================================================= */
 
-  function buildAttemptPayload() {
+  function buildAttemptPayload({
+    examStatus = "pause",
+  } = {}) {
     return {
       uid,
       cid,
 
       exam_status:
-        "pause",
+        examStatus,
 
       lastposition:
-        lastPosition,
+        lastPosition ??
+        examType,
 
       exam_id:
         exam?.id,
@@ -431,22 +588,17 @@ export default function useExamController({
       total_questions:
         totalQuestions,
 
-      /*
-       * Keeping your current backend
-       * behaviour unchanged.
-       */
-
       paused_time:
-        Date.now(),
+        elapsedSeconds,
 
       total_mark:
-        "",
+        totalMark,
 
       user_score:
-        "",
+        userScore,
 
       minus_mark:
-        "",
+        minusMark,
 
       answer_array:
         formatExamArray(
@@ -465,11 +617,38 @@ export default function useExamController({
   ========================================================= */
 
   async function createAttempt() {
+    const payload =
+      buildAttemptPayload({
+        examStatus:
+          "pause",
+      });
+
+    console.log(
+      "CREATE EXAM ATTEMPT:",
+      {
+        uid:
+          payload.uid,
+
+        cid:
+          payload.cid,
+
+        exam_id:
+          payload.exam_id,
+
+        exam_type:
+          payload.exam_type,
+
+        exam_status:
+          payload.exam_status,
+      }
+    );
+
     const response =
       await fetch(
         "/api/exam-attempt/create",
         {
-          method: "POST",
+          method:
+            "POST",
 
           headers: {
             "Content-Type":
@@ -478,23 +657,42 @@ export default function useExamController({
 
           body:
             JSON.stringify(
-              buildAttemptPayload()
+              payload
             ),
         }
       );
 
-    if (!response.ok) {
+    let result;
+
+    try {
+      result =
+        await response.json();
+    } catch {
       throw new Error(
-        "Failed to create exam attempt"
+        "Create attempt API returned invalid JSON."
       );
     }
 
-    const result =
-      await response.json();
+    if (
+      !response.ok ||
+      result?.status ===
+        false
+    ) {
+      console.error(
+        "CREATE EXAM ATTEMPT FAILED:",
+        result
+      );
+
+      throw new Error(
+        result?.message ||
+          "Failed to create exam attempt."
+      );
+    }
 
     const newPauseId =
       result?.pauseid ??
       result?.pause_id ??
+      result?.id ??
       result?.data
         ?.pauseid ??
       result?.data
@@ -502,12 +700,30 @@ export default function useExamController({
       null;
 
     if (
-      newPauseId != null
+      newPauseId ==
+      null
     ) {
-      setPauseId(
-        newPauseId
+      console.error(
+        "CREATE ATTEMPT RESPONSE:",
+        result
+      );
+
+      throw new Error(
+        "Exam attempt created but pauseid was not returned."
       );
     }
+
+    setPauseId(
+      newPauseId
+    );
+
+    console.log(
+      "EXAM ATTEMPT CREATED:",
+      {
+        pauseid:
+          newPauseId,
+      }
+    );
 
     return {
       result,
@@ -523,13 +739,104 @@ export default function useExamController({
 
   async function updateAttempt({
     currentPauseId,
+
+    examStatus =
+      "pause",
+
     extra = {},
   }) {
+    if (
+      currentPauseId ==
+      null
+    ) {
+      throw new Error(
+        "pauseid is required."
+      );
+    }
+
+    const payload = {
+      ...buildAttemptPayload({
+        examStatus,
+      }),
+
+      pauseid:
+        currentPauseId,
+
+      total_correct:
+        examStats.totalCorrect,
+
+      total_wrong:
+        examStats.totalWrong,
+
+      total_attempted:
+        examStats.totalAttempted,
+
+      ...extra,
+    };
+
+    console.log(
+      "========================================"
+    );
+
+    console.log(
+      "UPDATE EXAM ATTEMPT"
+    );
+
+    console.log(
+      "uid:",
+      payload.uid
+    );
+
+    console.log(
+      "cid:",
+      payload.cid
+    );
+
+    console.log(
+      "exam_type:",
+      payload.exam_type
+    );
+
+    console.log(
+      "exam_status:",
+      payload.exam_status
+    );
+
+    console.log(
+      "pauseid:",
+      payload.pauseid
+    );
+
+    console.log(
+      "total_correct:",
+      payload.total_correct
+    );
+
+    console.log(
+      "total_wrong:",
+      payload.total_wrong
+    );
+
+    console.log(
+      "total_attempted:",
+      payload.total_attempted
+    );
+
+    console.log(
+      "user_score:",
+      payload.user_score
+    );
+
+    console.log(
+      "========================================"
+    );
+
     const response =
       await fetch(
         "/api/exam-attempt/update",
         {
-          method: "POST",
+          method:
+            "POST",
 
           headers: {
             "Content-Type":
@@ -537,28 +844,61 @@ export default function useExamController({
           },
 
           body:
-            JSON.stringify({
-              ...buildAttemptPayload(),
-
-              pauseid:
-                currentPauseId,
-
-              ...extra,
-            }),
+            JSON.stringify(
+              payload
+            ),
         }
       );
 
-    if (!response.ok) {
+    let result;
+
+    try {
+      result =
+        await response.json();
+    } catch {
       throw new Error(
-        "Failed to update exam attempt"
+        "Update attempt API returned invalid JSON."
       );
     }
 
-    return response.json();
+    if (
+      !response.ok ||
+      result?.status ===
+        false
+    ) {
+      console.error(
+        "UPDATE EXAM ATTEMPT FAILED:",
+        result
+      );
+
+      throw new Error(
+        result?.message ||
+          "Failed to update exam attempt."
+      );
+    }
+
+    return result;
   }
 
   /* =========================================================
-     PAUSE EXAM
+     GET OR CREATE PAUSE ID
+  ========================================================= */
+
+  async function getOrCreatePauseId() {
+    if (
+      pauseId != null
+    ) {
+      return pauseId;
+    }
+
+    const created =
+      await createAttempt();
+
+    return created.pauseId;
+  }
+
+  /* =========================================================
+     PAUSE
   ========================================================= */
 
   async function handlePause() {
@@ -575,49 +915,57 @@ export default function useExamController({
 
       /*
        * First pause:
-       * create backend attempt.
+       *
+       * 1. setNewUserExams
+       * 2. receive pauseid
+       * 3. setUpdateUserExams
        */
 
-      if (
-        pauseId == null
-      ) {
-        await createAttempt();
+      const currentPauseId =
+        await getOrCreatePauseId();
 
-        return;
-      }
+      const result =
+        await updateAttempt({
+          currentPauseId,
 
-      /*
-       * Existing attempt:
-       * update same backend attempt.
-       */
+          examStatus:
+            "pause",
+        });
 
-      await updateAttempt({
-        currentPauseId:
-          pauseId,
-
-        extra: {
-          total_attempted:
-            answeredCount,
+      console.log(
+        "PAUSE EXAM SAVED:",
+        {
+          pauseid:
+            currentPauseId,
 
           total_correct:
-            "",
+            examStats.totalCorrect,
 
           total_wrong:
-            "",
-        },
-      });
+            examStats.totalWrong,
+
+          total_attempted:
+            examStats.totalAttempted,
+
+          result,
+        }
+      );
+
+      return result;
     } catch (error) {
       console.error(
         "Pause PYQ exam:",
         error
       );
+
+      throw error;
     } finally {
       setSaving(false);
     }
   }
 
   /* =========================================================
-     SUBMIT
+     SUBMIT / FINISH
   ========================================================= */
 
   async function handleSubmit() {
@@ -632,87 +980,121 @@ export default function useExamController({
     try {
       setSaving(true);
 
-      /* =====================================================
-         FINAL CORRECT COUNT
-      ===================================================== */
-
-      const finalCorrectCount =
-        normalizedQuestions.filter(
-          (question) =>
-            answers[
-              question.id
-            ] ===
-            question.answerkey
-        ).length;
-
-      /* =====================================================
-         FINAL ATTEMPTED COUNT
-      ===================================================== */
-
-      const finalAttemptedCount =
-        Object.keys(
-          answers
-        ).length;
-
-      /* =====================================================
-         FINAL WRONG COUNT
-      ===================================================== */
-
-      const finalWrongCount =
-        finalAttemptedCount -
-        finalCorrectCount;
-
-      let currentPauseId =
-        pauseId;
-
       /*
-       * If the exam has never
-       * been saved before,
-       * create the attempt first.
+       * Get the existing attempt ID.
+       *
+       * If this exam has never been saved,
+       * create it first.
        */
 
-      if (
-        currentPauseId == null
-      ) {
-        const created =
-          await createAttempt();
-
-        currentPauseId =
-          created.pauseId;
-      }
+      const currentPauseId =
+        await getOrCreatePauseId();
 
       /*
-       * Update attempt only when
-       * backend returned an id.
+       * IMPORTANT
+       *
+       * Final submission must use "finish",
+       * not "pause".
        */
 
-      if (
-        currentPauseId != null
-      ) {
+      const result =
         await updateAttempt({
           currentPauseId,
 
+          examStatus:
+            "finish",
+
           extra: {
             total_correct:
-              finalCorrectCount,
+              examStats.totalCorrect,
 
             total_wrong:
-              finalWrongCount,
+              examStats.totalWrong,
 
             total_attempted:
-              finalAttemptedCount,
+              examStats.totalAttempted,
+
+            user_score:
+              userScore,
           },
         });
-      }
 
-      setSubmitted(true);
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "FINAL EXAM SUBMITTED"
+      );
+
+      console.log(
+        "uid:",
+        uid
+      );
+
+      console.log(
+        "cid:",
+        cid
+      );
+
+      console.log(
+        "pauseid:",
+        currentPauseId
+      );
+
+      console.log(
+        "exam_type:",
+        examType
+      );
+
+      console.log(
+        "exam_status:",
+        "finish"
+      );
+
+      console.log(
+        "total_correct:",
+        examStats.totalCorrect
+      );
+
+      console.log(
+        "total_wrong:",
+        examStats.totalWrong
+      );
+
+      console.log(
+        "total_attempted:",
+        examStats.totalAttempted
+      );
+
+      console.log(
+        "user_score:",
+        userScore
+      );
+
+      console.log(
+        "result:",
+        result
+      );
+
+      console.log(
+        "========================================"
+      );
+
+      setSubmitted(
+        true
+      );
 
       scrollToTop();
+
+      return result;
     } catch (error) {
       console.error(
         "Submit PYQ exam:",
         error
       );
+
+      throw error;
     } finally {
       setSaving(false);
     }
@@ -751,13 +1133,16 @@ export default function useExamController({
 
     durationMinutes,
     totalDurationSeconds,
+
     remainingSeconds,
     elapsedSeconds,
+
     timerFinished,
 
     /* ACTIONS */
 
     handleAnswer,
+
     handlePreviousPage,
     handleNextPage,
     handlePageChange,

@@ -151,6 +151,9 @@ export default function TopicWiseExamList({
             totalPages={
               totalPages
             }
+            governmentExamsSlug={
+              governmentExamsSlug
+            }
           />
         </>
       ) : (

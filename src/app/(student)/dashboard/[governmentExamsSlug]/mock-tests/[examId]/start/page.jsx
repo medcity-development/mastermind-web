@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -12,33 +13,14 @@ import {
   getGovernmentExamConfig,
 } from "@/lib/governmentExamConfig";
 
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
 import MockTestQuestions from "./components/MockTestQuestions";
 
-/* =========================================================
-   NUMBER PARAM
-========================================================= */
-
-function getNumberParam(
-  value,
-  fallback = 0
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return fallback;
-  }
-
-  const parsed =
-    Number(value);
-
-  return Number.isFinite(
-    parsed
-  )
-    ? parsed
-    : fallback;
-}
+export const dynamic =
+  "force-dynamic";
 
 /* =========================================================
    METADATA
@@ -87,6 +69,10 @@ export default async function MockExamStartPage({
   const query =
     await searchParams;
 
+  /* =======================================================
+     CONFIG
+  ======================================================= */
+
   const config =
     getGovernmentExamConfig(
       governmentExamsSlug
@@ -96,36 +82,66 @@ export default async function MockExamStartPage({
     notFound();
   }
 
-  const {
-    cid,
-    name,
-    shortName,
-  } = config;
-
-  /*
-   * Current flow gets uid from query.
-   *
-   * Later you can replace this with the
-   * authenticated student's uid from cookie/session.
-   */
-  const uid =
-    getNumberParam(
-      query?.uid,
-      0
+  const cid =
+    Number(
+      config?.cid
     );
 
-  const title =
-    String(
-      query?.title ??
-        ""
-    );
+  if (
+    !Number.isFinite(cid) ||
+    cid <= 0
+  ) {
+    notFound();
+  }
 
   /* =======================================================
-     PRIVATE DASHBOARD DETAILS PATH
+     SESSION
+  ======================================================= */
+
+  const session =
+    await getStudentSession();
+
+  const uid =
+    Number(
+      session?.uid
+    );
+
+  if (
+    !Number.isFinite(uid) ||
+    uid <= 0
+  ) {
+    const redirectUrl =
+      `/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start`;
+
+    redirect(
+      `/login?redirect=${encodeURIComponent(
+        redirectUrl
+      )}`
+    );
+  }
+
+  /* =======================================================
+     EXAM TITLE
+
+     Comes from the real selected mock exam.
+  ======================================================= */
+
+  const examTitle =
+    String(
+      query?.title ??
+      ""
+    ).trim();
+
+  /* =======================================================
+     DETAILS PATH
   ======================================================= */
 
   const detailsPath =
     `/dashboard/${governmentExamsSlug}/mock-tests/${examId}`;
+
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <main
@@ -147,8 +163,6 @@ export default async function MockExamStartPage({
           lg:px-8
         "
       >
-        {/* TOP ACTION */}
-
         <div
           className="
             mb-5
@@ -168,12 +182,13 @@ export default async function MockExamStartPage({
                 pathname:
                   detailsPath,
 
-                query: {
-                  uid:
-                    String(uid),
-
-                  title,
-                },
+                query:
+                  examTitle
+                    ? {
+                        title:
+                          examTitle,
+                      }
+                    : {},
               }}
               className="
                 inline-flex
@@ -192,7 +207,6 @@ export default async function MockExamStartPage({
 
                 text-[11px]
                 font-bold
-
                 text-[#164fa5]
 
                 transition-all
@@ -216,13 +230,13 @@ export default async function MockExamStartPage({
               "
             >
               Answer the{" "}
-              {name} questions before
-              the timer expires.
+              {examTitle ||
+                config.name}{" "}
+              questions before the
+              timer expires.
             </p>
           </div>
         </div>
-
-        {/* EXAM */}
 
         <MockTestQuestions
           examId={
@@ -234,14 +248,14 @@ export default async function MockExamStartPage({
           cid={
             cid
           }
-          examTitle={
-            title
-          }
           examName={
-            name
+            config.name
           }
           shortName={
-            shortName
+            config.shortName
+          }
+          examTitle={
+            examTitle
           }
           governmentExamsSlug={
             governmentExamsSlug
