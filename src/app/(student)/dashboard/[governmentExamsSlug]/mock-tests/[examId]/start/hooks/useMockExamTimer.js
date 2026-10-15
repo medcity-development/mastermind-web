@@ -1,4 +1,5 @@
 import {
+    useCallback,
     useEffect,
     useState,
 } from "react";
@@ -55,9 +56,7 @@ export default function useMockExamTimer({
         remainingSeconds,
     ]);
 
-    function startTimer(
-        seconds
-    ) {
+    const startTimer = useCallback((seconds) => {
         const value =
             Math.max(
                 0,
@@ -72,13 +71,13 @@ export default function useMockExamTimer({
         setTimerStarted(
             true
         );
-    }
+    }, []);
 
-    function stopTimer() {
+    const stopTimer = useCallback(() => {
         setTimerStarted(
             false
         );
-    }
+    }, []);
 
     return {
         remainingSeconds,

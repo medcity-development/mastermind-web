@@ -48,6 +48,7 @@ function formatTime(totalSeconds) {
 export default function MockTestHeader({
   exam,
   examTitle,
+  examName = "Kerala PSC",
   remainingSeconds = 0,
 }) {
   const router = useRouter();
@@ -155,7 +156,7 @@ export default function MockTestHeader({
                 text-blue-100
               "
             >
-              Kerala PSC Mock Test
+              {examName} Mock Test
             </p>
 
             <h1

@@ -7,12 +7,13 @@ import {
 export default function ExamTopBar({
   slug,
   examSlug,
+  governmentExamsSlug,
 }) {
   return (
     <div className="mb-5">
       <Link
         href={
-          `/government-exams-coaching/kerala-psc/topic-wise-exams/test/${slug}/${examSlug}`
+          `/government-exams-coaching/${governmentExamsSlug}/topic-wise-exams/test/${slug}/${examSlug}`
         }
         className="
           inline-flex

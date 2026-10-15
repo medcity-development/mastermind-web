@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 
 import {
   ChevronLeft,
@@ -22,6 +23,7 @@ export default function MockTestsTab({
   examId,
   subId,
 }) {
+  const pathname = usePathname();
   const [
     exams,
     setExams,
@@ -687,6 +689,11 @@ export default function MockTestsTab({
         }
         exam={
           selectedPremiumExam
+        }
+        redirectPath={
+          selectedPremiumExam
+            ? `${pathname}?examId=${encodeURIComponent(selectedPremiumExam.id ?? "")}&selectedTestTitle=${encodeURIComponent(selectedPremiumExam.exam_name || "Mock Test")}`
+            : ""
         }
         onClose={() =>
           setSelectedPremiumExam(

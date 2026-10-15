@@ -1,3 +1,5 @@
+
+import Link from "next/link";
 import {
   notFound,
   redirect,
@@ -24,8 +26,53 @@ import {
 
 import ExamClient from "./components/ExamClient";
 
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Topic Wise Exam | MasterMind Academy",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
+function positiveId(value) {
+  const number = Number(value);
+
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : null;
+}
+
+function ErrorPage({ message, href }) {
+  return (
+    <main className="min-h-screen bg-[#f5f9ff] p-6">
+      <div
+        role="alert"
+        className="mx-auto max-w-2xl rounded-2xl border border-red-200 bg-white p-8"
+      >
+        <h1 className="text-xl font-black text-red-600">
+          Unable to Open Exam
+        </h1>
+
+        <p className="mt-3 text-slate-600">
+          {message}
+        </p>
+
+        <Link
+          href={href}
+          className="mt-6 inline-block rounded-xl bg-[#017dc0] px-6 py-3 font-bold text-white"
+        >
+          Back to Exams
+        </Link>
+      </div>
+    </main>
+  );
+}
+
 export default async function TopicWiseExamStartPage({
   params,
+  searchParams,
 }) {
   const {
     slug,
@@ -33,184 +80,213 @@ export default async function TopicWiseExamStartPage({
     governmentExamsSlug,
   } = await params;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const query = await searchParams;
+
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
   if (!config) {
     notFound();
   }
 
-  const session =
-    await getStudentSession();
+  const session = await getStudentSession();
 
-  const uid =
-    session?.uid;
+  const uid = positiveId(session?.uid) || 0;
+  const cid = positiveId(config.cid);
 
-  const cid =
-    config.cid;
-  const examType =
-    "twe";
+  if (!cid) {
+    notFound();
+  }
 
-  /* =======================================================
-     RESOLVE TOPIC
-  ======================================================= */
+  const examType = "twe";
 
-  const topicsResult =
-    await getTopicWiseExams({
+  const mode =
+    query?.mode === "resume"
+      ? "resume"
+      : "new";
+
+  const initialPauseId = positiveId(
+    query?.pauseId
+  );
+
+  const guestAction = [
+    "pause",
+    "submit",
+  ].includes(query?.guestAction)
+    ? query.guestAction
+    : "";
+
+  const root =
+    `/dashboard/${governmentExamsSlug}/topic-wise-exams`;
+
+  const listHref = `${root}/test/${slug}`;
+
+  if (!uid) {
+    const target =
+      `${root}/test/${slug}/${examSlug}/start` +
+      (mode === "resume" && initialPauseId
+        ? `?mode=resume&pauseId=${initialPauseId}`
+        : "");
+
+    redirect(
+      `/login?redirect=${encodeURIComponent(target)}`
+    );
+  }
+
+  if (mode === "resume" && !initialPauseId) {
+    return (
+      <ErrorPage
+        message="The resume link does not contain a valid saved attempt ID."
+        href={listHref}
+      />
+    );
+  }
+
+  // Load topic.
+  const topicsResult = await getTopicWiseExams({
+    uid,
+    cid,
+    type: examType,
+  });
+
+  const topics = Array.isArray(topicsResult?.data)
+    ? topicsResult.data
+    : [];
+
+  const topic = topics.find(
+    (item) => createSlug(item.subject) === slug
+  );
+
+  if (!topic) {
+    notFound();
+  }
+
+  // Load exams belonging to this topic.
+  const testsResult = await getAllTopicWiseTests({
+    uid,
+    topicId: topic.id,
+  });
+
+  const tests = Array.isArray(testsResult?.data)
+    ? testsResult.data
+    : [];
+
+  // IMPORTANT:
+  // Numeric ID and exam-name slug are both supported.
+  //
+  // /world-history/1/start
+  // /world-history/world-history-exam-1/start
+
+  const selected = tests.find((item) => {
+    const id = String(item.id ?? "");
+    const nameSlug = createSlug(
+      item.exam_name || ""
+    );
+
+    return (
+      id === String(examSlug) ||
+      nameSlug === examSlug
+    );
+  });
+
+  if (!selected) {
+    return (
+      <ErrorPage
+        message="The requested exam was not found in this topic."
+        href={listHref}
+      />
+    );
+  }
+
+  const examId = positiveId(selected.id);
+
+  if (!examId) {
+    notFound();
+  }
+
+  const access = String(
+    selected.access ?? ""
+  ).trim().toLowerCase();
+
+  // Preserve the existing free-exam restriction.
+  // Premium entitlement needs separate backend validation.
+  if (access !== "free") {
+    return (
+      <ErrorPage
+        message="This exam requires premium access."
+        href={listHref}
+      />
+    );
+  }
+
+  const [details, paper] = await Promise.all([
+    getTopicWiseExamDetails({
       uid,
       cid,
+      examId,
       type: examType,
-    });
+      offset: 0,
+    }),
 
-  const topics =
-    Array.isArray(
-      topicsResult?.data
-    )
-      ? topicsResult.data
-      : [];
-
-  const selectedTopic =
-    topics.find(
-      (item) =>
-        createSlug(
-          item?.subject
-        ) === slug
-    );
-
-  if (!selectedTopic) {
-    notFound();
-  }
-
-  const topicId =
-    selectedTopic.id;
-
-  /* =======================================================
-     RESOLVE EXAM
-  ======================================================= */
-
-  const testsResult =
-    await getAllTopicWiseTests({
+    getTopicWiseExamQuestions({
       uid,
-      topicId,
-    });
+      cid,
+      examId,
+      examType,
+    }),
+  ]);
 
-  const tests =
-    Array.isArray(
-      testsResult?.data
-    )
-      ? testsResult.data
-      : [];
+  const questions = Array.isArray(paper?.data)
+    ? paper.data
+    : [];
 
-  const selectedExam =
-    tests.find(
-      (item) =>
-        createSlug(
-          item?.exam_name
-        ) === examSlug
-    );
-
-  if (!selectedExam) {
-    notFound();
-  }
-
-  const isPaid =
-    String(
-      selectedExam?.access ||
-        ""
-    ).toLowerCase() ===
-    "paid";
-
-  if (isPaid) {
-    redirect(
-      `/dashboard/${governmentExamsSlug}/premium-packages`
+  if (!details?.exam) {
+    return (
+      <ErrorPage
+        message="The exam details could not be loaded."
+        href={listHref}
+      />
     );
   }
 
-  const examId =
-    selectedExam.id;
-
-  /* =======================================================
-     FETCH DETAILS + QUESTIONS
-  ======================================================= */
-
-  const [
-    detailsResult,
-    questionsResult,
-  ] =
-    await Promise.all([
-      getTopicWiseExamDetails({
-        uid,
-        cid,
-        examId,
-        type:
-          examType,
-        offset: 0,
-      }),
-
-      getTopicWiseExamQuestions({
-        uid,
-        cid,
-        examId,
-        examType,
-      }),
-    ]);
-
-  const exam =
-    detailsResult?.exam;
-
-  const questions =
-    Array.isArray(
-      questionsResult?.data
-    )
-      ? questionsResult.data
-      : [];
-
-  const imagePath =
-    questionsResult?.imagePath ||
-    "";
-
-  if (
-    !exam ||
-    !questionsResult?.status
-  ) {
-    notFound();
+  if (!questions.length) {
+    return (
+      <ErrorPage
+        message="The exam question API returned no questions. Please refresh and try again."
+        href={listHref}
+      />
+    );
   }
 
-  const normalizedExam = {
-    ...exam,
-
+  const exam = {
+    ...details.exam,
+    id: examId,
     total_minutes:
-      Number(
-        exam?.total_minutes ??
-          0
-      ) || 0,
+      Number(details.exam.total_minutes) || 0,
   };
 
   return (
     <ExamClient
-      exam={
-        normalizedExam
-      }
-      questions={
-        questions
-      }
+      key={`${examId}-${uid}-${mode}-${initialPauseId || "new"}`}
+      exam={exam}
+      examId={examId}
+      questions={questions}
       imagePath={
-        imagePath
+        paper?.imagePath ||
+        paper?.img_path ||
+        paper?.image_path ||
+        ""
       }
       uid={uid}
       cid={cid}
-      examType={
-        examType
-      }
+      examType={examType}
       slug={slug}
-      examSlug={
-        examSlug
-      }
-      governmentExamsSlug={
-        governmentExamsSlug
-      }
+      examSlug={String(examId)}
+      governmentExamsSlug={governmentExamsSlug}
+      mode={mode}
+      initialPauseId={initialPauseId}
+      guestAction={guestAction}
     />
   );
 }

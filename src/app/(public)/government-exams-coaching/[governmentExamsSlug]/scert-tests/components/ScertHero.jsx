@@ -4,7 +4,9 @@ import {
     Layers3,
   } from "lucide-react";
   
-  export default function ScertHero() {
+  export default function ScertHero({
+    examName = "Kerala PSC",
+  }) {
     return (
       <section
         className="
@@ -79,7 +81,7 @@ import {
                 size={16}
               />
   
-              Kerala PSC Preparation
+              {examName} Preparation
             </div>
   
             <h1
@@ -110,7 +112,7 @@ import {
               Select your class,
               practice available SCERT
               exams and strengthen your
-              Kerala PSC preparation.
+              {examName} preparation.
             </p>
           </div>
   

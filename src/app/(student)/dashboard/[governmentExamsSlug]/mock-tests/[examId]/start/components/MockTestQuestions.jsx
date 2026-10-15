@@ -2,7 +2,7 @@
 
 import MockQuestionPagination from "./MockQuestionPagination";
 import MockQuestionsSection from "./MockQuestionsSection";
-import MockResultModal from "./MockResultModal";
+import ExamResultModal from "@/components/ExamResultModal";
 import MockTestActions from "./MockTestActions";
 import MockTestEmpty from "./MockTestEmpty";
 import MockTestError from "./MockTestError";
@@ -24,6 +24,7 @@ export default function MockTestQuestions({
   examTitle = "",
 
   governmentExamsSlug = "",
+  guestAction = "",
 }) {
   const {
     exam,
@@ -63,6 +64,7 @@ export default function MockTestQuestions({
     handlePause,
     handleSubmit,
     handleResultClose,
+    handleViewAnalysis,
 
     timeEnded,
     interactionDisabled,
@@ -74,6 +76,7 @@ export default function MockTestQuestions({
     examTitle,
 
     governmentExamsSlug,
+    guestAction,
   });
 
   if (loading) {
@@ -227,7 +230,7 @@ export default function MockTestQuestions({
         />
       </section>
 
-      <MockResultModal
+      <ExamResultModal
         open={
           resultModalOpen
         }
@@ -239,6 +242,9 @@ export default function MockTestQuestions({
         }
         onClose={
           handleResultClose
+        }
+        onViewAnalysis={
+          handleViewAnalysis
         }
       />
     </>

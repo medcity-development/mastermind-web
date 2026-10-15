@@ -12,11 +12,12 @@ export default function ProfileField({
     <div>
       <label
         className="
-          mb-2
+          mb-1
           block
-          text-[12px]
-          font-bold
-          text-[#071b59]
+          text-[11px]
+          font-semibold
+          text-slate-700
+          lg:text-[13px]
         "
       >
         {label}
@@ -45,24 +46,30 @@ export default function ProfileField({
           required
         }
         className="
-          h-[52px]
+          h-[42px]
           w-full
-          rounded-[12px]
+          rounded-[11px]
           border
           border-slate-200
-          bg-white
-          px-4
-          text-[13px]
+          bg-slate-50/70
+          px-3
+          text-[12px]
           font-medium
           text-slate-800
           outline-none
           transition-all
           duration-200
+          lg:h-[50px]
+          lg:rounded-[12px]
+          lg:px-4
+          lg:text-[14px]
 
           placeholder:text-slate-400
 
           focus:border-[#4f6cf7]
+          focus:bg-white
           focus:shadow-[0_0_0_4px_rgba(79,108,247,0.08)]
+          hover:border-slate-300
         "
       />
     </div>

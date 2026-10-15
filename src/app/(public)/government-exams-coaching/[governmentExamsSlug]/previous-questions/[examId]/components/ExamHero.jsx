@@ -10,6 +10,8 @@ import {
 
 export default function ExamHero({
   exam,
+  examName = "Kerala PSC",
+  governmentExamsSlug = "kerala-psc",
 }) {
   if (!exam) {
     return null;
@@ -30,7 +32,7 @@ export default function ExamHero({
         text-white
         sm:px-7
         lg:px-8
-        lg:py-7 mt-20
+        lg:py-7
       "
     >
       <div
@@ -60,7 +62,7 @@ export default function ExamHero({
 
       <div className="relative z-10">
         <Link
-          href="/government-exams-coaching/kerala-psc/previous-questions"
+          href={`/government-exams-coaching/${governmentExamsSlug}/previous-questions`}
           className="
             inline-flex
             items-center
@@ -124,7 +126,7 @@ export default function ExamHero({
                 text-blue-100
               "
             >
-              Kerala PSC Previous
+              {examName} Previous
               Question Paper
             </p>
 
@@ -201,8 +203,8 @@ export default function ExamHero({
             value={
               exam.type
                 ? String(
-                    exam.type
-                  ).toUpperCase()
+                  exam.type
+                ).toUpperCase()
                 : "PQP"
             }
           />

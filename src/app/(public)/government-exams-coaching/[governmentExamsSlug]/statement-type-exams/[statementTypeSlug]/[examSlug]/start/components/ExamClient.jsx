@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { secondsToMilliseconds } from "@/lib/examAttemptData";
+import { saveGuestExamHandoff } from "@/lib/guestExamHandoff";
 
 import {
   useRouter,
@@ -129,6 +131,8 @@ export default function ExamClient({
   examSlug,
 
   governmentExamsSlug = "kerala-psc",
+  examName = "Kerala PSC",
+  guestAction = "",
 
   uid = 0,
 
@@ -159,6 +163,7 @@ export default function ExamClient({
     saving,
     setSaving,
   ] = useState(false);
+  const [attemptStartTime] = useState(() => Date.now());
 
   const [
     saveError,
@@ -226,27 +231,19 @@ export default function ExamClient({
     timeOverHandled.current =
       false;
 
-    if (
-      durationSeconds <= 0
-    ) {
-      setEndTime(null);
-      setTimeLeft(0);
+    const timer = window.setTimeout(() => {
+      if (durationSeconds <= 0) {
+        setEndTime(null);
+        setTimeLeft(0);
+        return;
+      }
 
-      return;
-    }
+      const deadline = Date.now() + durationSeconds * 1000;
+      setEndTime(deadline);
+      setTimeLeft(durationSeconds);
+    }, 0);
 
-    const deadline =
-      Date.now() +
-      durationSeconds *
-        1000;
-
-    setEndTime(
-      deadline
-    );
-
-    setTimeLeft(
-      durationSeconds
-    );
+    return () => window.clearTimeout(timer);
   }, [
     examId,
     durationSeconds,
@@ -540,8 +537,36 @@ export default function ExamClient({
   }
 
   function handleLogin() {
+    const action =
+      modalState.action === "pause"
+        ? "pause"
+        : "submit";
+
+    try {
+      saveGuestExamHandoff({
+        examId,
+        examType,
+        governmentExamsSlug,
+        action,
+        answers,
+        currentPage,
+        remainingSeconds: timeLeft,
+        startTime: attemptStartTime,
+        endTime: Date.now(),
+        examTitle: exam?.exam_name || "",
+        statementTypeSlug,
+        examSlug,
+      });
+    } catch (error) {
+      console.error("Save statement exam guest attempt:", error);
+      setSaveError(error?.message || "Unable to save exam progress.");
+      return;
+    }
+
     const currentUrl =
-      window.location.pathname;
+      `/dashboard/${governmentExamsSlug}/statement-type-exams/${encodeURIComponent(
+        statementTypeSlug
+      )}/${encodeURIComponent(examSlug)}/start?guestAction=${action}`;
 
     router.push(
       `/login?redirect=${encodeURIComponent(
@@ -595,15 +620,6 @@ export default function ExamClient({
       } =
         buildAnswerData();
 
-      const elapsedSeconds =
-        durationSeconds > 0
-          ? Math.max(
-              0,
-              durationSeconds -
-                timeLeft
-            )
-          : 0;
-
       const userScore =
         calculateScore(
           correctAnswerArray.length
@@ -635,7 +651,14 @@ export default function ExamClient({
           questions.length,
 
         paused_time:
-          elapsedSeconds,
+          secondsToMilliseconds(timeLeft),
+
+        start_time:
+          attemptStartTime,
+
+        ...(["complete", "completed", "finish", "finished"].includes(String(examStatus).toLowerCase())
+          ? { end_time: Date.now() }
+          : {}),
 
         total_mark:
           Number(
@@ -783,21 +806,15 @@ export default function ExamClient({
     timeOverHandled.current =
       true;
 
-    if (
-      !uid ||
-      Number(uid) === 0
-    ) {
-      openLoginModal(
-        "finish"
-      );
+    const timer = window.setTimeout(() => {
+      if (!uid || Number(uid) === 0) {
+        openLoginModal("finish");
+        return;
+      }
 
-      return;
-    }
-
-    saveExamAttempt(
-      "complete"
-    );
-
+      saveExamAttempt("complete");
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isTimeOver,
@@ -842,6 +859,12 @@ export default function ExamClient({
             }
             examSlug={
               examSlug
+            }
+            governmentExamsSlug={
+              governmentExamsSlug
+            }
+            examName={
+              examName
             }
           />
 

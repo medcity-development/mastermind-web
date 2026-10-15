@@ -339,6 +339,7 @@ export default function StatementExamCard({
             shortName={
               shortName
             }
+            redirectPath={`${examHref}?examId=${encodeURIComponent(exam.id)}&selectedTestTitle=${encodeURIComponent(title)}`}
           />
         </div>
       ) : (

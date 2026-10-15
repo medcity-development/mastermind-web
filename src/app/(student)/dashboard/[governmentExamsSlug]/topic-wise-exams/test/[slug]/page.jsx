@@ -1,15 +1,6 @@
+
 import Link from "next/link";
-
-import {
-  notFound,
-} from "next/navigation";
-
-import {
-  ArrowLeft,
-  ArrowRight,
-  FileQuestion,
-  Trophy,
-} from "lucide-react";
+import { notFound } from "next/navigation";
 
 import {
   getAllTopicWiseTests,
@@ -25,28 +16,40 @@ import {
 } from "@/lib/auth/getStudentSession";
 
 import {
+  getUserExamsList,
+} from "@/lib/examAttemptHelper";
+
+import {
+  getPausedAttemptIds,
+} from "@/lib/pausedExamAttempts";
+
+import {
   createSlug,
   formatSlug,
 } from "@/lib/pscSlug";
 
-import PremiumExamButton from "./components/PremiumExamButton";
+import {
+  ArrowRight,
+  BookOpen,
+  LockKeyhole,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 
-export async function generateMetadata({
-  params,
-}) {
-  const { slug } =
-    await params;
+export const dynamic = "force-dynamic";
 
-  const title =
-    formatSlug(slug);
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
 
   return {
-    title:
-      `${title} Topic Wise Exams | MasterMind Academy`,
-
-    description:
-      `Practice ${title} Kerala PSC topic-wise exams.`,
+    title: `${formatSlug(slug)} Topic Wise Exams | MasterMind Academy`,
   };
+}
+
+function getAccess(test) {
+  return String(test?.access ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 export default async function TopicWiseTestListPage({
@@ -55,517 +58,231 @@ export default async function TopicWiseTestListPage({
   const {
     slug,
     governmentExamsSlug,
-  } =
-    await params;
+  } = await params;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
-  if (!config) {
-    notFound();
-  }
+  if (!config) notFound();
 
-  const session =
-    await getStudentSession();
+  const session = await getStudentSession();
 
-  const uid =
-    session?.uid;
+  const uid = Number(session?.uid) || 0;
+  const cid = Number(config.cid);
 
-  const cid =
-    config.cid;
+  const root =
+    `${uid > 0 ? "/dashboard" : "/government-exams-coaching"}` +
+    `/${governmentExamsSlug}/topic-wise-exams`;
 
-  /* =======================================================
-     RESOLVE TOPIC FROM SEO SLUG
-  ======================================================= */
+  const topicsResult = await getTopicWiseExams({
+    uid,
+    cid,
+    type: "twe",
+  });
 
-  const topicsResult =
-    await getTopicWiseExams({
+  const topics = Array.isArray(topicsResult?.data)
+    ? topicsResult.data
+    : [];
+
+  const selectedTopic = topics.find(
+    (item) => createSlug(item.subject) === slug
+  );
+
+  if (!selectedTopic) notFound();
+
+  const [result, attemptsResult] = await Promise.all([
+    getAllTopicWiseTests({
       uid,
-      cid,
-      type: "twe",
-    });
+      topicId: selectedTopic.id,
+    }),
 
-  const topics =
-    Array.isArray(
-      topicsResult?.data
-    )
-      ? topicsResult.data
-      : [];
+    uid > 0
+      ? getUserExamsList({
+        uid,
+        exam_type: "twe",
+      })
+      : Promise.resolve({
+        status: true,
+        details: [],
+        data: [],
+      }),
+  ]);
 
-  const selectedTopic =
-    topics.find(
-      (item) =>
-        createSlug(
-          item?.subject
-        ) === slug
-    );
+  const tests = Array.isArray(result?.data)
+    ? result.data
+    : [];
 
-  if (!selectedTopic) {
-    notFound();
-  }
-
-  const topicId =
-    selectedTopic.id;
-
-  const topicName =
-    selectedTopic?.subject ||
-    formatSlug(slug);
-
-  /* =======================================================
-     FETCH TESTS USING INTERNAL TOPIC ID
-  ======================================================= */
-
-  const result =
-    await getAllTopicWiseTests({
-      uid,
-      topicId,
-    });
-
-  const tests =
-    Array.isArray(
-      result?.data
-    )
-      ? result.data
-      : [];
+  const pausedAttempts =
+    uid > 0
+      ? getPausedAttemptIds(attemptsResult)
+      : {};
 
   return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f8fafc] mt-20
-      "
-    >
-      <div
-        className="
-          mx-auto
-          w-full
-          max-w-[1450px]
-          px-4
-          py-6
-          sm:px-6
-          lg:px-8
-          lg:py-8
-        "
-      >
+    <main className="min-h-screen bg-[#f5f8ff] py-7">
+      <div className="mx-auto max-w-[1450px] px-4 sm:px-6 lg:px-8">
         <Link
-          href={`/dashboard/${governmentExamsSlug}/topic-wise-exams`}
-          className="
-            mb-5
-            inline-flex
-            items-center
-            gap-2
-            text-sm
-            font-bold
-            text-[#075fc8]
-          "
+          href={root}
+          className="inline-flex items-center gap-2 text-sm font-bold text-[#017dc0] hover:underline"
         >
-          <ArrowLeft size={16} />
-
-          Back to Topics
+          ← Back to Topics
         </Link>
 
-        {/* HERO */}
+        <section className="relative mt-5 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#05176a] via-[#164fa5] to-[#017dc0] p-7 text-white shadow-xl sm:p-9">
+          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
 
-        <section
-          className="
-            relative
-            overflow-hidden
-            rounded-[28px]
-            bg-gradient-to-r
-            from-[#071f55]
-            via-[#075fc8]
-            to-[#017dc0]
-            px-6
-            py-8
-            text-white
-            sm:px-8
-          "
-        >
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              inset-0
-              opacity-[0.06]
-              [background-image:linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)]
-              [background-size:34px_34px]
-            "
-          />
-
-          <div className="relative z-10">
-            <p
-              className="
-                text-[10px]
-                font-black
-                uppercase
-                tracking-[0.16em]
-                text-blue-100
-              "
-            >
-              Kerala PSC
+          <div className="relative">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">
+              {config.name}
             </p>
 
-            <h1
-              className="
-                mt-2
-                text-2xl
-                font-black
-                sm:text-3xl
-              "
-            >
-              {topicName}
+            <h1 className="mt-3 text-2xl font-black sm:text-3xl">
+              {selectedTopic.subject || formatSlug(slug)}
             </h1>
 
-            <p
-              className="
-                mt-3
-                text-sm
-                text-blue-100
-              "
-            >
-              Select an exam and start
-              your topic-wise practice.
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-blue-100">
+              Select an exam to begin or resume your
+              topic-wise practice.
             </p>
+
+            <div className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold">
+              <BookOpen size={17} />
+              {tests.length} Available Exams
+            </div>
           </div>
         </section>
 
-        {/* HEADER */}
+        <div className="mb-6 mt-9 flex items-center justify-between">
+          <h2 className="text-xl font-black text-[#071f55]">
+            Available Exams
+          </h2>
+        </div>
 
-        <section className="mt-7">
-          <div
-            className="
-              mb-5
-              flex
-              items-end
-              justify-between
-              gap-4
-            "
-          >
-            <div>
-              <p
-                className="
-                  text-[10px]
-                  font-black
-                  uppercase
-                  tracking-[0.14em]
-                  text-[#017dc0]
-                "
-              >
-                Practice Tests
-              </p>
-
-              <h2
-                className="
-                  mt-1
-                  text-xl
-                  font-black
-                  text-[#071f55]
-                "
-              >
-                Available Exams
-              </h2>
-            </div>
-
-            <div
-              className="
-                rounded-full
-                border
-                border-slate-200
-                bg-white
-                px-4
-                py-2
-              "
-            >
-              <p className="text-xs font-bold text-slate-500">
-                {tests.length} Exams
-              </p>
-            </div>
+        {!tests.length ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500">
+            No exams are currently available.
           </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {tests.map((test) => {
+              const access = getAccess(test);
+              const isFree = access === "free";
 
-          {!tests.length ? (
-            <div
-              className="
-                rounded-[22px]
-                border
-                border-slate-200
-                bg-white
-                p-10
-                text-center
-              "
-            >
-              No exams available.
-            </div>
-          ) : (
-            <div
-              className="
-                grid
-                grid-cols-1
-                gap-5
-                sm:grid-cols-2
-                lg:grid-cols-3
-                xl:grid-cols-4
-              "
-            >
-              {tests.map(
-                (test) => {
-                  const isPaid =
-                    String(
-                      test?.access ||
-                        ""
-                    ).toLowerCase() ===
-                    "paid";
+              const examSlug = createSlug(
+                test.exam_name || String(test.id)
+              );
 
-                  const examSlug =
-                    createSlug(
-                      test?.exam_name ||
-                        `exam-${test.id}`
-                    );
+              const pauseId = Number(
+                pausedAttempts[String(test.id)]
+              );
 
-                  return (
-                    <article
-                      key={test.id}
-                      className={`
-                        group
-                        flex
-                        h-full
-                        flex-col
-                        rounded-[24px]
-                        border
-                        p-5
+              const hasPausedAttempt =
+                uid > 0 &&
+                Number.isSafeInteger(pauseId) &&
+                pauseId > 0;
 
-                        ${
-                          isPaid
-                            ? `
-                              border-amber-200
-                              bg-amber-50/60
-                            `
-                            : `
-                              border-green-200
-                              bg-green-50/60
-                            `
-                        }
-                      `}
+              const detailsHref =
+                `${root}/test/${slug}/${examSlug}`;
+
+              const resumeHref =
+                `${detailsHref}/start?` +
+                new URLSearchParams({
+                  mode: "resume",
+                  pauseId: String(pauseId),
+                }).toString();
+
+              return (
+                <article
+                  key={test.id}
+                  className="group flex h-full flex-col overflow-hidden rounded-[26px] border border-[#dce8f5] bg-white p-5 shadow-[0_8px_30px_rgba(15,42,90,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-2xl ${isFree
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-amber-50 text-amber-600"
+                        }`}
                     >
-                      <div
-                        className="
-                          flex
-                          items-start
-                          justify-between
-                        "
-                      >
-                        <div
-                          className={`
-                            flex
-                            h-12
-                            w-12
-                            items-center
-                            justify-center
-                            rounded-[14px]
-                            border
-
-                            ${
-                              isPaid
-                                ? `
-                                  border-amber-200
-                                  bg-amber-100
-                                  text-amber-600
-                                `
-                                : `
-                                  border-green-200
-                                  bg-green-100
-                                  text-green-600
-                                `
-                            }
-                          `}
-                        >
-                          <FileQuestion
-                            size={21}
-                          />
-                        </div>
-
-                        <span
-                          className={`
-                            rounded-full
-                            border
-                            px-3
-                            py-1.5
-                            text-[9px]
-                            font-black
-                            uppercase
-
-                            ${
-                              isPaid
-                                ? `
-                                  border-amber-200
-                                  bg-amber-50
-                                  text-amber-600
-                                `
-                                : `
-                                  border-green-200
-                                  bg-green-50
-                                  text-green-600
-                                `
-                            }
-                          `}
-                        >
-                          {isPaid
-                            ? "Premium"
-                            : "Free"}
-                        </span>
-                      </div>
-
-                      <p
-                        className={`
-                          mt-5
-                          text-[9px]
-                          font-black
-                          uppercase
-                          tracking-[0.14em]
-
-                          ${
-                            isPaid
-                              ? "text-amber-600"
-                              : "text-green-600"
-                          }
-                        `}
-                      >
-                        {test?.subject ||
-                          topicName}
-                      </p>
-
-                      <h3
-                        className="
-                          mt-2
-                          text-[16px]
-                          font-black
-                          leading-6
-                          text-[#071f55]
-                        "
-                      >
-                        {test?.exam_name ||
-                          "Topic Exam"}
-                      </h3>
-
-                      <div
-                        className="
-                          mt-5
-                          grid
-                          grid-cols-2
-                          gap-3
-                        "
-                      >
-                        <div
-                          className="
-                            rounded-[14px]
-                            border
-                            border-white
-                            bg-white/70
-                            p-3
-                          "
-                        >
-                          <FileQuestion
-                            size={15}
-                          />
-
-                          <p className="mt-2 text-[10px] text-slate-500">
-                            Questions
-                          </p>
-
-                          <p className="text-sm font-black text-[#071f55]">
-                            {test?.total_questions ??
-                              0}
-                          </p>
-                        </div>
-
-                        <div
-                          className="
-                            rounded-[14px]
-                            border
-                            border-white
-                            bg-white/70
-                            p-3
-                          "
-                        >
-                          <Trophy size={15} />
-
-                          <p className="mt-2 text-[10px] text-slate-500">
-                            Marks
-                          </p>
-
-                          <p className="text-sm font-black text-[#071f55]">
-                            {test?.total_mark ??
-                              0}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* PREMIUM = MODAL */}
-
-                      {isPaid ? (
-                        <PremiumExamButton
-                          governmentExamsSlug={
-                            governmentExamsSlug
-                          }
-                        />
+                      {isFree ? (
+                        <BookOpen size={21} />
                       ) : (
-                        /* FREE = SEO URL */
-
-                        <Link
-                          href={
-                            `/dashboard/${governmentExamsSlug}/topic-wise-exams/test/${slug}/${examSlug}`
-                          }
-                          className="
-                            mt-auto
-                            pt-6
-                          "
-                        >
-                          <span
-                            className="
-                              inline-flex
-                              w-full
-                              items-center
-                              justify-between
-                              rounded-[13px]
-                              border
-                              border-green-200
-                              bg-green-100
-                              px-5
-                              py-3.5
-                              text-[11px]
-                              font-bold
-                              text-green-700
-                            "
-                          >
-                            View Exam
-
-                            <span
-                              className="
-                                flex
-                                h-7
-                                w-7
-                                items-center
-                                justify-center
-                                rounded-full
-                                bg-green-200/60
-                              "
-                            >
-                              <ArrowRight
-                                size={14}
-                              />
-                            </span>
-                          </span>
-                        </Link>
+                        <LockKeyhole size={21} />
                       )}
-                    </article>
-                  );
-                }
-              )}
-            </div>
-          )}
-        </section>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${isFree
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                        }`}
+                    >
+                      {isFree
+                        ? "Free"
+                        : access === "paid"
+                          ? "Premium"
+                          : "Access Unavailable"}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-5 min-h-[56px] text-base font-black leading-7 text-[#071f55]">
+                    {test.exam_name || "Topic Exam"}
+                  </h3>
+
+                  <div className="my-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-[#f4f8fd] p-4">
+                      <p className="text-xs font-semibold text-slate-500">
+                        Questions
+                      </p>
+                      <p className="mt-2 text-xl font-black text-[#071f55]">
+                        {test.total_questions ?? 0}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-[#f4f8fd] p-4">
+                      <p className="text-xs font-semibold text-slate-500">
+                        Marks
+                      </p>
+                      <p className="mt-2 text-xl font-black text-[#071f55]">
+                        {test.total_mark ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  {isFree ? (
+                    <Link
+                      href={
+                        hasPausedAttempt
+                          ? resumeHref
+                          : detailsHref
+                      }
+                      className="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-[#017dc0] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#164fa5]"
+                    >
+                      {hasPausedAttempt ? (
+                        <>
+                          <RotateCcw size={16} />
+                          Resume Exam
+                        </>
+                      ) : (
+                        <>
+                          <Play size={16} />
+                          View Exam
+                          <ArrowRight size={16} />
+                        </>
+                      )}
+                    </Link>
+                  ) : (
+                    <div className="mt-auto flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3.5 text-sm font-black text-amber-700">
+                      <LockKeyhole size={16} />
+                      {access === "paid"
+                        ? "Premium Access Required"
+                        : "Access Unavailable"}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </main>
   );

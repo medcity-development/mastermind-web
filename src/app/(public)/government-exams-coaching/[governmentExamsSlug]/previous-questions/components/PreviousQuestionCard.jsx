@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -21,6 +21,7 @@ export default function PreviousQuestionCard({
   type = "pqp",
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [
     showPremiumModal,
@@ -51,7 +52,12 @@ export default function PreviousQuestionCard({
   function handleOk() {
     setShowPremiumModal(false);
 
-    router.push("/login");
+    const returnPath =
+      `${pathname}/${encodeURIComponent(id)}` +
+      `?type=${encodeURIComponent(type)}` +
+      `&selectedTestTitle=${encodeURIComponent(exam_name || "Previous Question Paper")}`;
+
+    router.push(`/login?redirect=${encodeURIComponent(returnPath)}`);
   }
 
   return (
@@ -64,7 +70,6 @@ export default function PreviousQuestionCard({
           flex-col
           rounded-[22px]
           border
-          bg-white
           p-5
           transition-all
           duration-300
@@ -74,8 +79,8 @@ export default function PreviousQuestionCard({
 
           ${
             isPaid
-              ? "border-amber-200/80"
-              : "border-emerald-200/80"
+              ? "border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50"
+              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-green-50"
           }
         `}
       >
@@ -302,7 +307,7 @@ export default function PreviousQuestionCard({
             </button>
           ) : (
             <Link
-              href={`/government-exams-coaching/kerala-psc/previous-questions/${id}?uid=${uid}&cid=${cid}&type=${type}`}
+              href={`${pathname}/${encodeURIComponent(id)}?uid=${encodeURIComponent(uid)}&cid=${encodeURIComponent(cid)}&type=${encodeURIComponent(type)}`}
               className="
                 group/button
                 inline-flex
@@ -311,14 +316,17 @@ export default function PreviousQuestionCard({
                 justify-center
                 gap-2
                 rounded-[12px]
-                bg-green-200
+                border
+                border-emerald-200
+                bg-emerald-100
                 px-4
                 py-3
-                text-green-600 text-sm border border-green-300
+                text-sm
                 font-bold
+                text-emerald-800
                 transition-all
                 duration-300
-                hover:bg-green-300
+                hover:bg-emerald-200
               "
             >
               Start Exam

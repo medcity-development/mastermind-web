@@ -18,7 +18,7 @@ function formatTime(
   const minutes =
     Math.floor(
       safeSeconds /
-        60
+      60
     );
 
   const seconds =
@@ -62,7 +62,7 @@ export default function ScertExamHeader({
         px-6
         py-7
         text-white
-        sm:px-8 mt-20
+        sm:px-8
       "
     >
       <div
@@ -161,10 +161,9 @@ export default function ScertExamHeader({
             py-4
             text-center
             backdrop-blur
-            ${
-              timeIsLow
-                ? "border-red-300/30 bg-red-500/20"
-                : "border-white/15 bg-white/10"
+            ${timeIsLow
+              ? "border-red-300/30 bg-red-500/20"
+              : "border-white/15 bg-white/10"
             }
           `}
         >
@@ -193,10 +192,9 @@ export default function ScertExamHeader({
               mt-2
               text-3xl
               font-black
-              ${
-                timeIsLow
-                  ? "text-red-100"
-                  : "text-white"
+              ${timeIsLow
+                ? "text-red-100"
+                : "text-white"
               }
             `}
           >

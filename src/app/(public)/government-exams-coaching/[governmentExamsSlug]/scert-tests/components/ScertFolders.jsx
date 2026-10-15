@@ -2,6 +2,8 @@ import ScertFolderCard from "./ScertFolderCard";
 
 export default function ScertFolders({
   folders = [],
+  governmentExamsSlug = "kerala-psc",
+  examName = "Kerala PSC",
 }) {
   return (
     <section className="mt-9">
@@ -66,6 +68,10 @@ export default function ScertFolders({
                 folder={
                   folder
                 }
+                governmentExamsSlug={
+                  governmentExamsSlug
+                }
+                examName={examName}
               />
             )
           )}

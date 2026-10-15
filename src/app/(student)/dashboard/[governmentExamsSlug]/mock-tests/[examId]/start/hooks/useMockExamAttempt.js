@@ -16,6 +16,7 @@ import {
     getAttemptId,
     getDatabaseResult,
     getExamType,
+    getExamTotalMark,
     postJson,
 } from "../utils/mockTestUtils";
 
@@ -23,8 +24,10 @@ import {
     buildMockAttemptPayload,
     getMockExamTitle,
 } from "../utils/mockAttemptUtils";
+import { clearGuestExamHandoff } from "@/lib/guestExamHandoff";
 
 export default function useMockExamAttempt({
+    uid,
     cid,
     examId,
     examType,
@@ -35,12 +38,15 @@ export default function useMockExamAttempt({
     answersRef,
 
     remainingSeconds,
+    currentPage,
 
     initialPauseId = null,
+    startTime = 0,
 
     examTitle = "",
 
     governmentExamsSlug,
+    guestAction = "",
 
     stopTimer,
 
@@ -79,7 +85,7 @@ export default function useMockExamAttempt({
         pauseId,
         setPauseId,
     ] = useState(
-        initialPauseId
+        initialPauseId || null
     );
 
     const [
@@ -113,51 +119,32 @@ export default function useMockExamAttempt({
     ] = useState(false);
 
     /* =======================================================
-       SYNC INITIAL PAUSE ID
-    ======================================================= */
-
-    useEffect(() => {
-        setPauseId(
-            initialPauseId ||
-            null
-        );
-    }, [
-        initialPauseId,
-    ]);
-
-    /* =======================================================
        SYNC EXTERNAL STATES
     ======================================================= */
 
-    function updateSaving(
-        value
-    ) {
-        setSaving(value);
+    const updateSaving = useCallback(
+        (value) => {
+            setSaving(value);
+            onSavingChange?.(value);
+        },
+        [onSavingChange]
+    );
 
-        onSavingChange?.(
-            value
-        );
-    }
+    const updateSubmitted = useCallback(
+        (value) => {
+            setSubmitted(value);
+            onSubmittedChange?.(value);
+        },
+        [onSubmittedChange]
+    );
 
-    function updateSubmitted(
-        value
-    ) {
-        setSubmitted(value);
-
-        onSubmittedChange?.(
-            value
-        );
-    }
-
-    function updatePaused(
-        value
-    ) {
-        setIsPaused(value);
-
-        onPausedChange?.(
-            value
-        );
-    }
+    const updatePaused = useCallback(
+        (value) => {
+            setIsPaused(value);
+            onPausedChange?.(value);
+        },
+        [onPausedChange]
+    );
 
     /* =======================================================
        CALCULATE
@@ -188,6 +175,7 @@ export default function useMockExamAttempt({
             ({
                 examStatus,
                 result,
+                completedAt,
             }) =>
                 buildMockAttemptPayload({
                     cid,
@@ -199,6 +187,8 @@ export default function useMockExamAttempt({
 
                     remainingSeconds,
 
+                    startTime,
+                    completedAt,
                     examStatus,
                     result,
                 }),
@@ -209,6 +199,7 @@ export default function useMockExamAttempt({
                 exam,
                 questions,
                 remainingSeconds,
+                startTime,
             ]
         );
 
@@ -304,6 +295,7 @@ export default function useMockExamAttempt({
                                 calculated,
                         });
 
+                    let savedPauseId = pauseId;
                     if (pauseId) {
                         await postJson(
                             "/api/exam-attempt/update",
@@ -335,11 +327,27 @@ export default function useMockExamAttempt({
                         setPauseId(
                             createdId
                         );
+                        savedPauseId = createdId;
+                    }
+
+                    try {
+                        localStorage.setItem(
+                            `exam_draft_${uid}_${cid}_${examType}_${examId}`,
+                            JSON.stringify({
+                                pauseId: savedPauseId,
+                                answers: answersRef?.current || {},
+                                remainingSeconds,
+                                currentPage,
+                            })
+                        );
+                    } catch (error) {
+                        console.warn("Save mock exam resume draft:", error);
                     }
 
                     updatePaused(
                         true
                     );
+                    clearGuestExamHandoff();
 
                     setSaveMessage(
                         "Exam paused successfully."
@@ -371,6 +379,14 @@ export default function useMockExamAttempt({
                 getCurrentResult,
                 buildPayload,
                 pauseId,
+                answersRef,
+                uid,
+                cid,
+                examType,
+                examId,
+                currentPage,
+                updatePaused,
+                updateSaving,
             ]
         );
 
@@ -469,6 +485,9 @@ export default function useMockExamAttempt({
 
                             result:
                                 calculated,
+
+                            completedAt:
+                                Date.now(),
                         });
 
                     const updatePayload = {
@@ -489,6 +508,7 @@ export default function useMockExamAttempt({
                         "/api/exam-attempt/update",
                         updatePayload
                     );
+                    clearGuestExamHandoff();
 
                     /* ===============================================
                        STOP EXAM
@@ -508,20 +528,49 @@ export default function useMockExamAttempt({
                        READ SAVED RESULT
                     =============================================== */
 
-                    const databaseResult =
-                        await fetchDatabaseResult(
-                            finalPauseId
+                    const localResult = {
+                        id: finalPauseId,
+                        exam_id: examId,
+                        exam_type: examType,
+                        exam_name: getMockExamTitle({
+                            exam,
+                            fallback: examTitle,
+                        }),
+                        total_questions: questions.length,
+                        total_mark: getExamTotalMark(exam, questions.length),
+                        total_attempted: calculated.totalAttempted,
+                        total_correct: calculated.totalCorrect,
+                        total_wrong: calculated.totalWrong,
+                        user_score: calculated.userScore,
+                        minus_mark: calculated.minusMark,
+                    };
+                    let resultForModal = localResult;
+                    let resultDetailsLoaded = true;
+                    try {
+                        resultForModal = {
+                            ...localResult,
+                            ...await fetchDatabaseResult(finalPauseId),
+                        };
+                    } catch (resultError) {
+                        console.error(
+                            "MOCK TEST SAVED BUT RESULT DETAILS COULD NOT BE LOADED:",
+                            resultError
                         );
+                        resultDetailsLoaded = false;
+                        setSaveMessage(
+                            "Exam submitted. Showing the calculated result; saved analytics details are unavailable."
+                        );
+                    }
 
-                    setSubmittedResult(
-                        databaseResult
-                    );
+                    setSubmittedResult(resultForModal);
 
-                    setSaveMessage(
-                        timeout
-                            ? "Time is over. Exam submitted automatically."
-                            : "Exam submitted successfully."
-                    );
+                    if (resultDetailsLoaded) {
+                        setSaveMessage(
+                            timeout
+                                ? "Time is over. Exam submitted automatically."
+                                : "Exam submitted successfully."
+                        );
+                    }
 
                     setResultModalOpen(
                         true
@@ -564,6 +613,14 @@ export default function useMockExamAttempt({
                 fetchDatabaseResult,
 
                 stopTimer,
+                exam,
+                examId,
+                examTitle,
+                examType,
+                questions.length,
+                updatePaused,
+                updateSaving,
+                updateSubmitted,
             ]
         );
 
@@ -593,9 +650,12 @@ export default function useMockExamAttempt({
         timeoutHandledRef.current =
             true;
 
-        finishExam({
-            timeout: true,
-        });
+        const timer = window.setTimeout(() => {
+            void finishExam({
+                timeout: true,
+            });
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [
         remainingSeconds,
         submitted,
@@ -655,6 +715,11 @@ export default function useMockExamAttempt({
             false
         );
 
+        if (guestAction === "submit") {
+            router.replace(`/dashboard/${governmentExamsSlug}`);
+            return;
+        }
+
         const savedAttemptId =
             getAttemptId(
                 submittedResult
@@ -709,6 +774,13 @@ export default function useMockExamAttempt({
         );
     }
 
+    function handleViewAnalysis() {
+        setResultModalOpen(false);
+        router.replace(
+            `/dashboard/${governmentExamsSlug}/exam-attempted`
+        );
+    }
+
     return {
         saving,
         submitted,
@@ -726,6 +798,7 @@ export default function useMockExamAttempt({
         handlePause,
         handleSubmit,
         handleResultClose,
+        handleViewAnalysis,
 
         finishExam,
     };

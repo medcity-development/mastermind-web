@@ -19,36 +19,57 @@ import {
   
     return (
       <article
-        className="
+        className={`
           group
           relative
           overflow-hidden
           rounded-[22px]
           border
-          border-[#dce8f7]
-          bg-gradient-to-br
-          from-white
-          to-[#f5faff]
           p-5
           transition-all
           duration-300
-  
+
+          ${
+            isFree
+              ? `
+                  border-emerald-200
+                  bg-gradient-to-br
+                  from-emerald-50
+                  via-white
+                  to-green-50
+                  hover:border-emerald-300
+                  hover:shadow-[0_18px_45px_rgba(16,185,129,0.12)]
+                `
+              : `
+                  border-amber-200
+                  bg-gradient-to-br
+                  from-amber-50
+                  via-white
+                  to-orange-50
+                  hover:border-amber-300
+                  hover:shadow-[0_18px_45px_rgba(245,158,11,0.12)]
+                `
+          }
+
           hover:-translate-y-1
-          hover:border-[#087bea]/25
-          hover:shadow-[0_18px_45px_rgba(22,79,165,0.10)]
-        "
+        `}
       >
         <div
           aria-hidden="true"
-          className="
+          className={`
             absolute
             -right-10
             -top-10
             h-32
             w-32
             rounded-full
-            bg-[#087bea]/5
-          "
+
+            ${
+              isFree
+                ? "bg-emerald-200/30"
+                : "bg-amber-200/30"
+            }
+          `}
         />
   
         <div className="relative z-10">
@@ -61,16 +82,20 @@ import {
             "
           >
             <div
-              className="
+              className={`
                 flex
                 h-12
                 w-12
                 items-center
                 justify-center
                 rounded-[15px]
-                bg-[#e8f3ff]
-                text-[#087bea]
-              "
+
+              ${
+                isFree
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-amber-100 text-amber-700"
+              }
+              `}
             >
               <Brain size={21} />
             </div>
@@ -91,7 +116,7 @@ import {
                 ${
                   isFree
                     ? "bg-emerald-50 text-emerald-600"
-                    : "bg-orange-50 text-orange-600"
+                    : "bg-amber-50 text-amber-700"
                 }
               `}
             >
@@ -138,21 +163,24 @@ import {
   
           <button
             type="button"
-            className="
+            className={`
               mt-6
               inline-flex
               items-center
               gap-2
               rounded-full
-              bg-[#164fa5]
               px-5
               py-2.5
               text-[11px]
               font-bold
-              text-white
               transition
-              hover:bg-[#087bea]
-            "
+
+              ${
+                isFree
+                  ? "border border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                  : "border border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-200"
+              }
+            `}
           >
             Start Quiz
   

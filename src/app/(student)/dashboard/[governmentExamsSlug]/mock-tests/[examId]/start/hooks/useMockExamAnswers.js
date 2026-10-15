@@ -85,23 +85,18 @@ export default function useMockExamAnswers({
         answeredCount
     );
 
-  function restoreAnswers(
-    restored = {}
-  ) {
-    answersRef.current =
-      restored;
+  const restoreAnswers = useCallback(
+    (restored = {}) => {
+      answersRef.current = restored;
+      setAnswers(restored);
+    },
+    []
+  );
 
-    setAnswers(
-      restored
-    );
-  }
-
-  function resetAnswers() {
-    answersRef.current =
-      {};
-
+  const resetAnswers = useCallback(() => {
+    answersRef.current = {};
     setAnswers({});
-  }
+  }, []);
 
   return {
     answers,

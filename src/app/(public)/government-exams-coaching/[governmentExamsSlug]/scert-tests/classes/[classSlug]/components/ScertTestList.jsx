@@ -18,6 +18,7 @@ const TESTS_PER_PAGE = 10;
 export default function ScertTestList({
   tests = [],
   classId,
+  governmentExamsSlug = "kerala-psc",
 }) {
   const [
     currentPage,
@@ -300,6 +301,9 @@ export default function ScertTestList({
               test={test}
               classId={
                 classId
+              }
+              governmentExamsSlug={
+                governmentExamsSlug
               }
             />
           )

@@ -19,6 +19,7 @@ export default function PreviousQuestionCard({
   cid = 1,
   type = "pqp",
   governmentExamsSlug,
+  pauseId,
 }) {
   const [
     showPremiumModal,
@@ -56,7 +57,6 @@ export default function PreviousQuestionCard({
           flex-col
           rounded-[22px]
           border
-          bg-white
           p-5
           transition-all
           duration-300
@@ -66,8 +66,8 @@ export default function PreviousQuestionCard({
 
           ${
             isPaid
-              ? "border-amber-200/80"
-              : "border-emerald-200/80"
+              ? "border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50"
+              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-green-50"
           }
         `}
       >
@@ -110,7 +110,7 @@ export default function PreviousQuestionCard({
             />
           </div>
 
-          {isPaid ? (
+          {isPaid && !pauseId ? (
             <span
               className="
                 inline-flex
@@ -294,7 +294,18 @@ export default function PreviousQuestionCard({
             </button>
           ) : (
             <Link
-              href={`/dashboard/${governmentExamsSlug}/previous-questions/${id}?uid=${uid}&cid=${cid}&type=${type}`}
+              href={pauseId
+                ? {
+                    pathname: `/dashboard/${governmentExamsSlug}/previous-questions/${id}/start`,
+                    query: {
+                      uid: String(uid),
+                      cid: String(cid),
+                      type: String(type),
+                      mode: "resume",
+                      pauseId: String(pauseId),
+                    },
+                  }
+                : `/dashboard/${governmentExamsSlug}/previous-questions/${id}?uid=${uid}&cid=${cid}&type=${type}`}
               className="
                 group/button
                 inline-flex
@@ -303,17 +314,20 @@ export default function PreviousQuestionCard({
                 justify-center
                 gap-2
                 rounded-[12px]
-                bg-green-200
+                border
+                border-emerald-200
+                bg-emerald-100
                 px-4
                 py-3
-                text-green-600 text-sm border border-green-300
+                text-sm
                 font-bold
+                text-emerald-800
                 transition-all
                 duration-300
-                hover:bg-green-300
+                hover:bg-emerald-200
               "
             >
-              Start Exam
+              {pauseId ? "Resume Exam" : "Start Exam"}
 
               <ArrowRight
                 size={14}

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import MockTestCard from "./MockTestCard";
+import { fetchPausedAttemptIds } from "@/lib/pausedExamAttempts";
 
 const PAGE_SIZE = 10;
 
@@ -35,6 +36,16 @@ export default function MockTestList({
   const [
     error,
     setError,
+  ] = useState("");
+
+  const [
+    pausedAttempts,
+    setPausedAttempts,
+  ] = useState({});
+
+  const [
+    pausedAttemptsError,
+    setPausedAttemptsError,
   ] = useState("");
 
   const [
@@ -201,6 +212,40 @@ export default function MockTestList({
     uid,
     filter,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPausedAttempts() {
+      try {
+        setPausedAttemptsError("");
+        const attempts = await fetchPausedAttemptIds({
+          cid,
+          examType: "mock",
+        });
+
+        if (!cancelled) {
+          setPausedAttempts(attempts);
+        }
+      } catch (error) {
+        console.error("Load paused mock attempts:", error);
+        if (!cancelled) {
+          setPausedAttempts({});
+          setPausedAttemptsError(
+            error?.message || "Unable to check paused mock exams."
+          );
+        }
+      }
+    }
+
+    if (cid && uid) {
+      loadPausedAttempts();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cid, uid]);
 
   /* =======================================================
      PAGINATION
@@ -396,6 +441,11 @@ export default function MockTestList({
           }
         `}
       >
+        {pausedAttemptsError ? (
+          <p className="col-span-full text-sm text-amber-700" role="status">
+            {pausedAttemptsError}
+          </p>
+        ) : null}
         {tests.map(
           (test) => (
             <MockTestCard
@@ -404,6 +454,9 @@ export default function MockTestList({
               }
               test={
                 test
+              }
+              pauseId={
+                pausedAttempts[String(test?.id)]
               }
               uid={
                 uid

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -109,9 +110,15 @@ export default async function MockExamStartPage({
       query?.title ??
         ""
     );
+  const selectedExamId =
+    String(query?.examId ?? (/^\d+$/.test(examId) ? examId : ""));
 
   const detailsPath =
     `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${examId}`;
+
+  if (!selectedExamId) {
+    redirect(detailsPath);
+  }
 
   return (
     <main
@@ -157,6 +164,7 @@ export default async function MockExamStartPage({
                     ),
 
                   title,
+                  examId: selectedExamId,
                 },
               }}
               className="
@@ -200,7 +208,7 @@ export default async function MockExamStartPage({
 
         <MockTestQuestions
           examId={
-            examId
+            selectedExamId
           }
           uid={
             uid

@@ -1,6 +1,4 @@
-import {
-  notFound,
-} from "next/navigation";
+import { notFound } from "next/navigation";
 
 import {
   getGovernmentExamConfig,
@@ -17,178 +15,99 @@ import {
 import TopicWiseHero from "./components/TopicWiseHero";
 import TopicWiseExamList from "./components/TopicWiseExamList";
 
-const ITEMS_PER_PAGE =
-  10;
+export const dynamic = "force-dynamic";
 
-function getPageNumber(
-  value
-) {
-  const page =
-    Number(value);
+export async function generateMetadata({ params }) {
+  const { governmentExamsSlug } = await params;
 
-  if (
-    !Number.isInteger(
-      page
-    ) ||
-    page < 1
-  ) {
-    return 1;
-  }
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
-  return page;
-}
-
-export async function generateMetadata({
-  params,
-}) {
-  const {
-    governmentExamsSlug,
-  } = await params;
-
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
-
-  if (!config) {
-    return {};
-  }
-
-  return {
-    title:
-      `${config.name} Topic Wise Exams | MasterMind Academy`,
-
-    description:
-      `Practice topic-wise ${config.name} competitive exam questions with MasterMind Academy.`,
-
-    alternates: {
-      canonical:
-        `/dashboard/${governmentExamsSlug}/topic-wise-exams`,
-    },
-  };
+  return config
+    ? {
+      title:
+        `${config.name} Topic Wise Exams | MasterMind Academy`,
+      description:
+        `Practice topic-wise ${config.name} questions with MasterMind Academy.`,
+    }
+    : {};
 }
 
 export default async function TopicWiseExamsPage({
   params,
   searchParams,
 }) {
-  const {
-    governmentExamsSlug,
-  } = await params;
+  const { governmentExamsSlug } = await params;
+  const query = await searchParams;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
+
+  if (!config) notFound();
+
+  const session = await getStudentSession();
+  const uid = Number(session?.uid) || 0;
+
+  const basePath =
+    `${uid > 0 ? "/dashboard" : "/government-exams-coaching"}` +
+    `/${governmentExamsSlug}/topic-wise-exams`;
+
+  const result = await getTopicWiseExams({
+    uid,
+    cid: config.cid,
+    type: "twe",
+  });
+
+  if (result?.status === false) {
+    return (
+      <p role="alert" className="p-6 text-red-700">
+        Unable to load topics. Refresh and try again.
+      </p>
     );
-
-  if (!config) {
-    notFound();
   }
 
-  const {
-    cid,
-    name,
-    shortName,
-  } = config;
+  const allTopics = Array.isArray(result?.data)
+    ? result.data
+    : [];
 
-  const session =
-    await getStudentSession();
+  const totalPages = Math.max(
+    1,
+    Math.ceil(allTopics.length / 10)
+  );
 
-  const uid =
-    session?.uid;
+  const requested = Number(query?.page);
 
-  const query =
-    await searchParams;
-
-  const requestedPage =
-    getPageNumber(
-      query?.page
-    );
-
-  const result =
-    await getTopicWiseExams({
-      uid,
-      cid,
-      type: "twe",
-    });
-
-  const allTopics =
-    Array.isArray(
-      result?.data
-    )
-      ? result.data
-      : [];
-
-  const totalItems =
-    allTopics.length;
-
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        totalItems /
-          ITEMS_PER_PAGE
-      )
-    );
-
-  const currentPage =
-    Math.min(
-      requestedPage,
-      totalPages
-    );
-
-  const startIndex =
-    (currentPage - 1) *
-    ITEMS_PER_PAGE;
-
-  const topics =
-    allTopics.slice(
-      startIndex,
-      startIndex +
-        ITEMS_PER_PAGE
-    );
+  const currentPage = Math.min(
+    totalPages,
+    Number.isSafeInteger(requested) && requested > 0
+      ? requested
+      : 1
+  );
 
   return (
     <main className="min-h-screen bg-[#f5f9ff]">
-      <div
-        className="
-          mx-auto
-          w-full
-          max-w-[1450px]
-          px-4
-          py-6
-          sm:px-6
-          lg:px-8
-          lg:py-8
-        "
-      >
+      <div className="mx-auto max-w-[1450px] px-4 py-6 sm:px-6 lg:px-8">
         <TopicWiseHero
-          examName={name}
-          shortName={
-            shortName
-          }
+          examName={config.name}
+          shortName={config.shortName}
         />
 
         <TopicWiseExamList
-          topics={topics}
-          currentPage={
-            currentPage
-          }
-          totalPages={
-            totalPages
-          }
-          totalItems={
-            totalItems
-          }
-          itemsPerPage={
-            ITEMS_PER_PAGE
-          }
-          cid={cid}
+          topics={allTopics.slice(
+            (currentPage - 1) * 10,
+            currentPage * 10
+          )}
+          cid={config.cid}
           uid={uid}
-          examName={name}
-          governmentExamsSlug={
-            governmentExamsSlug
-          }
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={allTopics.length}
+          itemsPerPage={10}
+          governmentExamsSlug={governmentExamsSlug}
+          examName={config.name}
+          basePath={basePath}
         />
       </div>
     </main>

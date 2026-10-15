@@ -8,6 +8,10 @@ import {
 } from "@/lib/governmentExamConfig";
 
 import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
+import {
   getStatementTypeTopics,
   getStatementTypeExamsByTopic,
   getStatementTypeExamDetails,
@@ -67,10 +71,10 @@ export default async function StatementTypeExamStartPage({
      Later replace this with authenticated user/session.
   ======================================================= */
 
+  const session =
+    await getStudentSession();
   const uid =
-    Number(
-      query?.uid ?? 0
-    ) || 0;
+    session?.uid || 0;
 
   const examType =
     "tst";
@@ -174,7 +178,9 @@ export default async function StatementTypeExamStartPage({
     !uid
   ) {
     const currentPath =
-      `/government-exams-coaching/${governmentExamsSlug}/statement-type-exams/${statementTypeSlug}/${examSlug}/start`;
+      `/government-exams-coaching/${governmentExamsSlug}/statement-type-exams/${statementTypeSlug}/${examSlug}/start` +
+      `?examId=${encodeURIComponent(examId)}` +
+      `&selectedTestTitle=${encodeURIComponent(selectedExam?.exam_name || "Statement Type Exam")}`;
 
     redirect(
       `/login?redirect=${encodeURIComponent(
@@ -300,6 +306,12 @@ export default async function StatementTypeExamStartPage({
       }
       governmentExamsSlug={
         governmentExamsSlug
+      }
+      examName={
+        config.name
+      }
+      guestAction={
+        query?.guestAction || ""
       }
       uid={
         uid

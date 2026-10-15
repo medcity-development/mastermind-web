@@ -1,390 +1,176 @@
 "use client";
 
 import {
+  useRef,
   useState,
 } from "react";
 
-import {
-  Mail,
-} from "lucide-react";
-
-import Link from "next/link";
-
-import Swal from "sweetalert2";
-
-import LoginInput from "./LoginInput";
-import LoginButton from "./LoginButton";
 import OtpVerification from "./OtpVerification";
 
-export default function LoginCard() {
-  const [
-    email,
-    setEmail,
-  ] = useState("");
+export default function LoginCard({
+  redirectTo = "",
+}) {
+  const [email, setEmail] = useState("");
+  const [authData, setAuthData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
+  const busy = useRef(false);
 
-  const [
-    step,
-    setStep,
-  ] = useState("login");
-
-  const [
-    authData,
-    setAuthData,
-  ] = useState(null);
-
-  /* =========================================================
-     SEND OTP
-  ========================================================= */
-
-  async function handleSubmit(
-    event
-  ) {
+  async function sendOtp(event) {
     event.preventDefault();
 
+    if (busy.current) return;
+
     const cleanEmail =
-      email
-        .trim()
-        .toLowerCase();
-
-    /* =======================================================
-       VALIDATION
-    ======================================================= */
-
-    if (!cleanEmail) {
-      await Swal.fire({
-        icon: "warning",
-
-        title:
-          "Enter your email",
-
-        text:
-          "Please enter your email address to continue.",
-
-        confirmButtonColor:
-          "#2468f2",
-      });
-
-      return;
-    }
-
-    const emailPattern =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      email.trim().toLowerCase();
 
     if (
-      !emailPattern.test(
-        cleanEmail
-      )
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)
     ) {
-      await Swal.fire({
-        icon: "warning",
-
-        title:
-          "Invalid email",
-
-        text:
-          "Please enter a valid email address.",
-
-        confirmButtonColor:
-          "#2468f2",
-      });
-
+      setError("Enter a valid email address.");
       return;
     }
 
+    busy.current = true;
+    setLoading(true);
+    setError("");
+
     try {
-      setLoading(true);
+      const response = await fetch(
+        "/api/auth/send-otp",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: cleanEmail,
+          }),
+        }
+      );
 
-      /* =====================================================
-         EMAIL LOGIN PAYLOAD
-      ===================================================== */
-
-      const payload = {
-        type: "email",
-        email: cleanEmail,
-        mobile: "",
-        code: "+91",
-      };
-
-      /* =====================================================
-         SEND OTP API
-      ===================================================== */
-
-      const response =
-        await fetch(
-          "/api/auth/send-otp",
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify(
-                payload
-              ),
-          }
-        );
-
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (
         !response.ok ||
-        result?.status !==
-          true
+        result?.status !== true
       ) {
         throw new Error(
           result?.message ||
-            result?.msg ||
-            "Unable to send OTP."
+          result?.msg ||
+          "Unable to send OTP."
         );
       }
 
-      /* =====================================================
-         SAVE DATA FOR OTP STEP
-      ===================================================== */
-
       setAuthData({
-        type: "email",
-
-        email:
-          result?.email ||
-          cleanEmail,
-
-        stage:
-          result?.stage ||
-          "",
+        ...result,
+        email: cleanEmail,
       });
-
-      /* =====================================================
-         SUCCESS ALERT
-      ===================================================== */
-
-      await Swal.fire({
-        icon:
-          "success",
-
-        title:
-          "OTP Sent",
-
-        text:
-          "Please check your email for the verification code.",
-
-        timer:
-          1600,
-
-        showConfirmButton:
-          false,
-
-        timerProgressBar:
-          true,
-      });
-
-      setStep(
-        "otp"
+    } catch (failure) {
+      setError(
+        failure.message ||
+        "Unable to send OTP. Please retry."
       );
-    } catch (error) {
-      console.error(
-        "Send OTP:",
-        error
-      );
-
-      await Swal.fire({
-        icon:
-          "error",
-
-        title:
-          "Unable to continue",
-
-        text:
-          error?.message ||
-          "Unable to send OTP. Please try again.",
-
-        confirmButtonColor:
-          "#ef4444",
-      });
     } finally {
+      busy.current = false;
       setLoading(false);
     }
   }
 
-  /* =========================================================
-     OTP STEP
-  ========================================================= */
-
-  if (
-    step === "otp" &&
-    authData
-  ) {
+  if (authData) {
     return (
       <OtpVerification
-        authData={
-          authData
-        }
+        authData={authData}
+        redirectTo={redirectTo}
         onBack={() => {
-          setStep(
-            "login"
-          );
-
-          setAuthData(
-            null
-          );
+          setAuthData(null);
+          setError("");
         }}
       />
     );
   }
 
-  /* =========================================================
-     LOGIN CARD
-  ========================================================= */
-
   return (
-    <div
+    <section
       className="
-        w-full
-        rounded-[30px]
-        border
-        border-white/10
-        bg-white
-        px-6
-        py-8
-        shadow-[0_30px_90px_rgba(0,0,0,0.30)]
-
-        sm:px-8
-        sm:py-10
-
-        xl:px-10
+        rounded-[30px] border border-white/10
+        bg-white px-6 py-8 shadow-2xl
+        sm:px-8 sm:py-10
       "
     >
-      {/* HEADER */}
+      <p className="text-xs font-bold uppercase tracking-widest text-[#017dc0]">
+        MasterMind Academy
+      </p>
 
-      <div className="text-center">
-        <p
-          className="
-            text-[10px]
-            font-bold
-            uppercase
-            tracking-[0.25em]
-            text-[#172554]
-          "
-        >
-          MasterMind PSC
-        </p>
+      <h1 className="mt-3 text-3xl font-black text-[#071b59]">
+        Login to continue
+      </h1>
 
-        <h2
-          className="
-            mt-2
-            text-[32px]
-            font-extrabold
-            tracking-[-0.04em]
-            text-[#071b59]
-
-            sm:text-[38px]
-          "
-        >
-          Welcome{" "}
-
-          <span
-            className="
-              bg-gradient-to-r
-              from-[#246fff]
-              to-[#7c3cff]
-              bg-clip-text
-              text-transparent
-            "
-          >
-            Back!
-          </span>
-        </h2>
-
-        <p
-          className="
-            mx-auto
-            mt-2
-            max-w-[340px]
-            text-[13px]
-            leading-5
-            text-slate-500
-          "
-        >
-          Enter your email address
-          and we will send you a
-          verification code.
-        </p>
-      </div>
-
-      {/* FORM */}
+      <p className="mt-3 text-sm leading-6 text-slate-500">
+        {redirectTo
+          ? "Verify your email to continue. Your exam answers are preserved."
+          : "Enter your email to receive a verification code."}
+      </p>
 
       <form
-        onSubmit={
-          handleSubmit
-        }
-        className="
-          mt-7
-          space-y-5
-        "
+        onSubmit={sendOtp}
+        className="mt-6 space-y-4"
       >
-        <LoginInput
-          label="Email Address"
-          type="email"
-          value={
-            email
-          }
-          onChange={(
-            event
-          ) =>
-            setEmail(
-              event.target
-                .value
-            )
-          }
-          placeholder="Enter your email address"
-          icon={
-            Mail
-          }
-        />
+        <div>
+          <label
+            htmlFor="login-email"
+            className="mb-2 block text-sm font-bold text-[#071b59]"
+          >
+            Email address
+          </label>
 
-        <LoginButton
-          loading={
-            loading
-          }
-          label="Send OTP"
-          loadingLabel="Sending OTP..."
-        />
-      </form>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(event) =>
+              setEmail(event.target.value)
+            }
+            disabled={loading}
+            placeholder="Enter your email"
+            className="
+              w-full rounded-xl
+              border border-slate-200
+              bg-slate-50 px-4 py-3
+              text-slate-900 outline-none
+              focus:border-blue-500
+            "
+          />
+        </div>
 
-      {/* REGISTER */}
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-red-600"
+          >
+            {error}
+          </p>
+        )}
 
-      {/* <div
-        className="
-          mt-7
-          text-center
-          text-[12px]
-          text-slate-500
-        "
-      >
-        New to MasterMind PSC?{" "}
-
-        <Link
-          href="/register"
+        <button
+          type="submit"
+          disabled={loading}
           className="
-            font-bold
-            text-[#3854e8]
-            transition
-            hover:text-[#7139f4]
+            w-full rounded-xl
+            bg-gradient-to-r
+            from-[#164fa5] to-[#017dc0]
+            py-3 font-bold text-white
+            disabled:opacity-60
           "
         >
-          Create an account
-        </Link>
-      </div> */}
-    </div>
+          {loading
+            ? "Sending OTP…"
+            : "Send OTP"}
+        </button>
+      </form>
+    </section>
   );
 }

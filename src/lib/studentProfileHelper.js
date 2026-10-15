@@ -133,6 +133,8 @@ async function postProfileRequest(
    GET STUDENT PROFILE
 ========================================================= */
 
+const profileCache = new Map();
+
 export async function getStudentProfile({
     uid,
     cid,
@@ -149,36 +151,54 @@ export async function getStudentProfile({
         );
     }
 
-    const result =
-        await postProfileRequest(
-            "getStudentProfile",
-            {
-                uid,
-                cid,
-            }
-        );
+    const key = `${uid}_${cid}`;
+    const cached = profileCache.get(key);
 
-    const profile =
-        Array.isArray(
-            result?.data
-        )
-            ? result.data[0] ??
-            null
-            : result?.data ??
-            null;
+    if (cached && Date.now() - cached.timestamp < 60000) {
+        return cached.data;
+    }
 
-    return {
-        status:
-            result?.status ===
-            true,
+    try {
+        const result =
+            await postProfileRequest(
+                "getStudentProfile",
+                {
+                    uid,
+                    cid,
+                }
+            );
 
-        profile,
+        const profile =
+            Array.isArray(
+                result?.data
+            )
+                ? result.data[0] ??
+                null
+                : result?.data ??
+                null;
 
-        message:
-            result?.msg ||
-            result?.message ||
-            "",
-    };
+        const res = {
+            status:
+                result?.status ===
+                true,
+
+            profile,
+
+            message:
+                result?.msg ||
+                result?.message ||
+                "",
+        };
+
+        profileCache.set(key, { data: res, timestamp: Date.now() });
+        return res;
+    } catch (error) {
+        if (cached?.data) {
+            console.warn("Returning cached student profile after error:", error?.message);
+            return cached.data;
+        }
+        throw error;
+    }
 }
 
 /* =========================================================

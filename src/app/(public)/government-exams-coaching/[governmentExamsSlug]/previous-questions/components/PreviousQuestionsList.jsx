@@ -140,7 +140,7 @@ export default function PreviousQuestionsList({
 
       const response =
         await fetch(
-          `/api/previous-questions?${params.toString()}`,
+          `/api/public/previous-questions?${params.toString()}`,
           {
             cache:
               "no-store",

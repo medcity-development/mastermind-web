@@ -14,6 +14,7 @@ export async function generateMetadata({
 }) {
   const {
     governmentExamsSlug,
+    examId,
   } = await params;
 
   const query =
@@ -29,12 +30,18 @@ export async function generateMetadata({
   }
 
   const examTitle =
+    query?.selectedTestTitle ||
     query?.title ||
     `${config.name} Mock Test`;
 
   return {
     title:
       `${examTitle} | MasterMind Academy`,
+
+    alternates: {
+      canonical:
+        `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${examId}`,
+    },
 
     robots: {
       index: false,
@@ -78,8 +85,11 @@ export default async function MockTestDetailsPage({
   const examTitle =
     String(
       query?.title ??
+      query?.selectedTestTitle ??
         ""
     );
+  const selectedExamId =
+    String(query?.examId ?? "");
 
   return (
     <main
@@ -101,9 +111,10 @@ export default async function MockTestDetailsPage({
         "
       >
         <MockTestDetails
-          examId={
+          examSlug={
             examId
           }
+          selectedExamId={selectedExamId}
           uid={
             uid
           }

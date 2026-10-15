@@ -20,7 +20,7 @@ import {
   createPortal,
 } from "react-dom";
 
-export default function PremiumExamButton() {
+export default function PremiumExamButton({ redirectPath = "" }) {
   const router =
     useRouter();
 
@@ -72,9 +72,11 @@ export default function PremiumExamButton() {
   ========================================================= */
 
   function handleLogin() {
-    router.push(
-      "/login"
-    );
+    const loginPath = redirectPath
+      ? `/login?redirect=${encodeURIComponent(redirectPath)}`
+      : "/login";
+
+    router.push(loginPath);
   }
 
   /* =========================================================

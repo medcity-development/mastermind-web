@@ -19,6 +19,9 @@ import {
   Trophy,
   X,
 } from "lucide-react";
+import {
+  createSlug,
+} from "@/lib/pscSlug";
 
 export default function MockTestCard({
   test,
@@ -74,7 +77,14 @@ export default function MockTestCard({
     access === "paid";
 
   const examPath =
-    `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${examId}`;
+    `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(testTitle)}`;
+
+  const examQuery = {
+    examId: String(examId),
+    uid: String(uid),
+    title: testTitle,
+    selectedTestTitle: testTitle,
+  };
 
   function openPremiumModal(
     event
@@ -93,13 +103,10 @@ export default function MockTestCard({
       false
     );
 
-    const returnUrl =
-      encodeURIComponent(
-        examPath
-      );
+    const returnUrl = `${examPath}?${new URLSearchParams(examQuery).toString()}`;
 
     router.push(
-      `/login?redirect=${returnUrl}`
+      `/login?redirect=${encodeURIComponent(returnUrl)}`
     );
   }
 
@@ -330,15 +337,7 @@ export default function MockTestCard({
                 pathname:
                   examPath,
 
-                query: {
-                  uid:
-                    String(
-                      uid
-                    ),
-
-                  title:
-                    testTitle,
-                },
+                query: examQuery,
               }}
               className="
                 inline-flex

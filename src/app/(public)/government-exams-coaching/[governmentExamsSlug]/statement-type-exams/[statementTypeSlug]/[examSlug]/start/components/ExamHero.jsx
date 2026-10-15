@@ -17,6 +17,8 @@ export default function ExamHero({
   durationMinutes,
   statementTypeSlug,
   examSlug,
+  governmentExamsSlug = "kerala-psc",
+  examName = "Kerala PSC",
 }) {
   const isTimeOver =
     durationMinutes > 0 &&
@@ -30,7 +32,7 @@ export default function ExamHero({
     <>
       <Link
         href={
-          `/government-exams-coaching/kerala-psc/statement-type-exams/${statementTypeSlug}/${examSlug}`
+          `/government-exams-coaching/${governmentExamsSlug}/statement-type-exams/${statementTypeSlug}/${examSlug}`
         }
         className="
           mb-5
@@ -95,7 +97,7 @@ export default function ExamHero({
                 text-blue-100
               "
             >
-              Kerala PSC Statement Type
+              {examName} Statement Type
             </p>
 
             <h1

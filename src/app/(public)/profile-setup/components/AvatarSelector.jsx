@@ -4,6 +4,9 @@ import Image from "next/image";
 
 import {
   Check,
+  GraduationCap,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 
 import maleAvatar from "../images/avatar-male.png";
@@ -14,49 +17,133 @@ export default function AvatarSelector({
   onChange,
 }) {
   return (
-    <div>
-      <label
-        className="
-          mb-2
-          block
-          text-[12px]
-          font-bold
-          text-[#071b59]
-        "
-      >
-        Choose Avatar
-      </label>
-
-      <div
+    <div
         className="
           grid
-          grid-cols-2
-          gap-3
+          gap-4
+          lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]
+          lg:gap-5
         "
       >
-        <AvatarOption
-          label="Male"
-          image={maleAvatar}
-          selected={
-            gender === "male"
-          }
-          onClick={() =>
-            onChange("male")
-          }
-        />
+        <div>
+          <label
+            className="
+              mb-1
+              block
+              text-[11px]
+              font-bold
+              text-[#071b59]
+              lg:text-[13px]
+            "
+          >
+            Choose your avatar
+          </label>
 
-        <AvatarOption
-          label="Female"
-          image={femaleAvatar}
-          selected={
-            gender === "female"
-          }
-          onClick={() =>
-            onChange("female")
-          }
-        />
+          <div
+            className="
+              grid
+              grid-cols-2
+              gap-2
+              lg:gap-3
+            "
+          >
+            <AvatarOption
+              label="Male"
+              image={maleAvatar}
+              selected={
+                gender === "male"
+              }
+              onClick={() =>
+                onChange("male")
+              }
+            />
+
+            <AvatarOption
+              label="Female"
+              image={femaleAvatar}
+              selected={
+                gender === "female"
+              }
+              onClick={() =>
+                onChange("female")
+              }
+            />
+          </div>
+        </div>
+
+        <div
+          className="
+            relative
+            hidden
+            min-h-[148px]
+            overflow-hidden
+            rounded-2xl
+            bg-gradient-to-br
+            from-[#0b216c]
+            via-[#123c91]
+            to-[#315ff4]
+            p-4
+            text-white
+            lg:flex
+            lg:flex-col
+            lg:justify-between
+          "
+        >
+          <div
+            aria-hidden="true"
+            className="
+              pointer-events-none
+              absolute
+              -right-8
+              -top-12
+              h-36
+              w-36
+              rounded-full
+              border
+              border-white/10
+              bg-white/5
+            "
+          />
+          <div
+            aria-hidden="true"
+            className="
+              pointer-events-none
+              absolute
+              -bottom-20
+              -right-2
+              h-40
+              w-40
+              rounded-full
+              border
+              border-white/10
+            "
+          />
+
+          <div className="relative flex items-start justify-between">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-blue-100 ring-1 ring-white/15">
+              <GraduationCap size={19} />
+            </span>
+            <span className="flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-blue-100">
+              <Sparkles size={11} />
+              Your journey
+            </span>
+          </div>
+
+          <div className="relative mt-3">
+            <h3 className="text-[15px] font-bold tracking-tight">
+              Make this space yours
+            </h3>
+            <p className="mt-1 max-w-[280px] text-[10px] leading-[1.6] text-blue-100/85">
+              Your profile helps us shape a learning experience around you.
+            </p>
+          </div>
+
+          <div className="relative mt-3 flex items-center gap-2 border-t border-white/15 pt-2.5 text-[10px] font-medium text-blue-50">
+            <ShieldCheck size={14} className="shrink-0 text-cyan-200" />
+            Your details stay safe and secure
+          </div>
+        </div>
       </div>
-    </div>
   );
 }
 
@@ -79,10 +166,13 @@ function AvatarOption({
         justify-center
         gap-2
         overflow-hidden
-        rounded-[18px]
+        rounded-2xl
         border
         px-3
-        py-4
+        py-2
+        lg:gap-2.5
+        lg:px-4
+        lg:py-3
         text-center
         transition-all
         duration-300
@@ -90,19 +180,22 @@ function AvatarOption({
         ${
           selected
             ? `
-                border-[#4f6cf7]
-                bg-gradient-to-b
-                from-[#eef4ff]
-                to-[#f8faff]
-                shadow-[0_0_0_3px_rgba(79,108,247,0.08)]
-              `
+              border-blue-400
+              bg-gradient-to-br
+              from-blue-50
+              to-indigo-50
+              shadow-[0_8px_24px_rgba(37,99,235,0.12)]
+              ring-1
+              ring-blue-200
+            `
             : `
-                border-slate-200
-                bg-white
-                hover:-translate-y-0.5
-                hover:border-[#a8b7f6]
-                hover:shadow-[0_8px_22px_rgba(79,108,247,0.08)]
-              `
+              border-slate-200
+              bg-white/80
+              hover:-translate-y-0.5
+              hover:border-blue-200
+              hover:bg-white
+              hover:shadow-[0_10px_24px_rgba(15,23,42,0.07)]
+            `
         }
       `}
     >
@@ -111,19 +204,23 @@ function AvatarOption({
       <div
         className={`
           relative
-          h-[82px]
-          w-[82px]
+          h-[48px]
+          w-[48px]
+          lg:h-[64px]
+          lg:w-[64px]
+          shrink-0
           overflow-hidden
           rounded-full
-          border-[3px]
+          border-2
+          bg-white
           transition-all
           duration-300
 
           ${
             selected
               ? `
-                  border-[#4f6cf7]
-                  shadow-[0_8px_25px_rgba(79,108,247,0.18)]
+                  border-blue-500
+                  shadow-[0_6px_18px_rgba(37,99,235,0.2)]
                 `
               : `
                   border-slate-100
@@ -134,12 +231,19 @@ function AvatarOption({
         <Image
           src={image}
           alt={`${label} avatar`}
-          fill
-          sizes="82px"
+          width={130}
+          height={130}
           className="
+            block
+            h-full
+            w-full
             object-cover
             object-center
           "
+          style={{
+            width: "100%",
+            height: "100%",
+          }}
         />
       </div>
 
@@ -147,9 +251,10 @@ function AvatarOption({
 
       <span
         className="
-          text-[12px]
+          text-[11px]
           font-bold
-          text-[#071b59]
+          text-slate-700
+          lg:text-[13px]
         "
       >
         {label}
@@ -161,11 +266,11 @@ function AvatarOption({
         <span
           className="
             absolute
-            right-3
-            top-3
+            right-2
+            top-2
             flex
-            h-6
-            w-6
+            h-5
+            w-5
             items-center
             justify-center
             rounded-full
@@ -175,7 +280,7 @@ function AvatarOption({
           "
         >
           <Check
-            size={13}
+            size={12}
             strokeWidth={3}
           />
         </span>

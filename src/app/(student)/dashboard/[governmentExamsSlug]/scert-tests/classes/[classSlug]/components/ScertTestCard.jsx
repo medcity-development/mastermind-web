@@ -33,6 +33,7 @@ function createSlug(
 
 export default function ScertTestCard({
   test,
+  pauseId,
   classId,
   governmentExamsSlug,
 }) {
@@ -70,6 +71,17 @@ export default function ScertTestCard({
         String(classId),
       examId:
         String(examId),
+    },
+  };
+
+  const resumeHref = {
+    pathname:
+      `/dashboard/${governmentExamsSlug}/scert-tests/tests/${testSlug}/start`,
+    query: {
+      classId: String(classId),
+      examId: String(examId),
+      mode: "resume",
+      pauseId: String(pauseId),
     },
   };
 
@@ -137,7 +149,7 @@ export default function ScertTestCard({
               }
             `}
           >
-            {isPaid ? (
+            {isPaid && !pauseId ? (
               <Crown
                 size={22}
               />
@@ -294,7 +306,7 @@ export default function ScertTestCard({
             </button>
           ) : (
             <Link
-              href={examHref}
+              href={pauseId ? resumeHref : examHref}
               className="
                 inline-flex
                 w-full
@@ -314,7 +326,7 @@ export default function ScertTestCard({
                 hover:bg-emerald-200
               "
             >
-              View Test
+              {pauseId ? "Resume Exam" : "View Test"}
 
               <ArrowRight
                 size={17}

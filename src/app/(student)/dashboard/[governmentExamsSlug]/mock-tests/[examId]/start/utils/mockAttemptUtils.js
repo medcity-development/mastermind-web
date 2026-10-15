@@ -1,6 +1,7 @@
 import {
     getExamTotalMark,
 } from "./mockTestUtils";
+import { secondsToMilliseconds } from "@/lib/examAttemptData";
 
 export function buildMockAttemptPayload({
     cid,
@@ -9,6 +10,8 @@ export function buildMockAttemptPayload({
     exam,
     questions = [],
     remainingSeconds = 0,
+    startTime,
+    completedAt,
     examStatus,
     result,
 }) {
@@ -31,13 +34,28 @@ export function buildMockAttemptPayload({
         exam_status:
             examStatus,
 
+        start_time:
+            String(startTime ?? Date.now()),
+
+        ...(String(examStatus).toLowerCase() === "finish" ||
+            String(examStatus).toLowerCase() === "complete"
+            ? {
+                // Store when the student actually submits, not the timer's
+                // scheduled deadline (which can be many hours later).
+                end_time:
+                    String(completedAt ?? Date.now()),
+            }
+            : {}),
+
         lastposition:
             exam?.lastposition ??
             examType,
 
         paused_time:
             String(
-                remainingSeconds
+                secondsToMilliseconds(
+                    remainingSeconds
+                )
             ),
 
         total_questions:

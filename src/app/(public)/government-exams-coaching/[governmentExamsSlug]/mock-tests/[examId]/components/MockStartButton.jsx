@@ -4,12 +4,16 @@ import {
   ArrowRight,
   Play,
 } from "lucide-react";
+import {
+  createSlug,
+} from "@/lib/pscSlug";
 
 export default function MockStartButton({
   examId,
   uid,
   cid,
   title = "",
+  governmentExamsSlug = "kerala-psc",
 }) {
   return (
     <div
@@ -22,9 +26,10 @@ export default function MockStartButton({
       <Link
         href={{
           pathname:
-            `/government-exams-coaching/kerala-psc/mock-tests/${examId}/start`,
+            `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(title)}/start`,
 
           query: {
+            examId: String(examId),
             uid:
               String(uid),
 

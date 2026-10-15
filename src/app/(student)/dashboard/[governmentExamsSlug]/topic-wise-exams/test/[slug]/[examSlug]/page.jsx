@@ -1,17 +1,6 @@
+
 import Link from "next/link";
-
-import {
-  notFound,
-  redirect,
-} from "next/navigation";
-
-import {
-  ArrowLeft,
-  ArrowRight,
-  Clock3,
-  FileQuestion,
-  Trophy,
-} from "lucide-react";
+import { notFound } from "next/navigation";
 
 import {
   getAllTopicWiseTests,
@@ -32,24 +21,13 @@ import {
   formatSlug,
 } from "@/lib/pscSlug";
 
-export async function generateMetadata({
-  params,
-}) {
-  const {
-    examSlug,
-  } = await params;
+export const dynamic = "force-dynamic";
 
-  const title =
-    formatSlug(
-      examSlug
-    );
+export async function generateMetadata({ params }) {
+  const { examSlug } = await params;
 
   return {
-    title:
-      `${title} | MasterMind Academy`,
-
-    description:
-      `Practice ${title} for Kerala PSC preparation.`,
+    title: `${formatSlug(examSlug)} | MasterMind Academy`,
   };
 }
 
@@ -62,404 +40,211 @@ export default async function TopicWiseExamDetailsPage({
     governmentExamsSlug,
   } = await params;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
   if (!config) {
     notFound();
   }
 
-  const session =
-    await getStudentSession();
+  const session = await getStudentSession();
 
-  const uid =
-    session?.uid;
+  const uid = Number(session?.uid) || 0;
+  const cid = Number(config.cid);
 
-  const cid =
-    config.cid;
-  const type = "twe";
+  const root =
+    `/dashboard/${governmentExamsSlug}/topic-wise-exams`;
 
-  /* =======================================================
-     RESOLVE TOPIC
-  ======================================================= */
+  const listHref = `${root}/test/${slug}`;
 
-  const topicsResult =
-    await getTopicWiseExams({
-      uid,
-      cid,
-      type,
-    });
+  const topicsResult = await getTopicWiseExams({
+    uid,
+    cid,
+    type: "twe",
+  });
 
-  const topics =
-    Array.isArray(
-      topicsResult?.data
-    )
-      ? topicsResult.data
-      : [];
+  const topics = Array.isArray(topicsResult?.data)
+    ? topicsResult.data
+    : [];
 
-  const selectedTopic =
-    topics.find(
-      (item) =>
-        createSlug(
-          item?.subject
-        ) === slug
-    );
+  const topic = topics.find(
+    (item) => createSlug(item.subject) === slug
+  );
 
-  if (!selectedTopic) {
+  if (!topic) {
     notFound();
   }
 
-  const topicId =
-    selectedTopic.id;
+  const testsResult = await getAllTopicWiseTests({
+    uid,
+    topicId: topic.id,
+  });
 
-  /* =======================================================
-     RESOLVE EXAM
-  ======================================================= */
+  const tests = Array.isArray(testsResult?.data)
+    ? testsResult.data
+    : [];
 
-  const testsResult =
-    await getAllTopicWiseTests({
-      uid,
-      topicId,
-    });
+  // Supports both:
+  // /world-history/1
+  // /world-history/world-history-exam-1
 
-  const tests =
-    Array.isArray(
-      testsResult?.data
-    )
-      ? testsResult.data
-      : [];
-
-  const selectedExam =
-    tests.find(
-      (item) =>
-        createSlug(
-          item?.exam_name
-        ) === examSlug
+  const selected = tests.find((item) => {
+    const id = String(item.id ?? "");
+    const nameSlug = createSlug(
+      item.exam_name || ""
     );
 
-  if (!selectedExam) {
+    return (
+      id === String(examSlug) ||
+      nameSlug === examSlug
+    );
+  });
+
+  if (!selected) {
     notFound();
   }
 
-  /*
-    Prevent direct URL access
-    to premium exams for guest users.
-  */
-
-  const isPaid =
-    String(
-      selectedExam?.access ||
-        ""
-    ).toLowerCase() ===
-    "paid";
-
-  if (isPaid) {
-    redirect(
-      `/dashboard/${governmentExamsSlug}/premium-packages`
-    );
-  }
-
-  const examId =
-    selectedExam.id;
-
-  /* =======================================================
-     DETAILS
-  ======================================================= */
-
-  const result =
-    await getTopicWiseExamDetails({
-      uid,
-      cid,
-      examId,
-      type,
-      offset: 0,
-    });
-
-  const exam =
-    result?.exam;
-
-  const instructions =
-    Array.isArray(
-      result?.instructions
-    )
-      ? result.instructions
-      : [];
+  const examId = Number(selected.id);
 
   if (
-    !result?.status ||
-    !exam
+    !Number.isSafeInteger(examId) ||
+    examId <= 0
   ) {
     notFound();
   }
 
-  return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f5f9ff]
-      "
-    >
-      <div
-        className="
-          mx-auto
-          w-full
-          max-w-[1200px]
-          px-4
-          py-6
-          sm:px-6
-          lg:px-8
-          lg:py-10
-        "
-      >
-        <Link
-          href={
-            `/dashboard/${governmentExamsSlug}/topic-wise-exams/test/${slug}`
-          }
-          className="
-            mb-5
-            inline-flex
-            items-center
-            gap-2
-            text-sm
-            font-bold
-            text-[#075fc8]
-          "
-        >
-          <ArrowLeft size={16} />
+  const access = String(
+    selected.access ?? ""
+  ).trim().toLowerCase();
 
-          Back to Exams
-        </Link>
-
-        {/* HERO */}
-
-        <section
-          className="
-            rounded-[28px]
-            bg-gradient-to-r
-            from-[#071f55]
-            via-[#075fc8]
-            to-[#017dc0]
-            p-6
-            text-white
-            sm:p-8 mt-15
-          "
-        >
-          <p
-            className="
-              text-[10px]
-              font-black
-              uppercase
-              tracking-[0.16em]
-              text-blue-100
-            "
-          >
-            Kerala PSC Topic Wise Exam
-          </p>
-
-          <h1
-            className="
-              mt-2
-              text-2xl
-              font-black
-              sm:text-3xl
-            "
-          >
-            {exam.exam_name}
+  if (access !== "free") {
+    return (
+      <main className="min-h-screen bg-[#f5f9ff] p-6">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-white p-8">
+          <h1 className="text-xl font-bold text-[#071f55]">
+            Premium Exam
           </h1>
 
-          <div
-            className="
-              mt-6
-              grid
-              grid-cols-1
-              gap-3
-              sm:grid-cols-3
-            "
+          <p className="mt-3 text-slate-600">
+            This exam requires premium access.
+          </p>
+
+          <Link
+            href={listHref}
+            className="mt-6 inline-block rounded-xl bg-[#017dc0] px-6 py-3 font-bold text-white"
           >
-            <ExamStat
-              icon={FileQuestion}
-              label="Questions"
-              value={
-                exam.total_questions
-              }
-            />
+            Back to Exams
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
-            <ExamStat
-              icon={Trophy}
-              label="Marks"
-              value={
-                exam.total_mark
-              }
-            />
+  const result = await getTopicWiseExamDetails({
+    uid,
+    cid,
+    examId,
+    type: "twe",
+    offset: 0,
+  });
 
-            <ExamStat
-              icon={Clock3}
-              label="Duration"
-              value={
-                `${exam.total_minutes || 0} Minutes`
-              }
-            />
+  if (!result?.exam) {
+    notFound();
+  }
+
+  const exam = result.exam;
+
+  const instructions = Array.isArray(
+    result.instructions
+  )
+    ? result.instructions
+    : [];
+
+  // Use the actual exam ID for consistent navigation.
+  const startHref =
+    `${root}/test/${slug}/${examId}/start`;
+
+  return (
+    <main className="min-h-screen bg-[#f5f9ff] py-6">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <Link
+          href={listHref}
+          className="font-bold text-blue-700"
+        >
+          ← Back to Exams
+        </Link>
+
+        <section className="mt-5 rounded-3xl bg-gradient-to-r from-[#071f55] to-[#017dc0] p-7 text-white">
+          <p className="text-xs font-black uppercase tracking-widest">
+            {config.name} Topic Wise Exam
+          </p>
+
+          <h1 className="mt-3 text-3xl font-black">
+            {exam.exam_name || selected.exam_name}
+          </h1>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[
+              ["Questions", exam.total_questions],
+              ["Marks", exam.total_mark],
+              [
+                "Duration",
+                `${exam.total_minutes || 0} minutes`,
+              ],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-2xl bg-white/10 p-4"
+              >
+                <p className="text-xs text-blue-100">
+                  {label}
+                </p>
+
+                <p className="mt-2 text-xl font-black">
+                  {value ?? 0}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* INSTRUCTIONS */}
-
-        <section
-          className="
-            mt-6
-            rounded-[24px]
-            border
-            border-[#dce8f7]
-            bg-white
-            p-6
-            sm:p-8
-          "
-        >
-          <p
-            className="
-              text-[10px]
-              font-black
-              uppercase
-              tracking-[0.14em]
-              text-[#017dc0]
-            "
-          >
-            Before you begin
-          </p>
-
-          <h2
-            className="
-              mt-2
-              text-xl
-              font-black
-              text-[#071f55]
-            "
-          >
+        <section className="mt-6 rounded-3xl border bg-white p-7">
+          <h2 className="text-xl font-black text-[#071f55]">
             Exam Instructions
           </h2>
 
-          <div className="mt-6 space-y-4">
-            {instructions.map(
-              (
-                item,
-                index
-              ) => (
-                <div
+          <div className="mt-5 space-y-3">
+            {instructions.length ? (
+              instructions.map((item, index) => (
+                <p
                   key={index}
-                  className="
-                    flex
-                    gap-4
-                    rounded-[16px]
-                    bg-[#f5f9ff]
-                    p-4
-                  "
+                  className="rounded-xl bg-blue-50 p-4 text-sm leading-7 text-slate-600"
                 >
-                  <div
-                    className="
-                      flex
-                      h-8
-                      w-8
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-full
-                      bg-[#075fc8]
-                      text-xs
-                      font-black
-                      text-white
-                    "
-                  >
-                    {index + 1}
-                  </div>
-
-                  <p
-                    className="
-                      text-sm
-                      leading-7
-                      text-slate-600
-                    "
-                  >
-                    {item?.instructions}
-                  </p>
-                </div>
-              )
+                  {index + 1}.{" "}
+                  {typeof item === "string"
+                    ? item
+                    : item.instructions ?? ""}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">
+                Read each question carefully before
+                submitting your answers.
+              </p>
             )}
           </div>
 
-          <div
-            className="
-              mt-8
-              flex
-              justify-end
-            "
-          >
+          <div className="mt-7 flex justify-end">
             <Link
-              href={
-                `/dashboard/${governmentExamsSlug}/topic-wise-exams/test/${slug}/${examSlug}/start`
-              }
-              className="
-                inline-flex
-                items-center
-                gap-2
-                rounded-[14px]
-                bg-gradient-to-r
-                from-[#071f55]
-                via-[#075fc8]
-                to-[#017dc0]
-                px-7
-                py-4
-                text-sm
-                font-bold
-                text-white
-              "
+              href={startHref}
+              className="rounded-xl bg-[#017dc0] px-7 py-3 font-bold text-white"
             >
               Start Exam
-
-              <ArrowRight size={17} />
             </Link>
           </div>
         </section>
       </div>
     </main>
-  );
-}
-
-function ExamStat({
-  icon: Icon,
-  label,
-  value,
-}) {
-  return (
-    <div
-      className="
-        rounded-[16px]
-        bg-white/10
-        p-4
-      "
-    >
-      <Icon size={18} />
-
-      <p
-        className="
-          mt-2
-          text-xs
-          text-blue-100
-        "
-      >
-        {label}
-      </p>
-
-      <p
-        className="
-          mt-1
-          text-lg
-          font-black
-        "
-      >
-        {value}
-      </p>
-    </div>
   );
 }

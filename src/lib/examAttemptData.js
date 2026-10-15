@@ -38,6 +38,56 @@ function numeric(
     : fallback;
 }
 
+export function secondsToMilliseconds(seconds) {
+  return Math.max(
+    0,
+    Math.round(numeric(seconds) * 1000)
+  );
+}
+
+export function timestampToMilliseconds(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const numericTimestamp = Number(value);
+  if (Number.isFinite(numericTimestamp) && numericTimestamp > 0) {
+    return Math.trunc(
+      numericTimestamp < 1_000_000_000_000
+        ? numericTimestamp * 1000
+        : numericTimestamp
+    );
+  }
+
+  const timestamp = String(value).trim();
+  const localDateTime = timestamp.match(
+    /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?))?$/
+  );
+  const normalizedTimestamp = localDateTime
+    ? `${localDateTime[1]}T${localDateTime[2] || "00:00:00"}+05:30`
+    : timestamp;
+  const parsedTimestamp = Date.parse(normalizedTimestamp);
+  return Number.isFinite(parsedTimestamp) && parsedTimestamp > 0
+    ? parsedTimestamp
+    : null;
+}
+
+export function millisecondsToSeconds(milliseconds) {
+  return Math.max(
+    0,
+    Math.ceil(numeric(milliseconds) / 1000)
+  );
+}
+
+export function savedPausedTimeToSeconds(value, durationSeconds) {
+  const savedTime = Math.max(0, numeric(value));
+  const duration = Math.max(0, numeric(durationSeconds));
+
+  return savedTime <= duration
+    ? Math.ceil(savedTime)
+    : millisecondsToSeconds(savedTime);
+}
+
 /* =========================================================
    ROUND TO 2 DECIMALS
 ========================================================= */
@@ -240,6 +290,19 @@ export function normalizeExamAnswer(
   }
 
   return upper;
+}
+
+function normalizeStoredAnswers(
+  answers
+) {
+  return answers.map((answer) => {
+    const option =
+      normalizeExamAnswer(answer);
+
+    return /^[A-D]$/.test(option)
+      ? option
+      : 0;
+  });
 }
 
 /* =========================================================
@@ -509,6 +572,8 @@ function normalizeExamStatus(
 export function calculateExamResult({
   answerArray = [],
   userAnswers = [],
+  markPerCorrect = CORRECT_MARK,
+  negativeMarkPerWrong = WRONG_MARK,
 } = {}) {
   const correctAnswers =
     parseAnswers(
@@ -575,7 +640,10 @@ export function calculateExamResult({
 
   const positiveMark =
     correct *
-    CORRECT_MARK;
+    numeric(
+      markPerCorrect,
+      CORRECT_MARK
+    );
 
   /*
    * Same as Android:
@@ -587,9 +655,12 @@ export function calculateExamResult({
   const negativeMark =
     Math.round(
       wrong *
-      WRONG_MARK *
-      100
-    ) / 100;
+    numeric(
+      negativeMarkPerWrong,
+      WRONG_MARK
+    ) *
+    100
+  ) / 100;
 
   const score =
     Math.round(
@@ -636,24 +707,14 @@ export function buildAttemptPayload(
   ======================================================= */
 
   const answerArray =
-    parseAnswers(
-      body?.answer_array
+    normalizeStoredAnswers(
+      parseAnswers(body?.answer_array)
     );
 
   const userAnswers =
-    parseAnswers(
-      body?.user_answers
+    normalizeStoredAnswers(
+      parseAnswers(body?.user_answers)
     );
-
-  /* =======================================================
-     CALCULATED RESULT
-  ======================================================= */
-
-  const calculated =
-    calculateExamResult({
-      answerArray,
-      userAnswers,
-    });
 
   /* =======================================================
      TOTAL QUESTIONS
@@ -671,6 +732,40 @@ export function buildAttemptPayload(
       body?.total_mark,
       totalQuestions
     );
+
+  const markPerCorrect =
+    numeric(
+      body?.__scoring?.markPerCorrect ??
+        body?.mark_per_question,
+      totalQuestions > 0 &&
+        totalMark > 0
+        ? totalMark / totalQuestions
+        : CORRECT_MARK
+    );
+
+  const negativeMarkPerWrong =
+    numeric(
+      body?.__scoring?.negativeMarkPerWrong ??
+        body?.negative_mark_per_wrong,
+      body?.total_attempted !== undefined
+        ? WRONG_MARK
+        : numeric(
+            body?.minus_mark,
+            WRONG_MARK
+          )
+    );
+
+  /* =======================================================
+     CALCULATED RESULT
+  ======================================================= */
+
+  const calculated =
+    calculateExamResult({
+      answerArray,
+      userAnswers,
+      markPerCorrect,
+      negativeMarkPerWrong,
+    });
 
   /* =======================================================
      STATUS
@@ -726,10 +821,10 @@ export function buildAttemptPayload(
       totalQuestions,
 
     paused_time:
-      numeric(
-        body?.paused_time,
-        0
-      ),
+      numeric(body?.paused_time ?? body?.time_taken, 0) > 0 &&
+      numeric(body?.paused_time ?? body?.time_taken, 0) <= 86400
+        ? Math.round(numeric(body?.paused_time ?? body?.time_taken, 0) * 1000)
+        : Math.round(numeric(body?.paused_time ?? body?.time_taken, 0)),
 
     total_mark:
       totalMark,
@@ -764,7 +859,30 @@ export function buildAttemptPayload(
 
     total_wrong:
       calculated.wrong,
+
+    __scoring: {
+      markPerCorrect,
+      negativeMarkPerWrong,
+    },
   };
+
+  const startTime = timestampToMilliseconds(
+    body?.start_time ?? body?.startTime ?? body?.started_at
+  );
+  const endTime = timestampToMilliseconds(
+    body?.end_time ??
+    body?.endTime ??
+    body?.ended_at ??
+    (["complete", "completed", "finish", "finished"].includes(examStatus) ? Date.now() : null)
+  );
+
+  if (startTime !== null) {
+    payload.start_time = startTime;
+  }
+
+  if (endTime !== null) {
+    payload.end_time = endTime;
+  }
 
   /* =======================================================
      UPDATE EXISTING ATTEMPT

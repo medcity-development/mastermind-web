@@ -9,23 +9,17 @@ export default function SidebarNavigation({
   return (
     <div
       className="
+        dashboard-sidebar-scroll
         relative
         z-10
 
         mt-4
 
-        flex-1
-        overflow-y-auto
-
         px-2
-        pb-5
-
-        [scrollbar-width:none]
+        pb-8
 
         xl:mt-5
         xl:px-3
-
-        [&::-webkit-scrollbar]:hidden
       "
     >
       {/* Learning */}

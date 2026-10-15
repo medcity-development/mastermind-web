@@ -1,11 +1,19 @@
+
+/* =========================================================
+   EXAM RESULT UTILITIES
+   MasterMind Academy
+
+   Android calculation:
+   Correct mark = correct answers
+   Negative mark = round(wrong answers * 0.333, 2)
+   Final score = round(correct mark - negative mark, 2)
+========================================================= */
+
 /* =========================================================
    NUMBER
 ========================================================= */
 
-export function toResultNumber(
-  value,
-  fallback = 0
-) {
+export function toResultNumber(value, fallback = 0) {
   if (
     value === undefined ||
     value === null ||
@@ -14,8 +22,7 @@ export function toResultNumber(
     return fallback;
   }
 
-  const parsed =
-    Number(value);
+  const parsed = Number(value);
 
   return Number.isFinite(parsed)
     ? parsed
@@ -24,34 +31,26 @@ export function toResultNumber(
 
 /* =========================================================
    ROUND
+   Equivalent to Android Math.round(x * 100) / 100
 ========================================================= */
 
-export function roundResultNumber(
-  value
-) {
-  const number =
-    toResultNumber(
-      value,
-      0
-    );
-
+export function roundResultNumber(value) {
   return (
-    Math.round(
-      number * 100
-    ) / 100
+    Math.round(toResultNumber(value, 0) * 100) / 100
   );
 }
 
 /* =========================================================
-   PARSE ANSWERS
+   PARSE SAVED ANSWERS
+
+   Supports:
+   ["A","B","C"]
+   [A,B,C]
+   Double-encoded JSON arrays
 ========================================================= */
 
-export function parseSavedAnswers(
-  value
-) {
-  if (
-    Array.isArray(value)
-  ) {
+export function parseSavedAnswers(value) {
+  if (Array.isArray(value)) {
     return value;
   }
 
@@ -63,79 +62,46 @@ export function parseSavedAnswers(
     return [];
   }
 
-  const text =
-    String(value)
-      .trim();
+  let text = String(value).trim();
 
   if (!text) {
     return [];
   }
 
-  try {
-    const parsed =
-      JSON.parse(text);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const parsed = JSON.parse(text);
 
-    if (
-      Array.isArray(
-        parsed
-      )
-    ) {
-      return parsed;
-    }
-
-    if (
-      typeof parsed ===
-      "string"
-    ) {
-      try {
-        const secondParsed =
-          JSON.parse(
-            parsed
-          );
-
-        if (
-          Array.isArray(
-            secondParsed
-          )
-        ) {
-          return secondParsed;
-        }
-      } catch {
-        // Continue.
+      if (Array.isArray(parsed)) {
+        return parsed;
       }
+
+      if (typeof parsed === "string") {
+        text = parsed.trim();
+        continue;
+      }
+
+      return [];
+    } catch {
+      break;
     }
-  } catch {
-    // Continue.
   }
 
+  // Legacy backend format: [A,B,0,C]
   return text
-    .replace(
-      /^\[/,
-      ""
-    )
-    .replace(
-      /\]$/,
-      ""
-    )
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
     .split(",")
-    .map(
-      (item) =>
-        String(item)
-          .trim()
-          .replace(
-            /^["']|["']$/g,
-            ""
-          )
+    .map((item) =>
+      item.trim().replace(/^["']|["']$/g, "")
     );
 }
 
 /* =========================================================
-   NORMALIZE ANSWER
+   NORMALIZE SAVED ANSWER
 ========================================================= */
 
-export function normalizeSavedAnswer(
-  value
-) {
+export function normalizeSavedAnswer(value) {
   if (
     value === undefined ||
     value === null
@@ -143,40 +109,29 @@ export function normalizeSavedAnswer(
     return "";
   }
 
-  const answer =
-    String(value)
-      .trim();
+  const answer = String(value).trim();
 
   if (
     !answer ||
     answer === "0" ||
-    answer.toLowerCase() ===
-      "null" ||
-    answer.toLowerCase() ===
-      "undefined"
+    ["null", "undefined", "none"].includes(
+      answer.toLowerCase()
+    )
   ) {
     return "";
   }
 
-  const upper =
-    answer.toUpperCase();
+  const upper = answer.toUpperCase();
 
-  if (
-    /^[A-Z]$/.test(
-      upper
-    )
-  ) {
+  if (/^[A-Z]$/.test(upper)) {
     return upper;
   }
 
-  const optionMatch =
-    upper.match(
-      /^([A-Z])(?:[\s.\):\-]|$)/
-    );
+  const optionMatch = upper.match(
+    /^([A-Z])(?:[\s.):\-]|$)/
+  );
 
-  if (
-    optionMatch?.[1]
-  ) {
+  if (optionMatch) {
     return optionMatch[1];
   }
 
@@ -184,166 +139,187 @@ export function normalizeSavedAnswer(
 }
 
 /* =========================================================
-   ANSWERED
+   IS ANSWERED
 ========================================================= */
 
-export function isAnswered(
-  value
-) {
-  return Boolean(
-    normalizeSavedAnswer(
-      value
-    )
-  );
+export function isAnswered(value) {
+  return Boolean(normalizeSavedAnswer(value));
 }
 
 /* =========================================================
-   CORRECT
+   IS CORRECT ANSWER
 ========================================================= */
 
 export function isCorrectAnswer(
   userAnswer,
   correctAnswer
 ) {
-  const user =
-    normalizeSavedAnswer(
-      userAnswer
-    );
+  const user = normalizeSavedAnswer(userAnswer);
+  const correct = normalizeSavedAnswer(correctAnswer);
 
-  const correct =
-    normalizeSavedAnswer(
-      correctAnswer
-    );
-
-  if (
-    !user ||
-    !correct
-  ) {
-    return false;
-  }
-
-  return (
+  return Boolean(
+    user &&
+    correct &&
     user === correct
   );
 }
 
 /* =========================================================
-   COUNTS
+   SAFE OPTIONAL NUMBER
+
+   Unlike toResultNumber, missing values remain null.
 ========================================================= */
 
-export function calculateExamCounts(
-  result = {}
-) {
-  const correctAnswers =
-    parseSavedAnswers(
-      result?.answer_array
-    );
+function optionalNumber(...values) {
+  for (const value of values) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      const parsed = Number(value);
 
-  const userAnswers =
-    parseSavedAnswers(
-      result?.user_answers
-    );
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+/* =========================================================
+   CALCULATE EXAM COUNTS
+
+   Priority:
+   1. Complete saved answer arrays
+   2. Backend attempted/correct/wrong values
+
+   Missing values are not treated as zero.
+========================================================= */
+
+export function calculateExamCounts(result = {}) {
+  const correctAnswers = parseSavedAnswers(
+    result.answer_array
+  );
+
+  const userAnswers = parseSavedAnswers(
+    result.user_answers
+  );
 
   const canCalculate =
-    correctAnswers.length >
-      0 &&
-    userAnswers.length >
-      0;
+    correctAnswers.length > 0 &&
+    userAnswers.length > 0 &&
+    correctAnswers.length === userAnswers.length &&
+    correctAnswers.every((answer) =>
+      Boolean(normalizeSavedAnswer(answer))
+    );
 
-  let attempted = 0;
-  let correct = 0;
-  let wrong = 0;
+  let attempted = null;
+  let correct = null;
+  let wrong = null;
 
   if (canCalculate) {
-    const totalItems =
-      Math.max(
-        correctAnswers.length,
-        userAnswers.length
-      );
+    attempted = 0;
+    correct = 0;
+    wrong = 0;
 
     for (
       let index = 0;
-      index < totalItems;
-      index += 1
+      index < userAnswers.length;
+      index++
     ) {
-      const userAnswer =
-        normalizeSavedAnswer(
-          userAnswers[index]
-        );
+      const userAnswer = normalizeSavedAnswer(
+        userAnswers[index]
+      );
 
       if (!userAnswer) {
         continue;
       }
 
-      attempted += 1;
+      attempted++;
 
-      const correctAnswer =
-        normalizeSavedAnswer(
-          correctAnswers[index]
-        );
+      const correctAnswer = normalizeSavedAnswer(
+        correctAnswers[index]
+      );
 
-      if (
-        correctAnswer &&
-        userAnswer ===
-          correctAnswer
-      ) {
-        correct += 1;
+      if (userAnswer === correctAnswer) {
+        correct++;
       } else {
-        wrong += 1;
+        wrong++;
       }
     }
   } else {
-    attempted =
-      toResultNumber(
-        result?.total_attempted,
-        0
-      );
+    attempted = optionalNumber(
+      result.total_attempted,
+      result.attempted
+    );
 
-    correct =
-      toResultNumber(
-        result?.total_correct,
-        0
-      );
+    correct = optionalNumber(
+      result.total_correct,
+      result.correct
+    );
 
-    wrong =
-      toResultNumber(
-        result?.total_wrong,
-        Math.max(
-          0,
-          attempted - correct
-        )
-      );
+    wrong = optionalNumber(
+      result.total_wrong,
+      result.wrong
+    );
+
+    if (
+      wrong === null &&
+      attempted !== null &&
+      correct !== null
+    ) {
+      wrong = Math.max(0, attempted - correct);
+    }
+
+    if (
+      attempted === null &&
+      correct !== null &&
+      wrong !== null
+    ) {
+      attempted = correct + wrong;
+    }
+
+    if (
+      correct === null &&
+      attempted !== null &&
+      wrong !== null
+    ) {
+      correct = Math.max(0, attempted - wrong);
+    }
   }
 
   return {
     attempted,
     correct,
     wrong,
-
     correctAnswers,
     userAnswers,
-
     canCalculate,
   };
 }
 
 /* =========================================================
-   SCORE
+   CALCULATE EXAM SCORE
 
-   Android calculation:
+   Android MockTestResultsActivity.java:
 
    wrongMark = wrong * 0.333
-   score = correct - wrongMark
+   minusMark = Math.round(wrongMark * 100) / 100
+   correctMark = correct
+   score = Math.round(
+     (correctMark - minusMark) * 100
+   ) / 100
+
+   Existing options remain supported for compatibility.
 ========================================================= */
 
 export function calculateExamScore(
   result = {},
   options = {}
 ) {
-  const counts =
-    calculateExamCounts(
-      result
-    );
+  const counts = calculateExamCounts(result);
 
   const {
     attempted,
@@ -354,64 +330,78 @@ export function calculateExamScore(
     canCalculate,
   } = counts;
 
-  const markPerCorrect =
-    toResultNumber(
-      options?.markPerCorrect ??
-        result?.mark_per_question ??
-        1,
-      1
-    );
+  const markPerCorrect = toResultNumber(
+    options.markPerCorrect ??
+      result.mark_per_question ??
+      1,
+    1
+  );
 
-  const negativeMarkPerWrong =
-    toResultNumber(
-      options?.negativeMarkPerWrong ??
-        result?.negative_mark_per_wrong ??
-        0.333,
-      0.333
-    );
+  const negativeMarkPerWrong = toResultNumber(
+    options.negativeMarkPerWrong ??
+      result.negative_mark_per_wrong ??
+      0.333,
+    0.333
+  );
 
-  const correctMark =
-    roundResultNumber(
-      correct *
-        markPerCorrect
-    );
+  const hasCounts =
+    correct !== null &&
+    wrong !== null;
 
-  const minusMark =
-    roundResultNumber(
-      wrong *
-        negativeMarkPerWrong
-    );
+  const correctMark = hasCounts
+    ? roundResultNumber(
+        correct * markPerCorrect
+      )
+    : null;
+
+  const minusMark = hasCounts
+    ? roundResultNumber(
+        wrong * negativeMarkPerWrong
+      )
+    : optionalNumber(
+        result.minus_mark,
+        result.minusMark
+      );
+
+  const calculatedScore = hasCounts
+    ? roundResultNumber(
+        correctMark - minusMark
+      )
+    : null;
+
+  const backendScore = optionalNumber(
+    result.user_score,
+    result.score
+  );
 
   const score =
-    roundResultNumber(
-      correctMark -
-        minusMark
-    );
+    calculatedScore !== null
+      ? calculatedScore
+      : backendScore;
 
-  const totalQuestions =
-    toResultNumber(
-      result?.total_questions,
-      Math.max(
-        correctAnswers.length,
-        userAnswers.length
-      )
-    );
+  const totalQuestions = optionalNumber(
+    result.total_questions,
+    result.totalQuestions,
+    correctAnswers.length || null,
+    userAnswers.length || null
+  );
 
-  const totalMark =
-    toResultNumber(
-      result?.total_mark,
-      totalQuestions *
-        markPerCorrect
-    );
+  const totalMark = optionalNumber(
+    result.total_mark,
+    result.totalMark,
+    totalQuestions !== null
+      ? totalQuestions * markPerCorrect
+      : null
+  );
 
   const percentage =
+    score !== null &&
+    totalMark !== null &&
     totalMark > 0
       ? roundResultNumber(
-          (score /
-            totalMark) *
-            100
+          (score / totalMark) * 100
         )
-      : 0;
+      : null;
 
   return {
     attempted,
@@ -430,45 +420,51 @@ export function calculateExamScore(
     userAnswers,
 
     canCalculate,
+    hasCounts,
+
+    scoreSource: hasCounts
+      ? "calculated"
+      : backendScore !== null
+        ? "backend"
+        : "unavailable",
   };
 }
 
 /* =========================================================
-   RESULT PAYLOAD VALUES
+   BUILD CALCULATED EXAM RESULT
+
+   Shared by:
+   - Mock Tests
+   - Previous Questions (PQP)
+   - SCERT
+   - Topic-wise Tests
+   - Exam History Table
+   - Exam History Result Modal
+
+   Preserve original backend fields and identifiers.
 ========================================================= */
 
 export function buildCalculatedExamResult(
   result = {},
   options = {}
 ) {
-  const calculated =
-    calculateExamScore(
-      result,
-      options
-    );
+  const calculated = calculateExamScore(
+    result,
+    options
+  );
 
   return {
+    ...result,
     ...calculated,
 
-    total_attempted:
-      calculated.attempted,
+    total_attempted: calculated.attempted,
+    total_correct: calculated.correct,
+    total_wrong: calculated.wrong,
 
-    total_correct:
-      calculated.correct,
+    user_score: calculated.score,
+    minus_mark: calculated.minusMark,
 
-    total_wrong:
-      calculated.wrong,
-
-    user_score:
-      calculated.score,
-
-    minus_mark:
-      calculated.minusMark,
-
-    total_mark:
-      calculated.totalMark,
-
-    total_questions:
-      calculated.totalQuestions,
+    total_mark: calculated.totalMark,
+    total_questions: calculated.totalQuestions,
   };
 }

@@ -21,7 +21,12 @@ export default async function DashboardLayout({
      NOT LOGGED IN
   ========================================================= */
 
-  if (!session) {
+  const uid = Number(session?.uid);
+  if (
+    session?.authenticated !== true ||
+    !Number.isFinite(uid) ||
+    uid <= 0
+  ) {
     redirect(
       "/login?redirect=/dashboard"
     );

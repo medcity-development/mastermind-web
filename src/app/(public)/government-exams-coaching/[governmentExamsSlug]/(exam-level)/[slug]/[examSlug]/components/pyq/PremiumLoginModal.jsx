@@ -15,6 +15,7 @@ export default function PremiumLoginModal({
   open,
   exam,
   onClose,
+  redirectPath = "",
 }) {
   const router =
     useRouter();
@@ -30,9 +31,11 @@ export default function PremiumLoginModal({
     "Premium Mock Test";
 
   function handleLogin() {
-    router.push(
-      "/login"
-    );
+    const loginPath = redirectPath
+      ? `/login?redirect=${encodeURIComponent(redirectPath)}`
+      : "/login";
+
+    router.push(loginPath);
   }
 
   return (

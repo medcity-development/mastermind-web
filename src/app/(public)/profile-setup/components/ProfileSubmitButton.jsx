@@ -15,20 +15,22 @@ export default function ProfileSubmitButton({
       className="
         group
         flex
-        h-[54px]
+        h-[44px]
+        lg:h-[50px]
         w-full
         items-center
         justify-center
         gap-2
-        rounded-[14px]
+        rounded-[12px]
         bg-gradient-to-r
         from-[#0969f1]
         via-[#315ff4]
         to-[#7b35f2]
-        text-[13px]
+        text-[12px]
+        lg:text-[13px]
         font-bold
         text-white
-        shadow-[0_14px_30px_rgba(67,74,239,0.24)]
+        shadow-[0_10px_24px_rgba(67,74,239,0.24)]
         transition-all
         duration-300
 

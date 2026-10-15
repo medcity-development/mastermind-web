@@ -3,7 +3,9 @@ import {
     Layers3,
   } from "lucide-react";
   
-  export default function TopicWiseHero() {
+  export default function TopicWiseHero({
+    examName = "Kerala PSC",
+  }) {
     return (
       <section
         className="
@@ -86,7 +88,7 @@ import {
                 size={14}
               />
   
-              Kerala PSC Preparation
+              {examName} Preparation
             </div>
   
             <h1
@@ -113,7 +115,7 @@ import {
                 sm:text-[15px]
               "
             >
-              Practice Kerala PSC
+              Practice {examName}{" "}
               questions subject by
               subject and strengthen
               every important topic

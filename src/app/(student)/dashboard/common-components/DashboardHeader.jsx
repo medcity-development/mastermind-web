@@ -4,7 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 import {
+  ArrowLeftRight,
   Bell,
+  ChevronDown,
   Menu,
   Search,
 } from "lucide-react";
@@ -16,6 +18,7 @@ import {
 export default function DashboardHeader({
   user,
   config,
+  dashboardOptions = [],
   onMenuClick,
 }) {
   /* =======================================================
@@ -127,7 +130,7 @@ export default function DashboardHeader({
           {/* LOGO */}
 
           <Link
-            href="/"
+            href="#"
             className="
               group
               flex
@@ -231,6 +234,38 @@ export default function DashboardHeader({
             gap-3
           "
         >
+          <details className="group relative">
+            <summary
+              aria-label={`Switch dashboard, current dashboard ${config?.shortName || config?.name}`}
+              className="flex h-9 w-9 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-0 text-[#071b59] shadow-sm transition hover:border-blue-200 hover:bg-blue-50 sm:h-10 sm:w-auto sm:justify-start sm:px-3 [&::-webkit-details-marker]:hidden"
+            >
+              <ArrowLeftRight size={16} />
+              <span className="hidden text-[10px] font-extrabold sm:inline">
+                {config?.shortName || config?.name}
+              </span>
+              <ChevronDown size={14} className="hidden text-slate-400 transition group-open:rotate-180 sm:block" />
+            </summary>
+            <div className="absolute right-0 top-full z-50 mt-2 w-[230px] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
+              <p className="px-3 pb-1 pt-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Switch dashboard
+              </p>
+              {dashboardOptions.map((option) => {
+                const active = option.slug === config?.slug;
+                return (
+                  <Link
+                    key={option.slug}
+                    href={`/dashboard/${encodeURIComponent(option.slug)}`}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-[11px] font-bold transition ${active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-[#071b59]"}`}
+                  >
+                    <span>{option.name}</span>
+                    {active ? <span className="text-[9px] font-extrabold uppercase tracking-wide">Current</span> : null}
+                  </Link>
+                );
+              })}
+            </div>
+          </details>
+
           {/* NOTIFICATION */}
 
           <button

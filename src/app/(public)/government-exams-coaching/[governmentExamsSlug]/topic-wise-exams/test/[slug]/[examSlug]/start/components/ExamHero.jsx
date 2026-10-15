@@ -47,6 +47,7 @@ import {
     questionsCount,
     timeLeft,
     durationMinutes,
+    examName = "Kerala PSC",
   }) {
     const isTimeOver =
       durationMinutes > 0 &&
@@ -122,7 +123,7 @@ import {
                 text-blue-100
               "
             >
-              Kerala PSC Topic Wise Exam
+              {examName} Topic Wise Exam
             </p>
   
             <h1

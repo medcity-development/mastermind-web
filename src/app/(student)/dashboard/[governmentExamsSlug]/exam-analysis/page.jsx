@@ -1,3 +1,4 @@
+
 import {
   notFound,
   redirect,
@@ -13,8 +14,7 @@ import {
 
 import ExamAnalysisClient from "./ExamAnalysisClient";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title:
@@ -26,50 +26,49 @@ export const metadata = {
   },
 };
 
+const ALLOWED_EXAM_TYPES = new Set([
+  "mock",
+  "pqp",
+  "scert",
+  "topicwise",
+  "twe",
+]);
+
 export default async function ExamAnalysisPage({
   params,
   searchParams,
 }) {
-  const {
-    governmentExamsSlug,
-  } = await params;
+  const { governmentExamsSlug } = await params;
 
-  const query =
-    await searchParams;
+  const query = await searchParams;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  /* =========================================
+     GOVERNMENT EXAM CONFIG
+  ========================================= */
+
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
   if (!config) {
     notFound();
   }
 
-  const cid =
-    Number(
-      config?.cid
-    );
+  const cid = Number(config.cid);
 
-  if (
-    !Number.isFinite(cid) ||
-    cid <= 0
-  ) {
+  if (!Number.isInteger(cid) || cid <= 0) {
     notFound();
   }
 
-  const session =
-    await getStudentSession();
+  /* =========================================
+     STUDENT AUTHENTICATION
+  ========================================= */
 
-  const uid =
-    Number(
-      session?.uid
-    );
+  const session = await getStudentSession();
 
-  if (
-    !Number.isFinite(uid) ||
-    uid <= 0
-  ) {
+  const uid = Number(session?.uid);
+
+  if (!Number.isInteger(uid) || uid <= 0) {
     const redirectPath =
       `/dashboard/${governmentExamsSlug}/exam-analysis`;
 
@@ -80,65 +79,58 @@ export default async function ExamAnalysisPage({
     );
   }
 
-  const attemptId =
-    String(
-      query?.attemptId ??
-      ""
-    ).trim();
+  /* =========================================
+     QUERY PARAMETERS
+  ========================================= */
 
-  const examType =
-    String(
-      query?.examType ??
-      ""
-    )
-      .trim()
-      .toLowerCase();
+  const attemptId = String(
+    query?.attemptId ?? ""
+  ).trim();
 
-  const examTitle =
-    String(
-      query?.title ??
-      ""
-    ).trim();
+  const examType = String(
+    query?.examType ?? "mock"
+  )
+    .trim()
+    .toLowerCase();
 
-  const examName =
-    examTitle ||
-    config?.shortName ||
-    config?.name ||
-    "";
+  const examTitle = String(
+    query?.title ??
+      config.shortName ??
+      config.name ??
+      "Exam Analysis"
+  ).trim();
+
+  /* =========================================
+     VALIDATION
+  ========================================= */
+
+  if (
+    !/^\d+$/.test(attemptId) ||
+    Number(attemptId) <= 0
+  ) {
+    redirect(
+      `/dashboard/${governmentExamsSlug}/exam-attempted`
+    );
+  }
+
+  if (!ALLOWED_EXAM_TYPES.has(examType)) {
+    redirect(
+      `/dashboard/${governmentExamsSlug}/exam-attempted`
+    );
+  }
+
+  /* =========================================
+     RENDER ANALYSIS
+  ========================================= */
 
   return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f4f7fc]
-        px-4
-        py-6
-        sm:px-6
-        lg:px-8
-      "
-    >
-      <div
-        className="
-          mx-auto
-          w-full
-          max-w-[1450px]
-        "
-      >
-        <ExamAnalysisClient
-          cid={
-            cid
-          }
-          attemptId={
-            attemptId
-          }
-          examType={
-            examType
-          }
-          examName={
-            examName
-          }
-        />
-      </div>
-    </main>
+    <ExamAnalysisClient
+      cid={cid}
+      uid={uid}
+      attemptId={attemptId}
+      examType={examType}
+      title={examTitle}
+      governmentExamsSlug={governmentExamsSlug}
+    />
   );
 }

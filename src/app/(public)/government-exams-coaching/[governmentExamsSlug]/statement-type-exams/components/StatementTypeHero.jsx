@@ -3,7 +3,9 @@ import {
     ListChecks,
   } from "lucide-react";
   
-  export default function StatementTypeHero() {
+  export default function StatementTypeHero({
+    examName = "Kerala PSC",
+  }) {
     return (
       <section
         className="
@@ -86,7 +88,7 @@ import {
                 size={14}
               />
   
-              Kerala PSC Preparation
+              {examName} Preparation
             </div>
   
             <h1
@@ -112,8 +114,8 @@ import {
             >
               Practice topic-wise
               statement type questions
-              and improve accuracy in
-              Kerala PSC examinations.
+              and improve accuracy in{" "}
+              {examName} examinations.
             </p>
           </div>
   

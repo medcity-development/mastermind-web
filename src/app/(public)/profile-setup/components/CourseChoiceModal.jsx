@@ -2,6 +2,8 @@
 
 "use client";
 
+import { createPortal } from "react-dom";
+
 import {
   ArrowRight,
   BookOpenCheck,
@@ -81,7 +83,10 @@ export default function CourseChoiceModal({
   const router =
     useRouter();
 
-  if (!open) {
+  if (
+    !open ||
+    typeof document === "undefined"
+  ) {
     return null;
   }
 
@@ -104,12 +109,12 @@ export default function CourseChoiceModal({
     );
   }
 
-  return (
+  return createPortal(
     <div
       className="
         fixed
         inset-0
-        z-[9999]
+        z-[10020]
         flex
         items-center
         justify-center
@@ -489,6 +494,7 @@ export default function CourseChoiceModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -78,7 +78,7 @@ export async function POST(
     const examType =
       String(
         body?.exam_type ??
-          ""
+        ""
       )
         .trim()
         .toLowerCase();

@@ -2,7 +2,7 @@ import Image from "next/image";
 
 import LoginCard from "./LoginCard";
 
-export default function LoginPage() {
+export default function LoginPage({ redirectTo = "" }) {
   return (
     <main
       className="
@@ -55,7 +55,7 @@ export default function LoginPage() {
             max-w-[460px]
           "
         >
-          <LoginCard />
+          <LoginCard redirectTo={redirectTo} />
         </div>
       </div>
     </main>

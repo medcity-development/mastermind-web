@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 
 import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
   getPyqExamDetails,
 } from "@/lib/pyqDetailsHelper";
 
@@ -11,44 +15,10 @@ import ExamInstructions from "./components/ExamInstructions";
    PARAM HELPERS
 ========================================================= */
 
-function getNumberParam(
-  value,
-  fallback
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return fallback;
-  }
-
-  const number =
-    Number(value);
-
-  return Number.isNaN(
-    number
-  )
-    ? fallback
-    : number;
-}
-
-function getQueryValues(
-  query
-) {
+function getQueryValues(query, cid) {
   return {
-    uid:
-      getNumberParam(
-        query?.uid,
-        0
-      ),
-
-    cid:
-      getNumberParam(
-        query?.cid,
-        1
-      ),
-
+    uid: 0,
+    cid,
     type:
       query?.type ??
       "pqp",
@@ -63,8 +33,14 @@ export async function generateMetadata({
   params,
   searchParams,
 }) {
-  const { examId } =
+  const {
+    examId,
+    governmentExamsSlug,
+  } =
     await params;
+
+  const config = getGovernmentExamConfig(governmentExamsSlug);
+  if (!config) return {};
 
   const query =
     await searchParams;
@@ -74,7 +50,8 @@ export async function generateMetadata({
     cid,
     type,
   } = getQueryValues(
-    query
+    query,
+    config.cid
   );
 
   const result =
@@ -102,7 +79,7 @@ export async function generateMetadata({
       `${result.exam.exam_name} | MasterMind Academy`,
 
     description:
-      "Kerala PSC previous question paper exam details and instructions.",
+      `${config.name} previous question paper exam details and instructions.`,
   };
 }
 
@@ -114,8 +91,14 @@ export default async function PyqDetailsPage({
   params,
   searchParams,
 }) {
-  const { examId } =
+  const {
+    examId,
+    governmentExamsSlug,
+  } =
     await params;
+
+  const config = getGovernmentExamConfig(governmentExamsSlug);
+  if (!config) notFound();
 
   const query =
     await searchParams;
@@ -125,7 +108,8 @@ export default async function PyqDetailsPage({
     cid,
     type,
   } = getQueryValues(
-    query
+    query,
+    config.cid
   );
 
   const result =
@@ -162,6 +146,12 @@ export default async function PyqDetailsPage({
           exam={
             result.exam
           }
+          examName={
+            config.name
+          }
+          governmentExamsSlug={
+            governmentExamsSlug
+          }
         />
 
         <div className="mt-6">
@@ -186,6 +176,9 @@ export default async function PyqDetailsPage({
             }
             view={
               result.view
+            }
+            governmentExamsSlug={
+              governmentExamsSlug
             }
           />
         </div>

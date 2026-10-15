@@ -8,6 +8,10 @@ import {
   getSidebarItems,
 } from "./sidebar/sidebarData";
 
+import {
+  prepareDashboardLearningTools,
+} from "./quick-actions/dashboardLearningToolsHelper";
+
 import SidebarBackdrop from "./sidebar/SidebarBackdrop";
 import SidebarExamIdentity from "./sidebar/SidebarExamIdentity";
 import SidebarNavigation from "./sidebar/SidebarNavigation";
@@ -16,6 +20,7 @@ import SidebarCloseButton from "./sidebar/SidebarCloseButton";
 
 export default function DashboardSidebar({
   config,
+  learningToolGrid = [],
   mobileOpen = false,
   onMobileClose,
 }) {
@@ -26,12 +31,18 @@ export default function DashboardSidebar({
     return null;
   }
 
+  const learningTools = prepareDashboardLearningTools({
+    grid: learningToolGrid,
+    governmentExamsSlug: config.slug,
+  }).filter((tool) => tool.hasRegisteredRoute);
+
   const {
     dashboardPath,
     mainItems,
     accountItems,
   } = getSidebarItems({
     config,
+    learningTools,
   });
 
   function isActive(
@@ -74,6 +85,9 @@ export default function DashboardSidebar({
           inset-y-0
           left-0
           z-50
+
+          h-dvh
+          min-h-0
 
           flex
           w-[84px]

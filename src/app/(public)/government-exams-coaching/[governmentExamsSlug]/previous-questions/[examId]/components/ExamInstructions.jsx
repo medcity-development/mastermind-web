@@ -19,6 +19,7 @@ export default function ExamInstructions({
   cid,
   type,
   view,
+  governmentExamsSlug = "kerala-psc",
 }) {
   if (!exam) {
     return null;
@@ -393,7 +394,7 @@ export default function ExamInstructions({
 
           {/* START BUTTON */}
           <Link
-            href={`/government-exams-coaching/kerala-psc/previous-questions/${examId}/start?uid=${uid}&cid=${cid}&type=${type}`}
+            href={`/government-exams-coaching/${governmentExamsSlug}/previous-questions/${examId}/start?uid=${uid}&cid=${cid}&type=${type}`}
             className="
               group
               mt-5

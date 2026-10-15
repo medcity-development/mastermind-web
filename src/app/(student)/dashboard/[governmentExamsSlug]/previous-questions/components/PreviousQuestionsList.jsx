@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useState,
 } from "react";
 
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 
 import PreviousQuestionCard from "./PreviousQuestionCard";
+import { fetchPausedAttemptIds } from "@/lib/pausedExamAttempts";
 
 export default function PreviousQuestionsList({
   initialExams = [],
@@ -62,6 +64,50 @@ export default function PreviousQuestionsList({
     error,
     setError,
   ] = useState("");
+
+  const [
+    pausedAttempts,
+    setPausedAttempts,
+  ] = useState({});
+
+  const [
+    pausedAttemptsError,
+    setPausedAttemptsError,
+  ] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPausedAttempts() {
+      try {
+        setPausedAttemptsError("");
+        const attempts = await fetchPausedAttemptIds({
+          cid,
+          examType: type,
+        });
+
+        if (!cancelled) {
+          setPausedAttempts(attempts);
+        }
+      } catch (error) {
+        console.error("Load paused previous-question attempts:", error);
+        if (!cancelled) {
+          setPausedAttempts({});
+          setPausedAttemptsError(
+            error?.message || "Unable to check paused previous-question exams."
+          );
+        }
+      }
+    }
+
+    if (cid && uid) {
+      loadPausedAttempts();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cid, uid, type]);
 
   /* =========================================================
      ACTIVE CATEGORIES FROM API
@@ -586,6 +632,12 @@ export default function PreviousQuestionsList({
         </div>
       )}
 
+      {pausedAttemptsError ? (
+        <p className="mb-5 text-sm text-amber-700" role="status">
+          {pausedAttemptsError}
+        </p>
+      ) : null}
+
       {/* =====================================================
           CARDS
       ===================================================== */}
@@ -629,6 +681,11 @@ export default function PreviousQuestionsList({
                 }
                 item={
                   exam
+                }
+                pauseId={
+                  pausedAttempts[String(
+                    exam?.exam_id ?? exam?.id
+                  )]
                 }
                 uid={uid}
                 cid={cid}

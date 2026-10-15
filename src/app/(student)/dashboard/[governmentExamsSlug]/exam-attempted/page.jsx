@@ -15,6 +15,10 @@ import {
     getExamHistoryTypes,
 } from "@/lib/examHistoryTypes";
 
+import {
+    getStudentProfile,
+} from "@/lib/studentProfileHelper";
+
 import ExamHistoryClient from "./ExamHistoryClient";
 
 export const dynamic =
@@ -109,11 +113,52 @@ export default async function ExamHistoryPage({
     }
 
     /* =======================================================
+       STUDENT PROFILE & ACTIVE PLAN CHECK
+    ======================================================= */
+
+    let profile = null;
+    try {
+        const profileResult = await getStudentProfile({
+            uid,
+            cid,
+        });
+
+        profile =
+            profileResult?.profile ||
+            profileResult?.data?.profile ||
+            profileResult?.data ||
+            null;
+    } catch (error) {
+        console.warn("STUDENT PROFILE CHECK ERROR:", error?.message);
+    }
+
+    const isPlanActive = Boolean(
+        profile?.active === "active" ||
+        profile?.active === true ||
+        profile?.active === 1 ||
+        profile?.active === "1" ||
+        profile?.status === "active" ||
+        profile?.is_active === 1 ||
+        profile?.is_active === true ||
+        profile?.is_active === "1" ||
+        profile?.package_status === "active" ||
+        profile?.plan_status === "active" ||
+        profile?.subscription_status === "active" ||
+        profile?.payment_status === "active" ||
+        profile?.stage === "active" ||
+        profile?.stage === "completed" ||
+        session?.active === "active" ||
+        session?.active === true ||
+        session?.status === "active"
+    );
+
+    /* =======================================================
        SUPPORTED BACKEND TYPES
     ======================================================= */
 
-    const examTypes =
-        getExamHistoryTypes();
+    const examTypes = isPlanActive
+        ? [...getExamHistoryTypes(), "studyplan"]
+        : getExamHistoryTypes();
 
     /* =======================================================
        PAGE
@@ -151,6 +196,9 @@ export default async function ExamHistoryPage({
                     }
                     governmentExamsSlug={
                         governmentExamsSlug
+                    }
+                    hasActivePlan={
+                        isPlanActive
                     }
                 />
             </div>

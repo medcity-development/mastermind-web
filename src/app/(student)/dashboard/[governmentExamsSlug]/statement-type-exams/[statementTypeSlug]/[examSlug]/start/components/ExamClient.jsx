@@ -1,6 +1,11 @@
 "use client";
 
-import { getAttemptId } from "@/lib/examAttemptData";
+import { getAttemptId, getResultArray, secondsToMilliseconds, timestampToMilliseconds } from "@/lib/examAttemptData";
+import { prepareExamHistoryResult } from "@/lib/examHistoryResult";
+import {
+  clearGuestExamHandoff,
+  readGuestExamHandoff,
+} from "@/lib/guestExamHandoff";
 
 import {
   useEffect,
@@ -18,6 +23,7 @@ import ExamProgress from "./ExamProgress";
 import ExamQuestions from "./ExamQuestions";
 import ExamPagination from "./ExamPagination";
 import ExamControls from "./ExamControls";
+import ExamResultModal from "@/components/ExamResultModal";
 
 import {
   QUESTIONS_PER_PAGE,
@@ -137,7 +143,7 @@ export default function ExamClient({
 
   examType = "tst",
 
-  initialAttemptCreated = false,
+  guestAction = "",
 }) {
   const router =
     useRouter();
@@ -170,8 +176,15 @@ export default function ExamClient({
     pauseId,
     setPauseId,
   ] = useState(null);
+  const [restoring, setRestoring] = useState(true);
+  const [guestRestoreError, setGuestRestoreError] = useState("");
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [submittedResult, setSubmittedResult] = useState(null);
+  const [attemptStartTime, setAttemptStartTime] = useState(() => Date.now());
+  const [attemptEndTime, setAttemptEndTime] = useState(null);
 
   const requestRef = useRef(false);
+  const guestActionHandledRef = useRef(false);
   const draftKey = `exam_draft_${uid}_${cid}_${examType}_${exam?.id}`;
 
   const timeOverHandled =
@@ -221,20 +234,61 @@ export default function ExamClient({
   );
 
   useEffect(() => {
-    try {
-      const draft = JSON.parse(localStorage.getItem(draftKey) || "null");
-      if (!draft) return;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAnswers(draft.answers || {});
-      setPauseId(draft.pauseId);
-      setTimeLeft(draft.timeLeft);
-      setEndTime(Date.now() + draft.timeLeft * 1000);
-      setCurrentPage(draft.currentPage || 1);
-    } catch {}
-  }, [draftKey]);
+    let cancelled = false;
+    async function restoreDraft() {
+      try {
+        await Promise.resolve();
+        let draft = JSON.parse(localStorage.getItem(draftKey) || "null");
+        if (["pause", "submit"].includes(guestAction)) {
+          draft = readGuestExamHandoff({
+            examId,
+            examType,
+            governmentExamsSlug,
+          });
+          if (!draft || draft.action !== guestAction) {
+            throw new Error("Saved exam progress could not be found.");
+          }
+        }
+
+        if (draft && !cancelled) {
+          const restoredTime = Math.max(
+            0,
+            Math.min(
+              durationSeconds,
+              Number(draft.timeLeft ?? draft.remainingSeconds) || 0
+            )
+          );
+          setAnswers(draft.answers || {});
+          setPauseId(draft.pauseId || null);
+          setAttemptStartTime(
+            timestampToMilliseconds(draft.startTime) ?? Date.now()
+          );
+          setAttemptEndTime(
+            guestAction === "submit"
+              ? timestampToMilliseconds(draft.endTime)
+              : null
+          );
+          setTimeLeft(restoredTime);
+          setEndTime(Date.now() + restoredTime * 1000);
+          setCurrentPage(draft.currentPage || 1);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setGuestRestoreError(error?.message || "Unable to restore saved exam.");
+          setSaveError(error?.message || "Unable to restore saved exam.");
+        }
+      } finally {
+        if (!cancelled) setRestoring(false);
+      }
+    }
+    void restoreDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, guestAction, examId, examType, governmentExamsSlug, durationSeconds]);
 
   useEffect(() => {
-    if (!endTime) {
+    if (!endTime || restoring) {
       return;
     }
 
@@ -267,7 +321,7 @@ export default function ExamClient({
         timer
       );
     };
-  }, [endTime]);
+  }, [endTime, restoring]);
 
   /* =======================================================
      PAGINATION
@@ -507,7 +561,7 @@ export default function ExamClient({
   async function saveExamAttempt(
     examStatus
   ) {
-    if (saving) {
+    if (saving || requestRef.current) {
       return;
     }
 
@@ -542,15 +596,6 @@ export default function ExamClient({
       } =
         buildAnswerData();
 
-      const elapsedSeconds =
-        durationSeconds > 0
-          ? Math.max(
-              0,
-              durationSeconds -
-                timeLeft
-            )
-          : 0;
-
       const userScore =
         calculateScore(
           correctAnswerArray.length
@@ -581,7 +626,15 @@ export default function ExamClient({
           ) ||
           questions.length,
 
-        paused_time: timeLeft,
+        paused_time:
+          secondsToMilliseconds(timeLeft),
+
+        start_time:
+          attemptStartTime,
+
+        ...(["complete", "completed", "finish", "finished"].includes(String(examStatus).toLowerCase())
+          ? { end_time: attemptEndTime ?? Date.now() }
+          : {}),
 
         total_mark:
           Number(
@@ -649,13 +702,26 @@ export default function ExamClient({
           });
       }
 
+      const savedAttemptId = pauseId || getAttemptId(result);
+      if (
+        !savedAttemptId &&
+        (examStatus === "pause" ||
+          (examStatus === "complete" && guestAction === "submit"))
+      ) {
+        throw new Error("The saved attempt ID was not returned. Please retry.");
+      }
+      if (savedAttemptId) setPauseId(savedAttemptId);
+      if (["pause", "submit"].includes(guestAction)) {
+        clearGuestExamHandoff();
+      }
+
       console.log(
         "STATEMENT EXAM SAVE RESULT:",
         result
       );
 
       try {
-        if (examStatus === "pause") localStorage.setItem(draftKey, JSON.stringify({ answers, pauseId: pauseId || getAttemptId(result), timeLeft, currentPage }));
+        if (examStatus === "pause") localStorage.setItem(draftKey, JSON.stringify({ answers, pauseId: savedAttemptId, timeLeft, currentPage, startTime: attemptStartTime }));
         else localStorage.removeItem(draftKey);
       } catch {}
 
@@ -682,6 +748,35 @@ export default function ExamClient({
         examStatus ===
         "complete"
       ) {
+        if (guestAction === "submit") {
+          let savedResult = result?.data?.[0] || result?.data || result || {};
+          if (savedAttemptId) {
+            try {
+              const details = await sendAttemptRequest({
+                endpoint: "/api/exam-attempt/analytics-details",
+                payload: {
+                  cid: Number(cid),
+                  uid: Number(uid),
+                  id: savedAttemptId,
+                  exam_type: examType,
+                },
+              });
+              savedResult = getResultArray(details)[0] || savedResult;
+            } catch (error) {
+              console.error("STATEMENT RESULT LOAD ERROR:", error);
+            }
+          }
+          setSubmittedResult(prepareExamHistoryResult({
+            ...payload,
+            ...savedResult,
+            id: savedAttemptId,
+            exam_type: examType,
+            exam_name: exam?.exam_name || exam?.title || "",
+          }));
+          setResultModalOpen(true);
+          return;
+        }
+
         router.push(
           `/dashboard/${governmentExamsSlug}/statement-type-exams/${statementTypeSlug}/${examSlug}`
         );
@@ -718,6 +813,36 @@ export default function ExamClient({
     );
   }
 
+  function handleViewAnalysis(result) {
+    const attemptId = result?.id ?? result?.attempt_id ?? result?.pauseid;
+    if (!attemptId || !governmentExamsSlug) return;
+    const params = new URLSearchParams({
+      attemptId: String(attemptId),
+      examType: String(result?.exam_type ?? examType),
+      ...(result?.exam_name ? { title: result.exam_name } : {}),
+    });
+    router.push(`/dashboard/${encodeURIComponent(governmentExamsSlug)}/exam-analysis?${params.toString()}`);
+  }
+
+  useEffect(() => {
+    if (
+      restoring ||
+      guestRestoreError ||
+      guestActionHandledRef.current ||
+      !["pause", "submit"].includes(guestAction)
+    ) {
+      return;
+    }
+
+    guestActionHandledRef.current = true;
+    const timer = window.setTimeout(() => {
+      void saveExamAttempt(guestAction === "pause" ? "pause" : "complete");
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // One handoff is replayed once after restoration; the ref prevents repeats.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoring, guestRestoreError, guestAction]);
+
   /* =======================================================
      TIME OVER
 
@@ -730,6 +855,8 @@ export default function ExamClient({
 
   useEffect(() => {
     if (
+      restoring ||
+      guestAction ||
       !isTimeOver ||
       timeOverHandled.current
     ) {
@@ -745,6 +872,7 @@ export default function ExamClient({
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    restoring,
     isTimeOver,
   ]);
 
@@ -754,6 +882,13 @@ export default function ExamClient({
 
   return (
     <>
+      <ExamResultModal
+        open={resultModalOpen}
+        result={submittedResult}
+        examTitle={exam?.exam_name || exam?.title || ""}
+        onClose={() => setResultModalOpen(false)}
+        onViewAnalysis={handleViewAnalysis}
+      />
       <main
         className="
           min-h-screen

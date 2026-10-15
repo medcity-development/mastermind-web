@@ -8,6 +8,8 @@ import {
 
 export default function ScertFolderCard({
   folder,
+  governmentExamsSlug = "kerala-psc",
+  examName = "Kerala PSC",
 }) {
   if (!folder?.id) {
     return null;
@@ -15,7 +17,7 @@ export default function ScertFolderCard({
 
   return (
     <Link
-      href={`/government-exams-coaching/kerala-psc/scert-tests/classes/${folder.id}`}
+      href={`/government-exams-coaching/${governmentExamsSlug}/scert-tests/classes/${folder.id}`}
       className="
         group
         relative
@@ -66,7 +68,7 @@ export default function ScertFolderCard({
           text-[#017dc0]
         "
       >
-        Kerala PSC SCERT
+        {examName} SCERT
       </p>
 
       <h3

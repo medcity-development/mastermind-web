@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +23,7 @@ import MockQuestionCard from "./MockQuestionCard";
 import MockQuestionPagination from "./MockQuestionPagination";
 import MockSubmitButton from "./MockSubmitButton";
 import MockTestHeader from "./MockTestHeader";
+import { saveGuestExamHandoff } from "@/lib/guestExamHandoff";
 
 const QUESTIONS_PER_PAGE = 10;
 
@@ -30,6 +32,8 @@ export default function MockTestQuestions({
   uid = 0,
   cid = 1,
   examTitle = "",
+  examName = "Kerala PSC",
+  governmentExamsSlug = "",
 }) {
   const router = useRouter();
 
@@ -81,6 +85,10 @@ export default function MockTestQuestions({
 
   const timeoutHandled =
     useRef(false);
+  const examStartedAt =
+    useRef(0);
+  const examEndedAt =
+    useRef(0);
 
   /* =========================================================
      LOAD EXAM DETAILS + QUESTIONS
@@ -94,6 +102,8 @@ export default function MockTestQuestions({
         setLoading(true);
         setError("");
         setTimerStarted(false);
+        examStartedAt.current = 0;
+        examEndedAt.current = 0;
 
         timeoutHandled.current =
           false;
@@ -246,6 +256,9 @@ export default function MockTestQuestions({
           validDuration * 60
         );
 
+        examStartedAt.current =
+          Date.now();
+
         setTimerStarted(
           true
         );
@@ -279,6 +292,50 @@ export default function MockTestQuestions({
     examId,
     uid,
     cid,
+  ]);
+
+  const redirectToLogin = useCallback((guestAction) => {
+    try {
+      saveGuestExamHandoff({
+        examId,
+        examType: "mock",
+        governmentExamsSlug,
+        action: guestAction,
+        answers,
+        currentPage,
+        remainingSeconds,
+        startTime: examStartedAt.current || Date.now(),
+        endTime: examEndedAt.current || Date.now(),
+        examTitle: examTitle || exam?.exam_name || "",
+      });
+    } catch (error) {
+      console.error("Save guest mock exam progress:", error);
+      setError(error?.message || "Unable to save your exam progress.");
+      setLoginModalOpen(false);
+      return;
+    }
+
+    const redirectUrl =
+      `/dashboard/${encodeURIComponent(governmentExamsSlug)}/mock-tests/${encodeURIComponent(examId)}/start` +
+      `?uid=${encodeURIComponent(String(uid))}` +
+      `&cid=${encodeURIComponent(String(cid))}` +
+      `&title=${encodeURIComponent(examTitle || exam?.exam_name || "")}` +
+      `&guestAction=${encodeURIComponent(guestAction)}`;
+
+    router.push(
+      `/login?redirect=${encodeURIComponent(redirectUrl)}`
+    );
+  }, [
+    answers,
+    cid,
+    currentPage,
+    exam,
+    examId,
+    examTitle,
+    governmentExamsSlug,
+    remainingSeconds,
+    router,
+    uid,
   ]);
 
   /* =========================================================
@@ -357,13 +414,10 @@ export default function MockTestQuestions({
     timeoutHandled.current =
       true;
 
-    setModalReason(
-      "timeout"
-    );
-
-    setLoginModalOpen(
-      true
-    );
+    examEndedAt.current =
+      Date.now();
+    setModalReason("timeout");
+    setLoginModalOpen(true);
   }, [
     timerStarted,
     remainingSeconds,
@@ -471,6 +525,8 @@ export default function MockTestQuestions({
   ========================================================= */
 
   function handlePause() {
+    examEndedAt.current =
+      Date.now();
     setModalReason(
       "pause"
     );
@@ -485,6 +541,8 @@ export default function MockTestQuestions({
   ========================================================= */
 
   function handleSubmit() {
+    examEndedAt.current =
+      Date.now();
     setModalReason(
       "submit"
     );
@@ -499,25 +557,7 @@ export default function MockTestQuestions({
   ========================================================= */
 
   function handleLogin() {
-    const redirectUrl =
-      `/government-exams-coaching/kerala-psc/mock-tests/${examId}/start` +
-      `?uid=${encodeURIComponent(
-        String(uid)
-      )}` +
-      `&cid=${encodeURIComponent(
-        String(cid)
-      )}` +
-      `&title=${encodeURIComponent(
-        examTitle ||
-          exam?.exam_name ||
-          ""
-      )}`;
-
-    router.push(
-      `/login?redirect=${encodeURIComponent(
-        redirectUrl
-      )}`
-    );
+    redirectToLogin(modalReason === "pause" ? "pause" : "submit");
   }
 
   /* =========================================================
@@ -680,6 +720,9 @@ export default function MockTestQuestions({
           }
           examTitle={
             examTitle
+          }
+          examName={
+            examName
           }
           remainingSeconds={
             remainingSeconds

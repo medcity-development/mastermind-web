@@ -16,11 +16,12 @@ export default function DistrictSelect({
     <div>
       <label
         className="
-          mb-2
+          mb-1
           block
-          text-[12px]
-          font-bold
-          text-[#071b59]
+          text-[11px]
+          font-semibold
+          text-slate-700
+          lg:text-[13px]
         "
       >
         District
@@ -41,24 +42,31 @@ export default function DistrictSelect({
             )
           }
           className="
-            h-[52px]
+            h-[42px]
             w-full
             appearance-none
-            rounded-[12px]
+            rounded-[11px]
             border
             border-slate-200
-            bg-white
-            px-4
-            pr-10
-            text-[13px]
+            bg-slate-50/70
+            px-3
+            pr-9
+            text-[12px]
             font-medium
             text-slate-700
             outline-none
             transition-all
             duration-200
+            lg:h-[50px]
+            lg:rounded-[12px]
+            lg:px-4
+            lg:pr-10
+            lg:text-[14px]
 
             focus:border-[#4f6cf7]
+            focus:bg-white
             focus:shadow-[0_0_0_4px_rgba(79,108,247,0.08)]
+            hover:border-slate-300
           "
         >
           <option value="">
@@ -82,10 +90,11 @@ export default function DistrictSelect({
           className="
             pointer-events-none
             absolute
-            right-4
+            right-3
             top-1/2
             -translate-y-1/2
             text-slate-400
+            lg:right-4
           "
         />
       </div>

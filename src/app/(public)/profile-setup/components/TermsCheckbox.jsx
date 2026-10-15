@@ -12,12 +12,13 @@ export default function TermsCheckbox({
         flex
         cursor-pointer
         items-start
-        gap-3
-        rounded-xl
+        gap-2.5
+        rounded-[14px]
         border
-        border-slate-100
-        bg-[#f8faff]
-        p-3
+        border-slate-200
+        bg-white/80
+        p-2.5
+        lg:p-3
       "
     >
       <input
@@ -41,9 +42,11 @@ export default function TermsCheckbox({
 
       <span
         className="
-          text-[11px]
-          leading-5
+          text-[10px]
+          leading-4
           text-slate-600
+          lg:text-[11px]
+          lg:leading-5
         "
       >
         I have read and accept the{" "}

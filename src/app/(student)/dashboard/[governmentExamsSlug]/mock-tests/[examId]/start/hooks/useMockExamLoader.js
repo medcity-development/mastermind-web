@@ -1,6 +1,7 @@
 import {
   useCallback,
 } from "react";
+import { savedPausedTimeToSeconds } from "@/lib/examAttemptData";
 
 import {
   getAttemptId,
@@ -9,6 +10,7 @@ import {
   getExamType,
   normalizeAnswer,
   parseAnswerArray,
+  QUESTIONS_PER_PAGE,
 } from "../utils/mockTestUtils";
 
 export default function useMockExamLoader({
@@ -220,6 +222,31 @@ export default function useMockExamLoader({
           );
         }
 
+        let savedDraft = null;
+        try {
+          savedDraft = JSON.parse(
+            localStorage.getItem(
+              `exam_draft_${uid}_${cid}_${examType}_${examId}`
+            ) || "null"
+          );
+        } catch {
+          savedDraft = null;
+        }
+
+        const draftMatchesAttempt =
+          Boolean(pauseId) &&
+          String(savedDraft?.pauseId ?? "") === String(pauseId);
+        const lastAnsweredIndex =
+          questions.reduce(
+            (lastIndex, question, index) =>
+              normalizeAnswer(
+                restoredAnswers[question?.id ?? index + 1]
+              )
+                ? index
+                : lastIndex,
+            -1
+          );
+
         /* ===============================================
            TIMER
         =============================================== */
@@ -238,9 +265,9 @@ export default function useMockExamLoader({
         }
 
         const savedRemaining =
-          Number(
-            pausedAttempt
-              ?.paused_time
+          savedPausedTimeToSeconds(
+            pausedAttempt?.paused_time,
+            fullDuration
           );
 
         const hasSavedTime =
@@ -270,7 +297,29 @@ export default function useMockExamLoader({
 
           pauseId,
 
-          restoredAnswers,
+          startTime:
+            pausedAttempt?.start_time ??
+            pausedAttempt?.startTime ??
+            pausedAttempt?.started_at ??
+            null,
+
+          restoredAnswers:
+            draftMatchesAttempt &&
+            savedDraft?.answers &&
+            typeof savedDraft.answers === "object"
+              ? savedDraft.answers
+              : restoredAnswers,
+
+          currentPage:
+            draftMatchesAttempt
+              ? Number(savedDraft.currentPage) || 1
+              : Math.max(
+                  1,
+                  Math.floor(
+                    Math.max(0, lastAnsweredIndex) /
+                      QUESTIONS_PER_PAGE
+                  ) + 1
+                ),
 
           initialRemaining:
             hasSavedTime

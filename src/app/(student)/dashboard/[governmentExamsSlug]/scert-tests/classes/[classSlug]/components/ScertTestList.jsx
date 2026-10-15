@@ -16,6 +16,7 @@ const TESTS_PER_PAGE = 10;
 
 export default function ScertTestList({
   tests = [],
+  pausedAttempts = {},
   classId,
   governmentExamsSlug,
 }) {
@@ -274,6 +275,7 @@ export default function ScertTestList({
               <ScertTestCard
               key={test.id}
               test={test}
+              pauseId={pausedAttempts[String(test.id)]}
                 classId={
                   classId
                 }

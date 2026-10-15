@@ -157,7 +157,7 @@ export default function MainCourseCard({
             src={imageUrl}
             alt={`${title} logo`}
             fill
-            sizes="72px"
+            sizes="72px" unoptimized
             className="
               object-contain
               p-2.5

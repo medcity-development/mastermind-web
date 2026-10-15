@@ -1,3 +1,4 @@
+
 // src/lib/examAttemptHelper.js
 
 import {
@@ -16,44 +17,26 @@ const API_KEY =
   process.env.PSC_API_KEY;
 
 /* =========================================================
-   CLEAN BASE URL
+   HELPERS
 ========================================================= */
 
-function cleanBaseUrl(
-  value = ""
-) {
+function cleanBaseUrl(value = "") {
   return String(value)
     .trim()
     .replace(/\/+$/, "");
 }
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function normalizeString(
-  value
-) {
-  return String(
-    value ?? ""
-  ).trim();
+function normalizeString(value) {
+  return String(value ?? "").trim();
 }
 
-function normalizeExamType(
-  value
-) {
-  return normalizeString(
-    value
-  ).toLowerCase();
+function normalizeExamType(value) {
+  return normalizeString(value).toLowerCase();
 }
 
-function normalizeExamStatus(
-  value
-) {
-  const status =
-    normalizeString(
-      value
-    ).toLowerCase();
+function normalizeExamStatus(value) {
+  const status = normalizeString(value)
+    .toLowerCase();
 
   if (
     status === "finish" ||
@@ -74,16 +57,10 @@ function normalizeExamStatus(
   return status;
 }
 
-function getPositiveNumber(
-  value
-) {
-  const parsed =
-    Number(value);
+function getPositiveNumber(value) {
+  const parsed = Number(value);
 
-  return Number.isFinite(
-    parsed
-  ) &&
-    parsed > 0
+  return Number.isFinite(parsed) && parsed > 0
     ? parsed
     : null;
 }
@@ -107,162 +84,151 @@ function appendFormValue(
   if (Array.isArray(value)) {
     formData.append(
       key,
-      `[${value.join(", ")}]`
+      key === "user_answers"
+        ? JSON.stringify(value)
+        : `[${value.join(", ")}]`
     );
 
     return;
   }
 
-  if (
-    typeof value ===
-    "object"
-  ) {
+  if (typeof value === "object") {
     formData.append(
       key,
-      JSON.stringify(
-        value
-      )
+      JSON.stringify(value)
     );
 
     return;
   }
 
-  formData.append(
-    key,
-    String(value)
-  );
+  formData.append(key, String(value));
 }
 
 /* =========================================================
-   COMMON REQUEST
+   COMMON API REQUEST
 ========================================================= */
 
 async function sendExamRequest(
   endpoint,
   payload = {}
 ) {
-  if (!API_BASE_URL) {
-    throw new Error(
-      "PSC_API_BASE_URL is missing."
+  if (!API_BASE_URL || !API_KEY) {
+    const error = new Error(
+      "PSC API configuration is missing."
+    );
+
+    error.httpStatus = 500;
+    throw error;
+  }
+
+  const formData = new FormData();
+
+  formData.append("api", API_KEY);
+
+  const requestPayload = Object.fromEntries(
+    Object.entries(payload).filter(
+      ([key]) => key !== "__scoring"
+    )
+  );
+
+  if (
+    requestPayload.paused_time != null &&
+    Number(requestPayload.paused_time) > 0 &&
+    Number(requestPayload.paused_time) <= 86400
+  ) {
+    requestPayload.paused_time = Math.round(
+      Number(requestPayload.paused_time) * 1000
     );
   }
 
-  if (!API_KEY) {
-    throw new Error(
-      "PSC_API_KEY is missing."
-    );
-  }
-
-  const baseUrl =
-    cleanBaseUrl(
-      API_BASE_URL
-    );
-
-  const url =
-    `${baseUrl}/${endpoint}`;
-
-  const formData =
-    new FormData();
-
-  formData.append(
-    "api",
-    API_KEY
-  );
-
-  Object.entries(
-    payload
-  ).forEach(
-    ([key, value]) => {
-      appendFormValue(
-        formData,
-        key,
-        value
-      );
-    }
-  );
-
-  console.log(
-    `EXAM API REQUEST -> ${endpoint}`,
-    payload
+  Object.entries(requestPayload).forEach(
+    ([key, value]) =>
+      appendFormValue(formData, key, value)
   );
 
   let response;
 
   try {
-    response =
-      await fetch(
-        url,
-        {
-          method:
-            "POST",
-
-          body:
-            formData,
-
-          cache:
-            "no-store",
-
-          headers: {
-            Accept:
-              "application/json",
-          },
-        }
-      );
-  } catch (error) {
-    console.error(
-      `${endpoint} NETWORK ERROR:`,
-      error
+    response = await fetch(
+      `${cleanBaseUrl(API_BASE_URL)}/${endpoint}`,
+      {
+        method: "POST",
+        body: formData,
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(15000),
+      }
     );
-
-    throw new Error(
+  } catch (cause) {
+    const error = new Error(
       `Unable to reach ${endpoint}.`
     );
+
+    error.httpStatus = 503;
+    throw error;
   }
 
-  const rawText =
-    await response.text();
+  const raw = await response.text();
 
   let result;
 
   try {
-    result =
-      rawText
-        ? JSON.parse(
-            rawText
-          )
-        : {};
+    result = raw ? JSON.parse(raw) : {};
   } catch {
-    console.error(
-      `${endpoint} INVALID JSON`
+    const phpError =
+      /Undefined variable|Undefined index|Fatal error|Warning:/i.test(
+        raw
+      );
+
+    const error = new Error(
+      phpError
+        ? "The exam backend encountered a PHP error. Please contact support."
+        : `Invalid response from ${endpoint}.`
     );
 
-    console.error(
-      `${endpoint} STATUS:`,
-      response.status
+    error.httpStatus =
+      response.status === 429 ? 429 : 502;
+
+    throw error;
+  }
+
+  // PHP may return an error in JSON with HTTP 200.
+  if (
+    result?.status === false &&
+    /Undefined variable|Undefined index|Fatal error|Warning:/i.test(
+      String(
+        result?.message ||
+        result?.msg ||
+        ""
+      )
+    )
+  ) {
+    const error = new Error(
+      "The exam backend could not load this saved attempt."
     );
 
-    console.error(
-      `${endpoint} RAW RESPONSE:`,
-      rawText
-    );
-
-    throw new Error(
-      `${endpoint} returned invalid JSON.`
-    );
+    error.httpStatus = 502;
+    throw error;
   }
 
   if (!response.ok) {
-    throw new Error(
-      result?.message ||
+    const error = new Error(
+      response.status === 429
+        ? "Too many exam requests. Please wait before trying again."
+        : result?.message ||
         result?.msg ||
-        `${endpoint} failed with HTTP ${response.status}.`
+        `${endpoint} failed (HTTP ${response.status}).`
     );
-  }
 
-  console.log(
-    `EXAM API RESPONSE -> ${endpoint}`,
-    result
-  );
+    error.httpStatus = response.status;
+
+    error.retryAfter =
+      response.headers.get("retry-after");
+
+    throw error;
+  }
 
   return result;
 }
@@ -275,48 +241,34 @@ function normalizeFailure(
   result,
   fallbackMessage
 ) {
-  if (
-    !isFailedResponse(
-      result
-    )
-  ) {
+  if (!isFailedResponse(result)) {
     return null;
   }
 
   return {
-    ...(result &&
-    typeof result ===
-      "object"
+    ...(result && typeof result === "object"
       ? result
       : {}),
 
-    status:
-      false,
+    status: false,
 
     message:
       result?.message ||
       result?.msg ||
       fallbackMessage,
 
-    data:
-      Array.isArray(
-        result?.data
-      )
-        ? result.data
-        : [],
+    data: Array.isArray(result?.data)
+      ? result.data
+      : [],
 
-    details:
-      Array.isArray(
-        result?.details
-      )
-        ? result.details
-        : [],
+    details: Array.isArray(result?.details)
+      ? result.details
+      : [],
   };
 }
 
 /* =========================================================
    CREATE ATTEMPT
-
    POST /setNewUserExams
 ========================================================= */
 
@@ -324,35 +276,27 @@ export async function createUserExamAttempt(
   payload = {}
 ) {
   try {
-    const result =
-      await sendExamRequest(
-        "setNewUserExams",
-        payload
-      );
+    const result = await sendExamRequest(
+      "setNewUserExams",
+      payload
+    );
 
-    const failed =
-      normalizeFailure(
-        result,
-        "Unable to save exam attempt."
-      );
+    const failed = normalizeFailure(
+      result,
+      "Unable to save exam attempt."
+    );
 
     if (failed) {
       return failed;
     }
 
-    const attemptId =
-      getAttemptId(
-        result
-      );
+    const attemptId = getAttemptId(result);
 
     return {
       ...result,
 
       ...(attemptId
-        ? {
-            pauseid:
-              attemptId,
-          }
+        ? { pauseid: attemptId }
         : {}),
     };
   } catch (error) {
@@ -362,13 +306,10 @@ export async function createUserExamAttempt(
     );
 
     return {
-      status:
-        false,
-
+      status: false,
       message:
         error?.message ||
         "Unable to save exam attempt.",
-
       data: [],
       details: [],
     };
@@ -377,7 +318,6 @@ export async function createUserExamAttempt(
 
 /* =========================================================
    UPDATE ATTEMPT
-
    POST /setUpdateUserExams
 ========================================================= */
 
@@ -391,17 +331,15 @@ export async function updateUserExamAttempt(
       );
     }
 
-    const result =
-      await sendExamRequest(
-        "setUpdateUserExams",
-        payload
-      );
+    const result = await sendExamRequest(
+      "setUpdateUserExams",
+      payload
+    );
 
-    const failed =
-      normalizeFailure(
-        result,
-        "Unable to update exam attempt."
-      );
+    const failed = normalizeFailure(
+      result,
+      "Unable to update exam attempt."
+    );
 
     if (failed) {
       return failed;
@@ -412,9 +350,7 @@ export async function updateUserExamAttempt(
 
       pauseid:
         payload.pauseid ??
-        getAttemptId(
-          result
-        ),
+        getAttemptId(result),
     };
   } catch (error) {
     console.error(
@@ -423,13 +359,10 @@ export async function updateUserExamAttempt(
     );
 
     return {
-      status:
-        false,
-
+      status: false,
       message:
         error?.message ||
         "Unable to update exam attempt.",
-
       data: [],
       details: [],
     };
@@ -438,15 +371,7 @@ export async function updateUserExamAttempt(
 
 /* =========================================================
    GET USER EXAMS LIST
-
-   IMPORTANT:
-   Correct endpoint supplied by backend:
-
    POST /getUserExamsList
-
-   api
-   uid
-   exam_type
 ========================================================= */
 
 export async function getUserExamsList({
@@ -455,14 +380,10 @@ export async function getUserExamsList({
 } = {}) {
   try {
     const safeUid =
-      getPositiveNumber(
-        uid
-      );
+      getPositiveNumber(uid);
 
     const safeExamType =
-      normalizeExamType(
-        exam_type
-      );
+      normalizeExamType(exam_type);
 
     if (!safeUid) {
       throw new Error(
@@ -476,23 +397,18 @@ export async function getUserExamsList({
       );
     }
 
-    const result =
-      await sendExamRequest(
-        "getUserExamsList",
-        {
-          uid:
-            safeUid,
+    const result = await sendExamRequest(
+      "getUserExamsList",
+      {
+        uid: safeUid,
+        exam_type: safeExamType,
+      }
+    );
 
-          exam_type:
-            safeExamType,
-        }
-      );
-
-    const failed =
-      normalizeFailure(
-        result,
-        "Unable to load saved exams."
-      );
+    const failed = normalizeFailure(
+      result,
+      "Unable to load saved exams."
+    );
 
     if (failed) {
       return failed;
@@ -506,13 +422,10 @@ export async function getUserExamsList({
     );
 
     return {
-      status:
-        false,
-
+      status: false,
       message:
         error?.message ||
         "Unable to load saved exams.",
-
       data: [],
       details: [],
     };
@@ -521,30 +434,17 @@ export async function getUserExamsList({
 
 /* =========================================================
    BACKWARD COMPATIBILITY
-
-   Remove later after all old imports are updated.
 ========================================================= */
 
 export async function getUserExamList(
   options = {}
 ) {
-  return getUserExamsList(
-    options
-  );
+  return getUserExamsList(options);
 }
 
 /* =========================================================
    USER EXAM ANALYTICS
-
    POST /getUserExamAnalytics
-
-   api
-   uid
-   cid
-   exam_type
-   exam_id
-
-   exam_status = optional
 ========================================================= */
 
 export async function getUserExamAnalytics({
@@ -556,29 +456,19 @@ export async function getUserExamAnalytics({
 } = {}) {
   try {
     const safeUid =
-      getPositiveNumber(
-        uid
-      );
+      getPositiveNumber(uid);
 
     const safeCid =
-      getPositiveNumber(
-        cid
-      );
+      getPositiveNumber(cid);
 
     const safeExamId =
-      getPositiveNumber(
-        exam_id
-      );
+      getPositiveNumber(exam_id);
 
     const safeExamType =
-      normalizeExamType(
-        exam_type
-      );
+      normalizeExamType(exam_type);
 
     const safeExamStatus =
-      normalizeExamStatus(
-        exam_status
-      );
+      normalizeExamStatus(exam_status);
 
     if (!safeUid) {
       throw new Error(
@@ -605,35 +495,25 @@ export async function getUserExamAnalytics({
     }
 
     const payload = {
-      uid:
-        safeUid,
-
-      cid:
-        safeCid,
-
-      exam_type:
-        safeExamType,
-
-      exam_id:
-        safeExamId,
+      uid: safeUid,
+      cid: safeCid,
+      exam_type: safeExamType,
+      exam_id: safeExamId,
     };
 
     if (safeExamStatus) {
-      payload.exam_status =
-        safeExamStatus;
+      payload.exam_status = safeExamStatus;
     }
 
-    const result =
-      await sendExamRequest(
-        "getUserExamAnalytics",
-        payload
-      );
+    const result = await sendExamRequest(
+      "getUserExamAnalytics",
+      payload
+    );
 
-    const failed =
-      normalizeFailure(
-        result,
-        "Unable to load exam analytics."
-      );
+    const failed = normalizeFailure(
+      result,
+      "Unable to load exam analytics."
+    );
 
     if (failed) {
       return failed;
@@ -647,13 +527,10 @@ export async function getUserExamAnalytics({
     );
 
     return {
-      status:
-        false,
-
+      status: false,
       message:
         error?.message ||
         "Unable to load exam analytics.",
-
       data: [],
       details: [],
     };
@@ -667,24 +544,15 @@ export async function getUserExamAnalytics({
 export async function getUserAnalytics(
   options = {}
 ) {
-  return getUserExamAnalytics(
-    options
-  );
+  return getUserExamAnalytics(options);
 }
 
 /* =========================================================
    GET SAVED ATTEMPT DETAILS
-
    POST /getExamAnalyticDetails
 
-   api
-   uid
-   cid
-   id
-   exam_type
-
-   NOTE:
-   id = saved attempt id
+   IMPORTANT:
+   id = saved attempt ID, not exam_id
 ========================================================= */
 
 export async function getExamAnalyticDetails({
@@ -695,24 +563,16 @@ export async function getExamAnalyticDetails({
 } = {}) {
   try {
     const safeUid =
-      getPositiveNumber(
-        uid
-      );
+      getPositiveNumber(uid);
 
     const safeCid =
-      getPositiveNumber(
-        cid
-      );
+      getPositiveNumber(cid);
 
     const safeId =
-      getPositiveNumber(
-        id
-      );
+      getPositiveNumber(id);
 
     const safeExamType =
-      normalizeExamType(
-        exam_type
-      );
+      normalizeExamType(exam_type);
 
     if (!safeUid) {
       throw new Error(
@@ -738,29 +598,20 @@ export async function getExamAnalyticDetails({
       );
     }
 
-    const result =
-      await sendExamRequest(
-        "getExamAnalyticDetails",
-        {
-          uid:
-            safeUid,
+    const result = await sendExamRequest(
+      "getExamAnalyticDetails",
+      {
+        uid: safeUid,
+        cid: safeCid,
+        id: safeId,
+        exam_type: safeExamType,
+      }
+    );
 
-          cid:
-            safeCid,
-
-          id:
-            safeId,
-
-          exam_type:
-            safeExamType,
-        }
-      );
-
-    const failed =
-      normalizeFailure(
-        result,
-        "Unable to load exam analytic details."
-      );
+    const failed = normalizeFailure(
+      result,
+      "Unable to load exam analytic details."
+    );
 
     if (failed) {
       return failed;
@@ -774,12 +625,17 @@ export async function getExamAnalyticDetails({
     );
 
     return {
-      status:
-        false,
+      status: false,
 
       message:
         error?.message ||
         "Unable to load exam analytic details.",
+
+      httpStatus:
+        error?.httpStatus || 502,
+
+      retryAfter:
+        error?.retryAfter || null,
 
       data: [],
       details: [],

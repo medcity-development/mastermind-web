@@ -1,8 +1,5 @@
-// src/app/api/exam-attempt/analytics/route.js
 
-import {
-  NextResponse,
-} from "next/server";
+import { NextResponse } from "next/server";
 
 import {
   getStudentSession,
@@ -12,234 +9,125 @@ import {
   getExamAnalyticDetails,
 } from "@/lib/examAttemptHelper";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
 
-/* =========================================================
-   POST
-========================================================= */
+const allowed = new Set([
+  "mock",
+  "pqp",
+  "scert",
+  "topicwise",
+  "twe",
+  "studyplan",
+]);
 
-export async function POST(
-  request
+function fail(
+  message,
+  status = 400,
+  retryAfter = null
 ) {
-  try {
-    /* =====================================================
-       SESSION
-    ===================================================== */
-
-    const session =
-      await getStudentSession();
-
-    const uid =
-      Number(
-        session?.uid
-      );
-
-    if (
-      !Number.isFinite(uid) ||
-      uid <= 0
-    ) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Please sign in to continue.",
-
-          data: [],
-          details: [],
-        },
-        {
-          status: 401,
-        }
-      );
+  return NextResponse.json(
+    {
+      status: false,
+      message,
+      details: [],
+      data: [],
+    },
+    {
+      status,
+      headers: retryAfter
+        ? { "Retry-After": String(retryAfter) }
+        : {},
     }
+  );
+}
 
-    /* =====================================================
-       REQUEST BODY
-    ===================================================== */
+export async function POST(request) {
+  try {
+    const session = await getStudentSession();
+    const uid = Number(session?.uid);
+
+    if (!Number.isInteger(uid) || uid <= 0) {
+      return fail("Please sign in to continue.", 401);
+    }
 
     let body;
 
     try {
-      body =
-        await request.json();
+      body = await request.json();
     } catch {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Invalid JSON request.",
-
-          data: [],
-          details: [],
-        },
-        {
-          status: 400,
-        }
-      );
+      return fail("Invalid JSON request.");
     }
 
-    /* =====================================================
-       VALUES
-    ===================================================== */
+    const cid = Number(body?.cid);
+    const id = Number(body?.id ?? body?.attemptId);
 
-    const cid =
-      Number(
-        body?.cid
-      );
+    const examType = String(
+      body?.exam_type ?? body?.examType ?? ""
+    )
+      .trim()
+      .toLowerCase();
 
-    const attemptId =
-      body?.id;
-
-    const examType =
-      String(
-        body?.exam_type ??
-          ""
-      )
-        .trim()
-        .toLowerCase();
-
-    /* =====================================================
-       VALIDATION
-    ===================================================== */
-
-    if (
-      !Number.isFinite(cid) ||
-      cid <= 0
-    ) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Valid course id is required.",
-
-          data: [],
-          details: [],
-        },
-        {
-          status: 400,
-        }
-      );
+    if (!Number.isInteger(cid) || cid <= 0) {
+      return fail("Valid course id is required.");
     }
 
-    if (!examType) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Exam type is required.",
-
-          data: [],
-          details: [],
-        },
-        {
-          status: 400,
-        }
-      );
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return fail("Valid saved attempt id is required.");
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * getExamAnalyticDetails requires
-     * a saved attempt id.
-     *
-     * It cannot produce the complete
-     * Exam Analysis list without id.
-     */
-    if (!attemptId) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Attempt id is required to load saved exam analytics.",
-
-          data: [],
-          details: [],
-        },
-        {
-          status: 400,
-        }
-      );
+    if (!allowed.has(examType)) {
+      return fail("Unsupported exam type.");
     }
 
-    /* =====================================================
-       DATABASE RESULT
-    ===================================================== */
+    const result = await getExamAnalyticDetails({
+      uid,
+      cid,
+      id,
+      exam_type: examType,
+    });
 
-    const result =
-      await getExamAnalyticDetails({
-        uid,
+    if (!result || result.status === false) {
+      const status =
+        result?.httpStatus === 429 ? 429 : 502;
 
-        cid,
-
-        id:
-          attemptId,
-
-        exam_type:
-          examType,
-      });
-
-    /* =====================================================
-       FAILURE
-    ===================================================== */
-
-    if (
-      result?.status ===
-      false
-    ) {
-      return NextResponse.json(
-        {
-          ...result,
-
-          status: false,
-
-          message:
-            result?.message ||
+      return fail(
+        status === 429
+          ? "Too many requests. Please try again later."
+          : /Undefined variable|Fatal error|Warning:/i.test(
+            String(result?.message || result?.msg || "")
+          )
+            ? "The exam backend could not load this attempt. Please contact support."
+            : result?.message ||
             result?.msg ||
-            "Unable to load saved exam analytics.",
-        },
-        {
-          status: 502,
-        }
+            "Unable to load saved exam result.",
+        status,
+        result?.retryAfter
       );
     }
 
-    /* =====================================================
-       SUCCESS
-    ===================================================== */
+    const details = Array.isArray(result.details)
+      ? result.details
+      : result.details &&
+        typeof result.details === "object"
+        ? [result.details]
+        : Array.isArray(result.data)
+          ? result.data
+          : result.data &&
+            typeof result.data === "object"
+            ? [result.data]
+            : [];
 
-    return NextResponse.json(
-      result,
-      {
-        status: 200,
-      }
-    );
+    return NextResponse.json({
+      ...result,
+      status: true,
+      details,
+    });
   } catch (error) {
-    console.error(
-      "EXAM ANALYTICS ROUTE:",
-      error
-    );
+    console.error("ANALYTICS DETAILS ROUTE:", error);
 
-    return NextResponse.json(
-      {
-        status: false,
-
-        message:
-          error?.message ||
-          "Unable to load saved exam analytics.",
-
-        data: [],
-        details: [],
-      },
-      {
-        status: 500,
-      }
+    return fail(
+      "Unable to load saved exam result.",
+      500
     );
   }
 }

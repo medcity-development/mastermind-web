@@ -1,67 +1,51 @@
-import { notFound } from "next/navigation";
+import {
+  notFound,
+} from "next/navigation";
 
 import {
   getPyqExamDetails,
   getPyqQuestions,
 } from "@/lib/pyqDetailsHelper";
 
+import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
 import ExamClient from "../components/ExamClient";
 
-/* =========================================================
-   PARAM HELPERS
-========================================================= */
-
-function getNumberParam(
-  value,
-  fallback
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return fallback;
-  }
-
-  const parsedValue =
-    Number(value);
-
-  return Number.isNaN(
-    parsedValue
-  )
-    ? fallback
-    : parsedValue;
-}
-
-/* =========================================================
-   PAGE
-========================================================= */
+export const dynamic = "force-dynamic";
 
 export default async function StartExamPage({
   params,
   searchParams,
 }) {
-  const { examId } =
-    await params;
+  const {
+    examId,
+    governmentExamsSlug,
+  } = await params;
 
-  const query =
-    await searchParams;
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
-  const uid =
-    getNumberParam(
-      query?.uid,
-      0
-    );
+  if (
+    !config ||
+    !Number.isSafeInteger(Number(examId)) ||
+    Number(examId) <= 0
+  ) {
+    notFound();
+  }
 
-  const cid =
-    getNumberParam(
-      query?.cid,
-      1
-    );
+  const query = await searchParams;
+  const session = await getStudentSession();
 
-  const examType =
-    query?.type ??
-    "pqp";
+  const uid = Number(session?.uid) || 0;
+  const cid = Number(config.cid);
+  const examType = "pqp";
 
   const [
     detailsResult,
@@ -71,16 +55,14 @@ export default async function StartExamPage({
       uid,
       cid,
       examId,
-      type:
-        examType,
+      type: examType,
     }),
 
     getPyqQuestions({
       uid,
       cid,
       examId,
-      type:
-        examType,
+      examType,
     }),
   ]);
 
@@ -88,57 +70,53 @@ export default async function StartExamPage({
     notFound();
   }
 
-  const questions =
-    Array.isArray(
-      questionsResult?.data
-    )
-      ? questionsResult.data
-      : [];
+  const questions = Array.isArray(
+    questionsResult?.data
+  )
+    ? questionsResult.data
+    : [];
 
-  const imagePath =
-    questionsResult?.imagePath ??
-    "";
+  if (!questions.length) {
+    return (
+      <p
+        role="alert"
+        className="p-6 text-red-700"
+      >
+        Unable to load the question paper.
+        Please refresh and try again.
+      </p>
+    );
+  }
+
+  const guestAction = [
+    "pause",
+    "submit",
+  ].includes(query?.guestAction)
+    ? query.guestAction
+    : "";
 
   return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f5f9ff]
-      "
-    >
-      <div
-        className="
-          mx-auto
-          w-full
-          max-w-[1450px]
-          px-4
-          py-6
-          sm:px-6
-          lg:px-8
-        "
-      >
+    <main className="min-h-screen bg-[#f5f9ff]">
+      <div className="mx-auto w-full max-w-[1450px] px-4 py-6 sm:px-6 lg:px-8">
         <ExamClient
-          exam={
-            detailsResult.exam
-          }
-          questions={
-            questions
-          }
+          key={`${examId}-${uid}-${guestAction || "new"}`}
+          exam={{
+            ...detailsResult.exam,
+            id: examId,
+          }}
+          examId={examId}
+          questions={questions}
           imagePath={
-            imagePath
+            questionsResult.imagePath ?? ""
           }
-          uid={
-            uid
+          uid={uid}
+          cid={cid}
+          examType={examType}
+          lastPosition={examType}
+          governmentExamsSlug={
+            governmentExamsSlug
           }
-          cid={
-            cid
-          }
-          examType={
-            examType
-          }
-          lastPosition={
-            examType
-          }
+          guestAction={guestAction}
         />
       </div>
     </main>

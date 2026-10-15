@@ -5,179 +5,79 @@ export default function TopicWiseExamList({
   topics = [],
   cid,
   uid = 0,
-  type = "twe",
   currentPage = 1,
   totalPages = 1,
   totalItems = 0,
   itemsPerPage = 10,
   governmentExamsSlug,
   examName,
+  basePath,
 }) {
-  const firstItem =
-    totalItems > 0
-      ? (currentPage - 1) *
-          itemsPerPage +
-        1
-      : 0;
+  const root =
+    basePath ||
+    `${Number(uid) > 0 ? "/dashboard" : "/government-exams-coaching"}` +
+    `/${governmentExamsSlug}/topic-wise-exams`;
 
-  const lastItem =
-    totalItems > 0
-      ? Math.min(
-          currentPage *
-            itemsPerPage,
-          totalItems
-        )
-      : 0;
+  const first = totalItems
+    ? (currentPage - 1) * itemsPerPage + 1
+    : 0;
+
+  const last = Math.min(
+    currentPage * itemsPerPage,
+    totalItems
+  );
 
   return (
     <section className="mt-9">
-      <div
-        className="
-          flex
-          flex-col
-          gap-4
-          sm:flex-row
-          sm:items-end
-          sm:justify-between
-        "
-      >
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p
-            className="
-              text-[10px]
-              font-black
-              uppercase
-              tracking-[0.16em]
-              text-[#017dc0]
-            "
-          >
-            {examName
-              ? `${examName} Practice`
-              : "Practice by Topic"}
+          <p className="text-xs font-black uppercase tracking-widest text-[#017dc0]">
+            {examName || "Government Exam"} Practice
           </p>
 
-          <h2
-            className="
-              mt-2
-              text-2xl
-              font-black
-              text-[#071f55]
-              sm:text-3xl
-            "
-          >
+          <h2 className="mt-2 text-3xl font-black text-[#071f55]">
             Choose a Topic
           </h2>
 
-          <p
-            className="
-              mt-2
-              max-w-2xl
-              text-sm
-              leading-6
-              text-slate-500
-            "
-          >
-            Select a topic to continue
-            with the available practice
-            exams.
+          <p className="mt-2 text-sm text-slate-500">
+            Select a topic to view its available practice exams.
           </p>
         </div>
 
-        {totalItems > 0 && (
-          <div
-            className="
-              shrink-0
-              rounded-full
-              border
-              border-[#dce8f7]
-              bg-white
-              px-4
-              py-2
-              text-[11px]
-              font-semibold
-              text-slate-500
-              shadow-sm
-            "
-          >
-            Showing{" "}
-            <span className="font-black text-[#071f55]">
-              {firstItem}
-            </span>
-            {" - "}
-            <span className="font-black text-[#071f55]">
-              {lastItem}
-            </span>
-            {" of "}
-            <span className="font-black text-[#071f55]">
-              {totalItems}
-            </span>
-          </div>
+        {!!totalItems && (
+          <p className="rounded-full border bg-white px-4 py-2 text-xs text-slate-500">
+            Showing {first}–{last} of {totalItems}
+          </p>
         )}
       </div>
 
-      {topics.length > 0 ? (
+      {topics.length ? (
         <>
-          <div
-            className="
-              mt-7
-              grid
-              grid-cols-1
-              gap-5
-              sm:grid-cols-2
-              lg:grid-cols-3
-              xl:grid-cols-4
-            "
-          >
-            {topics.map(
-              (item) => (
-             <TopicWiseExamCard
-  key={item.id}
-  item={item}
-  cid={cid}
-  uid={uid}
-  governmentExamsSlug={
-    governmentExamsSlug
-  }
-  examName={examName}
-/>
-              )
-            )}
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {topics.map((item) => (
+              <TopicWiseExamCard
+                key={item.id}
+                item={item}
+                uid={uid}
+                governmentExamsSlug={governmentExamsSlug}
+                examName={examName}
+                basePath={root}
+              />
+            ))}
           </div>
 
           <TopicWisePagination
-            currentPage={
-              currentPage
-            }
-            totalPages={
-              totalPages
-            }
+            currentPage={currentPage}
+            totalPages={totalPages}
+            basePath={root}
+            governmentExamsSlug={governmentExamsSlug}
+            uid={uid}
           />
         </>
       ) : (
-        <div
-          className="
-            mt-7
-            rounded-[22px]
-            border
-            border-dashed
-            border-slate-300
-            bg-white
-            px-6
-            py-14
-            text-center
-          "
-        >
-          <p
-            className="
-              text-sm
-              font-medium
-              text-slate-500
-            "
-          >
-            No topics are currently
-            available.
-          </p>
-        </div>
+        <p className="mt-7 rounded-2xl border border-dashed bg-white p-10 text-center text-slate-500">
+          No topics are currently available.
+        </p>
       )}
     </section>
   );

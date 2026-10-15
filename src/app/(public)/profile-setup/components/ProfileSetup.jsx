@@ -3,8 +3,16 @@
 "use client";
 
 import {
+  X,
+} from "lucide-react";
+
+import {
   useState,
 } from "react";
+
+import {
+  useRouter,
+} from "next/navigation";
 
 import Swal from "sweetalert2";
 
@@ -18,7 +26,11 @@ import CourseChoiceModal from "./CourseChoiceModal";
 
 export default function ProfileSetup({
   authData,
+  redirectTo = "",
 }) {
+  const router =
+    useRouter();
+
   /* =========================================================
      FORM STATE
   ========================================================= */
@@ -411,6 +423,12 @@ export default function ProfileSetup({
           true,
       });
 
+      if (redirectTo) {
+        router.replace(redirectTo);
+        router.refresh();
+        return;
+      }
+
       /* =====================================================
          NEW USER
          PROFILE COMPLETE
@@ -455,20 +473,70 @@ export default function ProfileSetup({
 
   return (
     <>
+      {!showCourseModal && (
+        <button
+          type="button"
+          onClick={() =>
+            router.replace("/")
+          }
+          aria-label="Close profile setup and return home"
+          title="Close profile setup"
+          className="
+            fixed
+            right-4
+            top-4
+            z-[10001]
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-full
+            border
+            border-white/20
+            bg-white/10
+            text-white
+            backdrop-blur
+            transition
+            hover:bg-white/20
+            focus-visible:outline
+            focus-visible:outline-2
+            focus-visible:outline-offset-2
+            focus-visible:outline-white
+          "
+        >
+          <X size={20} />
+        </button>
+      )}
+
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-setup-title"
         className="
+          relative
           w-full
-          rounded-[30px]
+          max-h-[calc(100dvh-32px)]
+          overflow-y-auto
+          overscroll-contain
+          rounded-[24px]
           border
-          border-white/10
-          bg-white
-          px-6
-          py-7
-          shadow-[0_30px_90px_rgba(0,0,0,0.30)]
+          border-white/80
+          bg-gradient-to-br
+          from-white
+          via-white
+          to-[#f7f9ff]
+          px-5
+          py-5
+          shadow-[0_32px_100px_rgba(1,10,40,0.36)]
+          ring-1
+          ring-black/5
 
-          sm:px-8
+          sm:px-7
 
-          xl:px-10
+          xl:px-8
+          lg:px-9
+          lg:py-8
         "
       >
         <ProfileHeader />
@@ -478,20 +546,29 @@ export default function ProfileSetup({
             handleSubmit
           }
           className="
-            mt-6
-            space-y-4
-          "
+              mt-4
+              grid
+              grid-cols-1
+              gap-x-4
+              gap-y-3
+              sm:grid-cols-2
+              lg:mt-5
+              lg:gap-x-7
+              lg:gap-y-4
+            "
         >
-          {/* AVATAR */}
+            {/* AVATAR */}
 
-          <AvatarSelector
-            gender={
-              gender
-            }
-            onChange={
-              setGender
-            }
-          />
+            <div className="sm:col-span-2">
+              <AvatarSelector
+                gender={
+                  gender
+                }
+                onChange={
+                  setGender
+                }
+              />
+            </div>
 
           {/* NAME */}
 
@@ -581,22 +658,26 @@ export default function ProfileSetup({
 
           {/* TERMS */}
 
-          <TermsCheckbox
-            checked={
-              accepted
-            }
-            onChange={
-              setAccepted
-            }
-          />
+          <div className="flex items-center">
+            <TermsCheckbox
+              checked={
+                accepted
+              }
+              onChange={
+                setAccepted
+              }
+            />
+          </div>
 
           {/* SUBMIT */}
 
-          <ProfileSubmitButton
-            loading={
-              loading
-            }
-          />
+          <div className="flex items-end sm:justify-end">
+            <ProfileSubmitButton
+              loading={
+                loading
+              }
+            />
+          </div>
         </form>
       </div>
 

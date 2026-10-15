@@ -15,6 +15,14 @@ import {
   getStudentProfile,
 } from "@/lib/studentProfileHelper";
 
+import {
+  getHomeResponses,
+} from "@/lib/pscApi";
+
+import {
+  GOVERNMENT_EXAM_CONFIG,
+} from "@/lib/governmentExamConfig";
+
 import DashboardShell from "../common-components/DashboardShell";
 
 export const dynamic =
@@ -54,11 +62,22 @@ export default async function GovernmentExamDashboardLayout({
     );
 
   if (
+    session?.authenticated !== true ||
     !Number.isFinite(uid) ||
     uid <= 0
   ) {
     redirect(
-      `/login?redirect=/dashboard/${governmentExamsSlug}`
+      `/login?redirect=${encodeURIComponent(
+        `/dashboard/${governmentExamsSlug}`
+      )}`
+    );
+  }
+
+  if (session.stage !== "completed") {
+    redirect(
+      `/profile-setup?redirect=${encodeURIComponent(
+        `/dashboard/${governmentExamsSlug}`
+      )}`
     );
   }
 
@@ -115,6 +134,24 @@ export default async function GovernmentExamDashboardLayout({
     profile,
   };
 
+  let learningToolGrid = [];
+
+  try {
+    const homeResponse = await getHomeResponses({
+      uid,
+      cid: config.cid,
+    });
+    learningToolGrid = Array.isArray(homeResponse?.grid)
+      ? homeResponse.grid
+      : [];
+  } catch (error) {
+    console.error("Dashboard sidebar tools load error:", error);
+  }
+
+  const dashboardOptions = Object.values(GOVERNMENT_EXAM_CONFIG).map(
+    ({ slug, name, shortName }) => ({ slug, name, shortName })
+  );
+
   /* =========================================================
      RENDER
   ========================================================= */
@@ -123,6 +160,8 @@ export default async function GovernmentExamDashboardLayout({
     <DashboardShell
       config={config}
       user={user}
+      learningToolGrid={learningToolGrid}
+      dashboardOptions={dashboardOptions}
     >
       {children}
     </DashboardShell>

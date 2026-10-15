@@ -260,6 +260,7 @@ export default async function MockExamStartPage({
           governmentExamsSlug={
             governmentExamsSlug
           }
+          guestAction={query?.guestAction || ""}
         />
       </div>
     </main>

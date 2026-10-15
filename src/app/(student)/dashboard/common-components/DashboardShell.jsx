@@ -1,15 +1,19 @@
 "use client";
 
+import { Suspense } from "react";
 import {
   useState,
 } from "react";
 
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
+import DashboardSelectedTestNotice from "./DashboardSelectedTestNotice";
 
 export default function DashboardShell({
   config,
   user,
+  learningToolGrid = [],
+  dashboardOptions = [],
   children,
 }) {
   const [
@@ -55,6 +59,7 @@ export default function DashboardShell({
       <DashboardSidebar
         config={config}
         user={user}
+        learningToolGrid={learningToolGrid}
         mobileOpen={
           sidebarOpen
         }
@@ -82,6 +87,7 @@ export default function DashboardShell({
         <DashboardHeader
           config={config}
           user={user}
+          dashboardOptions={dashboardOptions}
           onMenuClick={
             handleOpenSidebar
           }
@@ -109,6 +115,9 @@ export default function DashboardShell({
               max-w-[1500px]
             "
           >
+            <Suspense fallback={null}>
+              <DashboardSelectedTestNotice />
+            </Suspense>
             {children}
           </div>
         </main>

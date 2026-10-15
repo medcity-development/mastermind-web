@@ -3,6 +3,14 @@ import {
 } from "next/navigation";
 
 import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
+import {
   getScertFolders,
   getScertTestsByClassId,
   getScertExamDetails,
@@ -39,12 +47,13 @@ function createSlug(
 }
 
 async function findScertTestBySlug(
-  testSlug
+  testSlug,
+  courseCid
 ) {
   const foldersResult =
     await getScertFolders({
       uid: 0,
-      cid: 1,
+      cid: courseCid,
       offset: 0,
     });
 
@@ -107,10 +116,21 @@ export default async function ScertStartPage({
 }) {
   const {
     testSlug,
+    governmentExamsSlug,
   } = await params;
+  const config =
+    getGovernmentExamConfig(governmentExamsSlug);
+
+  if (!config) {
+    notFound();
+  }
 
   const query =
     await searchParams;
+  const session =
+    await getStudentSession();
+  const uid =
+    session?.uid || 0;
 
   const mode =
     query?.mode ===
@@ -124,7 +144,8 @@ export default async function ScertStartPage({
 
   const selected =
     await findScertTestBySlug(
-      testSlug
+      testSlug,
+      config.cid
     );
 
   if (!selected) {
@@ -141,16 +162,14 @@ export default async function ScertStartPage({
     questionsResult,
   ] = await Promise.all([
     getScertExamDetails({
-      uid: 0,
-      cid:
-        classId,
+      uid,
+      cid: config.cid,
       examId,
     }),
 
     getScertQuestions({
-      uid: 0,
-      cid:
-        classId,
+      uid,
+      cid: config.cid,
       examId,
     }),
   ]);
@@ -182,15 +201,21 @@ export default async function ScertStartPage({
         questionsResult?.imagePath ||
         ""
       }
-      uid={0}
+      uid={uid}
       cid={
-        classId
+        config.cid
       }
       classId={
         classId
       }
       testSlug={
         testSlug
+      }
+      governmentExamsSlug={
+        governmentExamsSlug
+      }
+      guestAction={
+        query?.guestAction || ""
       }
       examType="scert"
       lastPosition="scert"

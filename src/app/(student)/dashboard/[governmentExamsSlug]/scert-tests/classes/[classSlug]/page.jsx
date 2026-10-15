@@ -15,6 +15,13 @@ import {
 } from "@/lib/scertHelper";
 
 import {
+  getUserExamsList,
+} from "@/lib/examAttemptHelper";
+import {
+  getPausedAttemptIds,
+} from "@/lib/pausedExamAttempts";
+
+import {
   getGovernmentExamConfig,
 } from "@/lib/governmentExamConfig";
 
@@ -310,15 +317,17 @@ export default async function ScertClassPage({
      filter stays 0.
   ========================================================= */
 
-  const testsResult =
-    await getScertTestsByClassId({
+  const [testsResult, attemptsResult] = await Promise.all([
+    getScertTestsByClassId({
       uid,
-
-      classId:
-        currentClass.id,
-
+      classId: currentClass.id,
       filter: 0,
-    });
+    }),
+    getUserExamsList({
+      uid,
+      exam_type: "scert",
+    }),
+  ]);
 
   const tests =
     Array.isArray(
@@ -326,6 +335,9 @@ export default async function ScertClassPage({
     )
       ? testsResult.data
       : [];
+
+  const pausedAttempts =
+    getPausedAttemptIds(attemptsResult);
 
   /* =========================================================
      DEBUG
@@ -529,6 +541,7 @@ export default async function ScertClassPage({
 
         <ScertTestList
           tests={tests}
+          pausedAttempts={pausedAttempts}
           classId={
             currentClass.id
           }

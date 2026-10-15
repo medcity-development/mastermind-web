@@ -6,12 +6,14 @@ import {
   export default function MockTestInstructions({
     instructions = [],
   }) {
-    if (
-      !Array.isArray(instructions) ||
-      instructions.length === 0
-    ) {
-      return null;
-    }
+    const instructionItems =
+      Array.isArray(instructions) && instructions.length > 0
+        ? instructions
+        : [
+            { instructions: "Check the exam duration and total marks before starting." },
+            { instructions: "Choose one answer for each question; unanswered questions are not counted as attempted." },
+            { instructions: "Review your selections before submitting the exam." },
+          ];
   
     return (
       <section
@@ -79,7 +81,7 @@ import {
             lg:grid-cols-2
           "
         >
-          {instructions.map((item, index) => (
+          {instructionItems.map((item, index) => (
             <div
               key={index}
               className="

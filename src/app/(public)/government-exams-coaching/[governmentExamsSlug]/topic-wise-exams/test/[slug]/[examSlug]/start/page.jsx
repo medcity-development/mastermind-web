@@ -11,177 +11,180 @@ import {
 } from "@/lib/topicWiseExamHelper";
 
 import {
-  createSlug,
-} from "@/lib/pscSlug";
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
+import { createSlug } from "@/lib/pscSlug";
 
 import ExamClient from "./components/ExamClient";
 
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Topic Wise Exam | MasterMind Academy",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
 export default async function TopicWiseExamStartPage({
   params,
+  searchParams,
 }) {
   const {
     slug,
     examSlug,
+    governmentExamsSlug,
   } = await params;
 
-  const uid = 0;
-  const cid = 1;
-  const examType =
-    "twe";
+  const query = await searchParams;
 
-  /* =======================================================
-     RESOLVE TOPIC
-  ======================================================= */
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
-  const topicsResult =
-    await getTopicWiseExams({
-      uid,
-      cid,
-      type: examType,
+  if (!config) notFound();
+
+  const session = await getStudentSession();
+
+  const uid = Number(session?.uid) || 0;
+  const cid = Number(config.cid);
+  const examType = "twe";
+
+  const mode =
+    query?.mode === "resume"
+      ? "resume"
+      : "new";
+
+  const pauseId = Number(query?.pauseId);
+
+  const initialPauseId =
+    Number.isSafeInteger(pauseId) && pauseId > 0
+      ? pauseId
+      : null;
+
+  const guestAction = [
+    "pause",
+    "submit",
+  ].includes(query?.guestAction)
+    ? query.guestAction
+    : "";
+
+  if (mode === "resume" && !uid) {
+    const search = new URLSearchParams({
+      mode,
+
+      ...(initialPauseId
+        ? { pauseId: String(initialPauseId) }
+        : {}),
+
+      ...(guestAction
+        ? { guestAction }
+        : {}),
     });
 
-  const topics =
-    Array.isArray(
-      topicsResult?.data
-    )
-      ? topicsResult.data
-      : [];
+    const target =
+      `/government-exams-coaching/${governmentExamsSlug}` +
+      `/topic-wise-exams/test/${slug}/${examSlug}/start?${search}`;
 
-  const selectedTopic =
-    topics.find(
-      (item) =>
-        createSlug(
-          item?.subject
-        ) === slug
+    redirect(
+      `/login?redirect=${encodeURIComponent(target)}`
     );
-
-  if (!selectedTopic) {
-    notFound();
   }
 
-  const topicId =
-    selectedTopic.id;
+  const topicsResult = await getTopicWiseExams({
+    uid,
+    cid,
+    type: examType,
+  });
 
-  /* =======================================================
-     RESOLVE EXAM
-  ======================================================= */
+  const topic = (
+    topicsResult?.data || []
+  ).find(
+    (item) => createSlug(item.subject) === slug
+  );
 
-  const testsResult =
-    await getAllTopicWiseTests({
-      uid,
-      topicId,
-    });
+  if (!topic) notFound();
 
-  const tests =
-    Array.isArray(
-      testsResult?.data
-    )
-      ? testsResult.data
-      : [];
+  const testsResult = await getAllTopicWiseTests({
+    uid,
+    topicId: topic.id,
+  });
 
-  const selectedExam =
-    tests.find(
-      (item) =>
-        createSlug(
-          item?.exam_name
-        ) === examSlug
-    );
+  const selected = (
+    testsResult?.data || []
+  ).find(
+    (item) => createSlug(item.exam_name) === examSlug
+  );
 
-  if (!selectedExam) {
-    notFound();
-  }
-
-  const isPaid =
-    String(
-      selectedExam?.access ||
-        ""
-    ).toLowerCase() ===
-    "paid";
-
-  if (isPaid) {
-    redirect("/login");
-  }
-
-  const examId =
-    selectedExam.id;
-
-  /* =======================================================
-     FETCH DETAILS + QUESTIONS
-  ======================================================= */
-
-  const [
-    detailsResult,
-    questionsResult,
-  ] =
-    await Promise.all([
-      getTopicWiseExamDetails({
-        uid,
-        cid,
-        examId,
-        type:
-          examType,
-        offset: 0,
-      }),
-
-      getTopicWiseExamQuestions({
-        uid,
-        cid,
-        examId,
-        examType,
-      }),
-    ]);
-
-  const exam =
-    detailsResult?.exam;
-
-  const questions =
-    Array.isArray(
-      questionsResult?.data
-    )
-      ? questionsResult.data
-      : [];
-
-  const imagePath =
-    questionsResult?.imagePath ||
-    "";
+  if (!selected) notFound();
 
   if (
-    !exam ||
-    !questionsResult?.status
+    String(selected.access || "").toLowerCase() ===
+    "paid"
   ) {
-    notFound();
+    redirect(
+      `/dashboard/${governmentExamsSlug}/premium-packages`
+    );
   }
 
-  const normalizedExam = {
-    ...exam,
+  const examId = selected.id;
 
-    total_minutes:
-      Number(
-        exam?.total_minutes ??
-          0
-      ) || 0,
-  };
+  const [details, paper] = await Promise.all([
+    getTopicWiseExamDetails({
+      uid,
+      cid,
+      examId,
+      type: examType,
+      offset: 0,
+    }),
+
+    getTopicWiseExamQuestions({
+      uid,
+      cid,
+      examId,
+      examType,
+    }),
+  ]);
+
+  const questions = Array.isArray(paper?.data)
+    ? paper.data
+    : [];
+
+  if (!details?.exam || !questions.length) {
+    return (
+      <p role="alert" className="p-6 text-red-700">
+        Unable to load the exam. Refresh and try again.
+      </p>
+    );
+  }
 
   return (
     <ExamClient
-      exam={
-        normalizedExam
-      }
-      questions={
-        questions
-      }
-      imagePath={
-        imagePath
-      }
+      key={`${examId}-${uid}-${mode}-${guestAction}`}
+      exam={{
+        ...details.exam,
+        id: examId,
+        total_minutes:
+          Number(details.exam.total_minutes) || 0,
+      }}
+      examId={examId}
+      questions={questions}
+      imagePath={paper.imagePath || ""}
       uid={uid}
       cid={cid}
-      examType={
-        examType
-      }
+      examType={examType}
       slug={slug}
-      examSlug={
-        examSlug
-      }
+      examSlug={examSlug}
+      governmentExamsSlug={governmentExamsSlug}
+      mode={mode}
+      initialPauseId={initialPauseId}
+      guestAction={guestAction}
     />
   );
 }

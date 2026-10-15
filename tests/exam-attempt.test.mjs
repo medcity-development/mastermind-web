@@ -28,8 +28,83 @@ const {
   getResultArray,
   isFailedResponse,
   parseAnswers,
+  millisecondsToSeconds,
+  savedPausedTimeToSeconds,
+  secondsToMilliseconds,
+  timestampToMilliseconds,
 } = await import(
   dataUrl
+);
+
+test(
+  "normalizes attempt timestamps to epoch milliseconds",
+  () => {
+    assert.equal(
+      timestampToMilliseconds("2026-10-09T04:27:00.000Z"),
+      Date.UTC(2026, 9, 9, 4, 27)
+    );
+    assert.equal(
+      timestampToMilliseconds("not-a-date"),
+      null
+    );
+    assert.equal(
+      timestampToMilliseconds("2026-10-09 04:27:00"),
+      Date.UTC(2026, 9, 8, 22, 57)
+    );
+    assert.equal(
+      timestampToMilliseconds(1791512820),
+      1791512820000
+    );
+    assert.equal(
+      timestampToMilliseconds(1791512820000),
+      1791512820000
+    );
+  }
+);
+
+test(
+  "paused time is persisted in milliseconds and restored as countdown seconds",
+  () => {
+    const pausedTimeMilliseconds =
+      secondsToMilliseconds(5377);
+    assert.equal(pausedTimeMilliseconds, 5377000);
+    assert.equal(millisecondsToSeconds(5377804), 5378);
+    assert.equal(savedPausedTimeToSeconds(5377804, 5400), 5378);
+    assert.equal(savedPausedTimeToSeconds(5377, 5400), 5377);
+
+    const payload =
+      buildAttemptPayload(
+        {
+          paused_time: 5377804,
+          exam_status: "pause",
+        },
+        "session-user"
+      );
+
+    assert.equal(
+      payload.paused_time,
+      5377804
+    );
+  }
+);
+
+test(
+  "attempt payload persists start and end timestamps as epoch milliseconds",
+  () => {
+    const startTime = Date.UTC(2026, 9, 9, 4, 27);
+    const endTime = Date.UTC(2026, 9, 9, 5, 27);
+    const payload = buildAttemptPayload(
+      {
+        exam_status: "complete",
+        start_time: String(startTime / 1000),
+        end_time: new Date(endTime).toISOString(),
+      },
+      "session-user"
+    );
+
+    assert.equal(payload.start_time, startTime);
+    assert.equal(payload.end_time, endTime);
+  }
 );
 
 /* =========================================================
@@ -83,7 +158,7 @@ test(
             '["a","D",0,"D"]',
 
           paused_time:
-            45,
+            45000,
         },
 
         "session-user"
@@ -114,6 +189,16 @@ test(
       1
     );
 
+    assert.deepEqual(
+      payload.answer_array,
+      ["A", "B", "C", "D"]
+    );
+
+    assert.deepEqual(
+      payload.user_answers,
+      ["A", "D", 0, "D"]
+    );
+
     /*
      * 4 questions
      * total mark = 8
@@ -133,7 +218,41 @@ test(
 
     assert.equal(
       payload.paused_time,
-      45
+      45000
+    );
+  }
+);
+
+test(
+  "attempt payload stores option letters without answer text",
+  () => {
+    const payload =
+      buildAttemptPayload(
+        {
+          answer_array: [
+            "A. Paris",
+            "B) London",
+            "C: Rome",
+            "D - Madrid",
+          ],
+          user_answers: [
+            "a. Paris",
+            "B) London",
+            "Answer text without an option",
+            0,
+          ],
+        },
+        "1"
+      );
+
+    assert.deepEqual(
+      payload.answer_array,
+      ["A", "B", "C", "D"]
+    );
+
+    assert.deepEqual(
+      payload.user_answers,
+      ["A", "B", 0, 0]
     );
   }
 );
@@ -574,9 +693,6 @@ test(
             exam_type:
               "scert",
 
-            /*
-             * Legacy value should become finish.
-             */
             exam_status:
               "complete",
 
@@ -598,6 +714,12 @@ test(
               "A",
               "C",
             ],
+
+            start_time:
+              String(Date.UTC(2026, 9, 9, 4, 27)),
+
+            end_time:
+              String(Date.UTC(2026, 9, 9, 5, 27)),
           },
 
           "1"
@@ -671,6 +793,16 @@ test(
           .fields
           .exam_status,
         "finish"
+      );
+
+      assert.equal(
+        requests[0].fields.start_time,
+        String(Date.UTC(2026, 9, 9, 4, 27))
+      );
+
+      assert.equal(
+        requests[0].fields.end_time,
+        String(Date.UTC(2026, 9, 9, 5, 27))
       );
 
       assert.equal(

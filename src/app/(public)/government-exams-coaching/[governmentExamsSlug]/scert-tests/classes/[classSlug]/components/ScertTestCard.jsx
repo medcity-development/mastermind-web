@@ -34,6 +34,7 @@ function createSlug(
 export default function ScertTestCard({
   test,
   classId,
+  governmentExamsSlug = "kerala-psc",
 }) {
   const [
     showPremiumModal,
@@ -62,7 +63,7 @@ export default function ScertTestCard({
 
   const examHref = {
     pathname:
-      `/government-exams-coaching/kerala-psc/scert-tests/tests/${testSlug}`,
+      `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}`,
 
     query: {
       classId:
@@ -331,12 +332,15 @@ export default function ScertTestCard({
             )
           }
           redirectPath={
-            `/government-exams-coaching/kerala-psc/scert-tests/tests/${testSlug}` +
+            `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}` +
             `?classId=${encodeURIComponent(
               classId
             )}` +
             `&examId=${encodeURIComponent(
               examId
+            )}` +
+            `&selectedTestTitle=${encodeURIComponent(
+              test?.exam_name || "SCERT Practice Test"
             )}`
           }
         />

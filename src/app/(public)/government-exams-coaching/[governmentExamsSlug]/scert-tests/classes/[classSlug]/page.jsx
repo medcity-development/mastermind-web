@@ -1,6 +1,10 @@
 import Link from "next/link";
 
 import {
+  notFound,
+} from "next/navigation";
+
+import {
   ArrowLeft,
   BookOpenCheck,
 } from "lucide-react";
@@ -10,15 +14,25 @@ import {
   getScertTestsByClassId,
 } from "@/lib/scertHelper";
 
+import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
 import ScertTestList from "./components/ScertTestList";
 
-export const metadata = {
-  title:
-    "SCERT Practice Tests | MasterMind Academy",
+export async function generateMetadata({ params }) {
+  const { governmentExamsSlug } = await params;
+  const config = getGovernmentExamConfig(governmentExamsSlug);
 
-  description:
-    "Practice class-wise Kerala SCERT tests for Kerala PSC preparation.",
-};
+  if (!config) {
+    return {};
+  }
+
+  return {
+    title: `${config.name} SCERT Practice Tests | MasterMind Academy`,
+    description: `Practice class-wise SCERT tests for ${config.name} preparation.`,
+  };
+}
 
 export default async function ScertClassPage({
   params,
@@ -45,6 +59,16 @@ export default async function ScertClassPage({
 
   const classId =
     resolvedParams?.classSlug;
+  const governmentExamsSlug =
+    resolvedParams?.governmentExamsSlug;
+  const config =
+    getGovernmentExamConfig(governmentExamsSlug);
+
+  if (!config) {
+    notFound();
+  }
+
+  const { cid, name } = config;
 
   /* =========================================================
      NO CLASS ID
@@ -97,7 +121,7 @@ export default async function ScertClassPage({
             </p>
 
             <Link
-              href="/government-exams-coaching/kerala-psc/scert-tests"
+              href={`/government-exams-coaching/${governmentExamsSlug}/scert-tests`}
               className="
                 mt-6
                 inline-flex
@@ -135,13 +159,13 @@ export default async function ScertClassPage({
      GET SCERT CLASS LIST
 
      getScertListbyOffset uses:
-     cid = 1
+     use the selected course cid
   ========================================================= */
 
   const foldersResult =
     await getScertFolders({
       uid: 0,
-      cid: 1,
+      cid,
       offset: 0,
     });
 
@@ -230,7 +254,7 @@ export default async function ScertClassPage({
             </p>
 
             <Link
-              href="/government-exams-coaching/kerala-psc/scert-tests"
+              href={`/government-exams-coaching/${governmentExamsSlug}/scert-tests`}
               className="
                 mt-6
                 inline-flex
@@ -344,7 +368,7 @@ export default async function ScertClassPage({
         ================================================= */}
 
         <Link
-          href="/government-exams-coaching/kerala-psc/scert-tests"
+          href={`/government-exams-coaching/${governmentExamsSlug}/scert-tests`}
           className="
             inline-flex
             items-center
@@ -462,7 +486,7 @@ export default async function ScertClassPage({
                 Practice all available
                 SCERT tests for this
                 class and improve your
-                Kerala PSC preparation.
+                {name} preparation.
               </p>
             </div>
 
@@ -497,6 +521,9 @@ export default async function ScertClassPage({
           tests={tests}
           classId={
             currentClass.id
+          }
+          governmentExamsSlug={
+            governmentExamsSlug
           }
         />
       </div>

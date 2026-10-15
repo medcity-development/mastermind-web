@@ -1,378 +1,229 @@
-import {
-  NextResponse,
-} from "next/server";
+import { NextResponse } from "next/server";
 
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
 
-/* =========================================================
-   CLEAN BASE URL
-========================================================= */
+function positiveId(value) {
+  const number = Number(value);
 
-function cleanBaseUrl(
-  value = ""
-) {
-  return String(value)
-    .trim()
-    .replace(/\/+$/, "");
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : null;
 }
 
-/* =========================================================
-   GET
-========================================================= */
+function backendExamType(value) {
+  const type = String(value ?? "")
+    .trim()
+    .toLowerCase();
 
-export async function GET(
-  request
-) {
+  const aliases = {
+    topicwise: "twe",
+    "topic-wise": "twe",
+    twe: "twe",
+    pyq: "pqp",
+    pqp: "pqp",
+    study_plan: "studyplan",
+    "study-plan": "studyplan",
+  };
+
+  return aliases[type] || type;
+}
+
+function failed(value) {
+  return [
+    false,
+    "false",
+    0,
+    "0",
+    "error",
+    "failed",
+  ].includes(value);
+}
+
+function reply(body, status = 200, retryAfter = null) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      ...(retryAfter
+        ? { "Retry-After": String(retryAfter) }
+        : {}),
+    },
+  });
+}
+
+function fail(message, status, retryAfter = null) {
+  return reply(
+    {
+      status: false,
+      message,
+      data: [],
+      imagePath: "",
+    },
+    status,
+    retryAfter
+  );
+}
+
+export async function GET(request) {
   try {
-    /* =====================================================
-       SESSION
+    const session = await getStudentSession();
+    const uid = positiveId(session?.uid);
 
-       UID is NOT accepted from browser.
-       Always use logged-in student's uid.
-    ===================================================== */
-
-    const session =
-      await getStudentSession();
-
-    const uid =
-      Number(
-        session?.uid
-      );
-
-    if (
-      !Number.isFinite(uid) ||
-      uid <= 0
-    ) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Please sign in to continue.",
-
-          data: [],
-        },
-        {
-          status: 401,
-        }
-      );
+    if (!uid) {
+      return fail("Please sign in to continue.", 401);
     }
 
-    /* =====================================================
-       QUERY PARAMS
-    ===================================================== */
+    const { searchParams } = new URL(request.url);
 
-    const {
-      searchParams,
-    } = new URL(
-      request.url
+    const cid = positiveId(searchParams.get("cid"));
+
+    const examId = positiveId(
+      searchParams.get("examid") ??
+        searchParams.get("examId")
     );
 
-    const cid =
-      Number(
-        searchParams.get(
-          "cid"
-        )
-      );
+    const examType = backendExamType(
+      searchParams.get("examtype") ??
+        searchParams.get("examType")
+    );
 
-    const examId =
-      Number(
-        searchParams.get(
-          "examid"
-        ) ??
-        searchParams.get(
-          "examId"
-        )
-      );
-
-    const examType =
-      String(
-        searchParams.get(
-          "examtype"
-        ) ??
-        searchParams.get(
-          "examType"
-        ) ??
-        ""
-      )
-        .trim()
-        .toLowerCase();
-
-    /* =====================================================
-       VALIDATION
-    ===================================================== */
-
-    if (
-      !Number.isFinite(cid) ||
-      cid <= 0
-    ) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Valid cid is required.",
-
-          data: [],
-        },
-        {
-          status: 400,
-        }
-      );
+    if (!cid) {
+      return fail("Valid cid is required.", 400);
     }
 
-    if (
-      !Number.isFinite(
-        examId
-      ) ||
-      examId <= 0
-    ) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Valid examid is required.",
-
-          data: [],
-        },
-        {
-          status: 400,
-        }
-      );
+    if (!examId) {
+      return fail("Valid examid is required.", 400);
     }
 
     if (!examType) {
-      return NextResponse.json(
-        {
-          status: false,
+      return fail("examtype is required.", 400);
+    }
 
-          message:
-            "examtype is required.",
+    const apiBaseUrl = String(
+      process.env.PSC_API_BASE_URL || ""
+    )
+      .trim()
+      .replace(/\/+$/, "");
 
-          data: [],
-        },
-        {
-          status: 400,
-        }
+    const apiKey = String(
+      process.env.PSC_API_KEY || ""
+    ).trim();
+
+    if (!apiBaseUrl || !apiKey) {
+      return fail(
+        "PSC API configuration is missing.",
+        500
       );
     }
 
-    /* =====================================================
-       ENV
-    ===================================================== */
+    const formData = new FormData();
 
-    const apiBaseUrl =
-      cleanBaseUrl(
-        process.env
-          .PSC_API_BASE_URL
-      );
+    formData.append("api", apiKey);
+    formData.append("cid", String(cid));
+    formData.append("uid", String(uid));
+    formData.append("examid", String(examId));
 
-    const apiKey =
-      process.env
-        .PSC_API_KEY;
+    // Topic-wise UI names must become "twe" here.
+    formData.append("examtype", examType);
 
-    if (
-      !apiBaseUrl ||
-      !apiKey
-    ) {
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "PSC API configuration is missing.",
-
-          data: [],
+    const response = await fetch(
+      `${apiBaseUrl}/getMockTestQuestions`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
         },
-        {
-          status: 500,
-        }
+        body: formData,
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+
+    if (response.status === 429) {
+      return fail(
+        "Question service is busy. Please try again later.",
+        429,
+        response.headers.get("retry-after")
       );
     }
 
-    /* =====================================================
-       FORM DATA
-
-       Your getMockTestQuestions Postman request uses:
-
-       api
-       cid
-       uid
-       examid
-    ===================================================== */
-
-    const formData =
-      new FormData();
-
-    formData.append(
-      "api",
-      apiKey
-    );
-
-    formData.append(
-      "cid",
-      String(cid)
-    );
-
-    formData.append(
-      "uid",
-      String(uid)
-    );
-
-    formData.append(
-      "examid",
-      String(examId)
-    );
-
-    /*
-     * Keep examtype available because
-     * your dashboard is dynamic.
-     *
-     * If backend ignores it for mock,
-     * that is harmless.
-     */
-    formData.append(
-      "examtype",
-      examType
-    );
-
-    /* =====================================================
-       REQUEST
-    ===================================================== */
-
-    const response =
-      await fetch(
-        `${apiBaseUrl}/getMockTestQuestions`,
-        {
-          method:
-            "POST",
-
-          body:
-            formData,
-
-          cache:
-            "no-store",
-        }
-      );
-
-    const rawText =
-      await response.text();
-
-    /* =====================================================
-       JSON PARSE
-    ===================================================== */
+    const rawText = await response.text();
 
     let result;
 
     try {
-      result =
-        rawText
-          ? JSON.parse(
-              rawText
-            )
-          : {};
+      result = rawText ? JSON.parse(rawText) : null;
     } catch {
-      console.error(
-        "getMockTestQuestions RAW RESPONSE:",
-        rawText
-      );
+      console.error("QUESTIONS API INVALID JSON:", {
+        status: response.status,
+        examType,
+        examId,
+      });
 
-      return NextResponse.json(
-        {
-          status: false,
-
-          message:
-            "Questions API returned invalid JSON.",
-
-          data: [],
-        },
-        {
-          status: 502,
-        }
+      return fail(
+        "Questions API returned invalid JSON.",
+        502
       );
     }
 
-    /* =====================================================
-       UPSTREAM ERROR
-    ===================================================== */
-
-    if (!response.ok) {
-      return NextResponse.json(
-        {
-          ...result,
-
-          status: false,
-
-          message:
-            result?.message ||
-            result?.msg ||
-            "Unable to load exam questions.",
-
-          data:
-            Array.isArray(
-              result?.data
-            )
-              ? result.data
-              : [],
-        },
-        {
-          status:
-            response.status,
-        }
-      );
-    }
-
-    /* =====================================================
-       NORMALIZE
-    ===================================================== */
-
-    const questions =
-      Array.isArray(
-        result?.data
-      )
-        ? result.data
-        : [];
-
-    return NextResponse.json(
-      {
-        ...result,
-
-        status:
-          result?.status !==
-          false,
-
-        data:
-          questions,
-      },
-      {
-        status: 200,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "STUDENT MOCK QUESTIONS:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        status: false,
-
-        message:
-          error?.message ||
+    if (
+      !response.ok ||
+      !result ||
+      failed(result.status)
+    ) {
+      return fail(
+        result?.message ||
+          result?.msg ||
           "Unable to load exam questions.",
+        502
+      );
+    }
 
-        data: [],
-      },
-      {
-        status: 500,
-      }
+    const questions = Array.isArray(result.data)
+      ? result.data
+      : [];
+
+    if (!questions.length) {
+      return fail(
+        "The backend returned no questions for this exam.",
+        502
+      );
+    }
+
+    const imagePath =
+      result.img_path ||
+      result.imagePath ||
+      result.image_path ||
+      "";
+
+    return reply({
+      ...result,
+      status: true,
+      exam_type: examType,
+      imagePath,
+      img_path: imagePath,
+      data: questions,
+    });
+  } catch (error) {
+    const timedOut = [
+      "TimeoutError",
+      "AbortError",
+    ].includes(error?.name);
+
+    console.error("STUDENT EXAM QUESTIONS:", {
+      name: error?.name,
+      message: error?.message,
+    });
+
+    return fail(
+      timedOut
+        ? "Question service timed out. Please retry."
+        : "Unable to load exam questions.",
+      timedOut ? 504 : 502
     );
   }
 }

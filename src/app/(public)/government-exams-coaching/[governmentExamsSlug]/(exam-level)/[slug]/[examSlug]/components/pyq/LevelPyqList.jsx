@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 
 import {
   LoaderCircle,
@@ -19,6 +20,7 @@ export default function LevelPyqList({
   cid = 1,
   levelFilter,
 }) {
+  const pathname = usePathname();
   const [
     exams,
     setExams,
@@ -365,6 +367,11 @@ export default function LevelPyqList({
         }
         exam={
           premiumExam
+        }
+        redirectPath={
+          premiumExam
+            ? `${pathname}?examId=${encodeURIComponent(premiumExam.id ?? "")}&selectedTestTitle=${encodeURIComponent(premiumExam.exam_name || "Previous Question Paper")}`
+            : ""
         }
         onClose={
           handleClosePremium

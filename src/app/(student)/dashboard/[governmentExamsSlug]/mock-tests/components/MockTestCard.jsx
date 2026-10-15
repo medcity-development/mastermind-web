@@ -24,6 +24,7 @@ export default function MockTestCard({
   examName,
   shortName,
   governmentExamsSlug,
+  pauseId,
 }) {
   const [
     showPremiumModal,
@@ -72,6 +73,12 @@ export default function MockTestCard({
 
   const examPath =
     `/dashboard/${governmentExamsSlug}/mock-tests/${examId}`;
+  const startPath = {
+    pathname: `${examPath}/start`,
+    query: {
+      title: testTitle,
+    },
+  };
 
   function openPremiumModal(
     event
@@ -119,11 +126,11 @@ export default function MockTestCard({
                   to-orange-50
                 `
               : `
-                  border-blue-100
+                  border-emerald-200
                   bg-gradient-to-br
-                  from-[#f7fbff]
+                  from-emerald-50
                   via-white
-                  to-[#f5f3ff]
+                  to-green-50
                 `
           }
         `}
@@ -150,11 +157,11 @@ export default function MockTestCard({
               ${
                 premium
                   ? "bg-amber-100 text-amber-700"
-                  : "bg-[#e6f3ff] text-[#176ed1]"
+                  : "bg-emerald-100 text-emerald-700"
               }
             `}
           >
-            {premium ? (
+            {premium && !pauseId ? (
               <Crown size={20} />
             ) : (
               <BookOpen size={20} />
@@ -175,7 +182,7 @@ export default function MockTestCard({
               ${
                 premium
                   ? "bg-amber-100 text-amber-700"
-                  : "bg-blue-50 text-blue-700"
+                  : "bg-emerald-100 text-emerald-700"
               }
             `}
           >
@@ -198,7 +205,7 @@ export default function MockTestCard({
               ${
                 premium
                   ? "text-amber-700"
-                  : "text-blue-600"
+                  : "text-emerald-700"
               }
             `}
           >
@@ -318,16 +325,11 @@ export default function MockTestCard({
             </button>
           ) : (
             <Link
-              href={{
-                pathname:
-                  examPath,
-
+              href={pauseId ? startPath : {
+                pathname: examPath,
                 query: {
-                  uid:
-                    String(uid),
-
-                  title:
-                    testTitle,
+                  uid: String(uid),
+                  title: testTitle,
                 },
               }}
               className="
@@ -339,26 +341,23 @@ export default function MockTestCard({
 
                 rounded-[13px]
 
-                bg-gradient-to-r
-                from-[#164fa5]
-                via-[#087fd0]
-                to-[#3154ee]
+                border
+                border-emerald-200
+                bg-emerald-100
 
                 px-5
                 py-3.5
 
                 text-[11px]
                 font-extrabold
-                text-white
-
-                shadow-[0_10px_24px_rgba(49,84,238,0.18)]
+                text-emerald-700
 
                 transition-all
 
-                hover:-translate-y-0.5
+                hover:bg-emerald-200
               "
             >
-              Start Exam
+              {pauseId ? "Resume Exam" : "Start Exam"}
 
               <ArrowRight
                 size={14}
@@ -407,8 +406,8 @@ function InfoBox({
                 bg-amber-50
               `
             : `
-                border-blue-100
-                bg-blue-50/70
+                border-emerald-100
+                bg-emerald-50/70
               `
         }
       `}
@@ -426,7 +425,7 @@ function InfoBox({
           ${
             premium
               ? "bg-amber-100 text-amber-700"
-              : "bg-blue-100 text-blue-700"
+              : "bg-emerald-100 text-emerald-700"
           }
         `}
       >

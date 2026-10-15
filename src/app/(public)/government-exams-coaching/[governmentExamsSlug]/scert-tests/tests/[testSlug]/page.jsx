@@ -3,18 +3,28 @@ import {
 } from "next/navigation";
 
 import {
+  getGovernmentExamConfig,
+} from "@/lib/governmentExamConfig";
+
+import {
   getScertExamDetails,
 } from "@/lib/scertHelper";
 
 import ScertInstructions from "./components/ScertInstructions";
 
-export const metadata = {
-  title:
-    "SCERT Test | MasterMind Academy",
+export async function generateMetadata({ params }) {
+  const { governmentExamsSlug } = await params;
+  const config = getGovernmentExamConfig(governmentExamsSlug);
 
-  description:
-    "Practice Kerala PSC SCERT questions with MasterMind Academy.",
-};
+  if (!config) {
+    return {};
+  }
+
+  return {
+    title: `${config.name} SCERT Test | MasterMind Academy`,
+    description: `Practice ${config.name} SCERT questions with MasterMind Academy.`,
+  };
+}
 
 /* =========================================================
    SCERT TEST DETAILS
@@ -26,7 +36,10 @@ export default async function ScertExamDetailsPage({
 }) {
   const {
     testSlug,
+    governmentExamsSlug,
   } = await params;
+  const config =
+    getGovernmentExamConfig(governmentExamsSlug);
 
   const search =
     await searchParams;
@@ -42,6 +55,7 @@ export default async function ScertExamDetailsPage({
   ======================================================= */
 
   if (
+    !config ||
     !testSlug ||
     !examId ||
     !classId
@@ -52,16 +66,15 @@ export default async function ScertExamDetailsPage({
   /* =======================================================
      DETAILS API
 
-     IMPORTANT:
-     getMockTestDetails expects course cid = 1.
-     classId is NOT the cid here.
+     The course cid identifies the exam catalog;
+     classId identifies the SCERT class.
   ======================================================= */
 
   const detailsResult =
     await getScertExamDetails({
       uid: 0,
 
-      cid: 1,
+      cid: config.cid,
 
       examId,
 
@@ -156,6 +169,7 @@ export default async function ScertExamDetailsPage({
   testSlug={testSlug}
   classId={classId}
   examId={examId}
+  governmentExamsSlug={governmentExamsSlug}
 />
       </div>
     </main>

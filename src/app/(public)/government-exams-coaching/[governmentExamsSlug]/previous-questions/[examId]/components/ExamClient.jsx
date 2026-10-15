@@ -20,523 +20,381 @@ import ExamPause from "./ExamPause";
 import ExamSubmit from "./ExamSubmit";
 import ExamResult from "./ExamResult";
 import ExamEmpty from "./ExamEmpty";
-import LoginRequiredModal from "./LoginRequiredModal";
 
 import useExamController from "./hooks/useExamController";
 
+import PyqResultModal from "@/components/PyqResultModal";
+
+import {
+  clearGuestExamHandoff,
+  readGuestExamHandoff,
+} from "@/lib/guestExamHandoff";
+
 export default function ExamClient({
   exam,
+  examId,
   questions = [],
   imagePath = "",
-  uid,
+  uid = 0,
   cid,
-  examType,
+  examType = "pqp",
   lastPosition,
   initialPauseId = null,
+  governmentExamsSlug = "",
+  guestAction = "",
 }) {
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  /* =========================================================
-     LOGIN MODAL
-  ========================================================= */
+  const id = examId ?? exam?.id;
+
+  const handoff = [
+    "pause",
+    "submit",
+  ].includes(guestAction);
+
+  const [restored, setRestored] = useState(
+    !handoff
+  );
 
   const [
-    showLoginModal,
-    setShowLoginModal,
-  ] = useState(false);
+    restoreError,
+    setRestoreError,
+  ] = useState("");
 
-  /* =========================================================
-     PREVENT MULTIPLE TIMER SUBMITS
-  ========================================================= */
+  const restoredOnce = useRef(false);
+  const appliedOnce = useRef(false);
+  const autoSubmitted = useRef(false);
 
-  const autoSubmitStartedRef =
-    useRef(false);
-
-  /* =========================================================
-     EXAM CONTROLLER
-  ========================================================= */
-
-  const {
-    currentPage,
-    totalPages,
-
-    currentQuestions,
-    totalQuestions,
-
-    startIndex,
-    endIndex,
-
-    answers,
-
-    answeredCount,
-    unansweredCount,
-
-    progress,
-
-    submitted,
-    saving,
-
-    correctCount,
-    wrongCount,
-
-    /* TIMER */
-
-    durationMinutes,
-    remainingSeconds,
-    timerFinished,
-
-    /* ACTIONS */
-
-    handleAnswer,
-    handlePreviousPage,
-    handleNextPage,
-    handlePageChange,
-
-    handlePause,
-    handleSubmit,
-  } = useExamController({
+  const controller = useExamController({
     exam,
+    examId: id,
     questions,
     uid,
     cid,
     examType,
     lastPosition,
     initialPauseId,
+    governmentExamsSlug,
+    guestAction,
   });
 
-  /* =========================================================
-     PAUSE WRAPPER
-  ========================================================= */
-
-  async function handleExamPause() {
-    /*
-     * Guest:
-     *
-     * Don't create/update backend
-     * attempt.
-     *
-     * Show login modal instead.
-     */
-
-    if (
-      Number(uid) === 0
-    ) {
-      setShowLoginModal(
-        true
-      );
-
-      return;
-    }
-
-    await handlePause();
-  }
-
-  /* =========================================================
-     SUBMIT WRAPPER
-  ========================================================= */
-
-  async function handleExamSubmit() {
-    /*
-     * Guest:
-     *
-     * Show login modal instead
-     * of submitting.
-     */
-
-    if (
-      Number(uid) === 0
-    ) {
-      setShowLoginModal(
-        true
-      );
-
-      return;
-    }
-
-    await handleSubmit();
-  }
-
-  /* =========================================================
-     TIMER FINISHED
-  ========================================================= */
-
   useEffect(() => {
-    /*
-     * Timer hasn't finished.
-     */
+    restoredOnce.current = false;
+    appliedOnce.current = false;
+    autoSubmitted.current = false;
 
-    if (!timerFinished) {
-      return;
-    }
-
-    /*
-     * Already submitted.
-     */
-
-    if (submitted) {
-      return;
-    }
-
-    /*
-     * Backend request running.
-     */
-
-    if (saving) {
-      return;
-    }
-
-    /*
-     * Prevent duplicate automatic
-     * submission.
-     */
-
-    if (
-      autoSubmitStartedRef.current
-    ) {
-      return;
-    }
-
-    autoSubmitStartedRef.current =
-      true;
-
-    /*
-     * Guest user:
-     *
-     * Time ended, so show
-     * login modal.
-     */
-
-    if (
-      Number(uid) === 0
-    ) {
-      setShowLoginModal(
-        true
-      );
-
-      return;
-    }
-
-    /*
-     * Logged-in user:
-     *
-     * Automatically submit exam.
-     */
-
-    handleSubmit();
+    setRestored(!handoff);
+    setRestoreError("");
   }, [
-    timerFinished,
-    submitted,
-    saving,
-    uid,
-    handleSubmit,
+    id,
+    guestAction,
+    handoff,
   ]);
 
-  /* =========================================================
-     RESET AUTO SUBMIT GUARD
-     WHEN EXAM CHANGES
-  ========================================================= */
+  /* RESTORE BEFORE SAVING */
 
   useEffect(() => {
-    autoSubmitStartedRef.current =
-      false;
+    if (
+      !handoff ||
+      restoredOnce.current
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (restoredOnce.current) return;
+
+      restoredOnce.current = true;
+
+      try {
+        const saved = readGuestExamHandoff({
+          examId: id,
+          examType,
+          governmentExamsSlug,
+        });
+
+        if (
+          !saved ||
+          saved.action !== guestAction
+        ) {
+          throw new Error(
+            "Saved exam progress could not be found. Return to the original exam tab."
+          );
+        }
+
+        controller.restoreGuestAttempt(saved);
+        setRestored(true);
+      } catch (error) {
+        setRestoreError(
+          error.message ||
+          "Unable to restore this exam."
+        );
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [
-    exam?.id,
+    handoff,
+    id,
+    examType,
+    governmentExamsSlug,
+    guestAction,
+    controller.restoreGuestAttempt,
   ]);
 
-  /* =========================================================
-     LOGIN REDIRECT
-  ========================================================= */
+  /* SAVE AFTER LOGIN / PROFILE SETUP */
 
-  function handleLoginRedirect() {
-    setShowLoginModal(
-      false
-    );
+  useEffect(() => {
+    if (
+      !handoff ||
+      !restored ||
+      restoreError ||
+      !controller.restoreReady ||
+      appliedOnce.current
+    ) {
+      return;
+    }
 
-    /*
-     * You can later include
-     * redirect back to the exam
-     * if required.
-     */
+    appliedOnce.current = true;
+
+    // Already saved before refresh.
+    if (controller.submitted) return;
+
+    if (guestAction === "submit") {
+      controller.handleSubmit();
+    } else {
+      controller.handlePause();
+    }
+  }, [
+    handoff,
+    restored,
+    restoreError,
+    guestAction,
+    controller.restoreReady,
+    controller.submitted,
+    controller.handleSubmit,
+    controller.handlePause,
+  ]);
+
+  /* AUTOMATIC FINISH */
+
+  useEffect(() => {
+    if (
+      !restored ||
+      restoreError ||
+      handoff ||
+      !controller.timerFinished ||
+      controller.submitted ||
+      controller.saving ||
+      autoSubmitted.current
+    ) {
+      return;
+    }
+
+    autoSubmitted.current = true;
+    controller.handleSubmit();
+  }, [
+    restored,
+    restoreError,
+    handoff,
+    controller.timerFinished,
+    controller.submitted,
+    controller.saving,
+    controller.handleSubmit,
+  ]);
+
+  function viewAttempted() {
+    if (!governmentExamsSlug) return;
+
+    try {
+      clearGuestExamHandoff();
+    } catch {
+      // Attempt is already saved to the backend.
+    }
 
     router.push(
-      "/login"
+      `/dashboard/${encodeURIComponent(
+        governmentExamsSlug
+      )}/exam-attempted`
     );
   }
 
-  /* =========================================================
-     EMPTY EXAM
-  ========================================================= */
+  if (restoreError) {
+    return (
+      <p
+        role="alert"
+        className="rounded-xl bg-red-50 p-5 text-red-700"
+      >
+        {restoreError}
+      </p>
+    );
+  }
 
   if (
-    totalQuestions === 0
+    !restored ||
+    !controller.restoreReady
   ) {
+    return (
+      <p
+        role="status"
+        className="rounded-xl bg-white p-5"
+      >
+        Restoring your completed exam…
+      </p>
+    );
+  }
+
+  if (!controller.totalQuestions) {
     return <ExamEmpty />;
   }
 
-  /* =========================================================
-     RENDER
-  ========================================================= */
+  const c = controller;
 
   return (
     <>
-      <section
-        className="
-          space-y-6
-        "
-      >
-        {/* =================================================
-            HERO
-        ================================================= */}
+      <section className="space-y-6">
+        {c.saveError && (
+          <p
+            role="alert"
+            className="rounded-xl bg-red-50 p-4 text-red-700"
+          >
+            {c.saveError} Your answers are retained.
+            Use the action button to retry.
+          </p>
+        )}
+
+        {c.paused && (
+          <p
+            role="status"
+            className="rounded-xl bg-amber-50 p-4"
+          >
+            Exam paused. Answers and remaining time
+            are saved.
+          </p>
+        )}
 
         <ExamHero
           exam={exam}
-          totalQuestions={
-            totalQuestions
-          }
-          currentPage={
-            currentPage
-          }
-          totalPages={
-            totalPages
-          }
+          totalQuestions={c.totalQuestions}
+          currentPage={c.currentPage}
+          totalPages={c.totalPages}
         />
 
-        {/* =================================================
-            TIMER
-        ================================================= */}
-
-        {durationMinutes > 0 ? (
-          <div
-            className="
-              flex
-              items-center
-              justify-end
-            "
-          >
+        {c.durationMinutes > 0 && (
+          <div className="flex justify-end">
             <ExamTimer
-              remainingSeconds={
-                remainingSeconds
-              }
-              durationMinutes={
-                durationMinutes
-              }
+              remainingSeconds={c.remainingSeconds}
+              durationMinutes={c.durationMinutes}
             />
           </div>
-        ) : null}
-
-        {/* =================================================
-            RESULT
-        ================================================= */}
-
-        {submitted && (
-          <ExamResult
-            totalQuestions={
-              totalQuestions
-            }
-            answeredCount={
-              answeredCount
-            }
-            correctCount={
-              correctCount
-            }
-            wrongCount={
-              wrongCount
-            }
-          />
         )}
 
-        {/* =================================================
-            PROGRESS
-        ================================================= */}
+        {c.submitted && (
+          <ExamResult
+            totalQuestions={c.totalQuestions}
+            answeredCount={c.answeredCount}
+            correctCount={c.correctCount}
+            wrongCount={c.wrongCount}
+          />
+        )}
 
         <ExamProgress
-          answeredCount={
-            answeredCount
-          }
-          totalQuestions={
-            totalQuestions
-          }
-          progress={
-            progress
-          }
+          answeredCount={c.answeredCount}
+          totalQuestions={c.totalQuestions}
+          progress={c.progress}
         />
-
-        {/* =================================================
-            QUESTION RANGE
-        ================================================= */}
 
         <ExamQuestionRange
-          startIndex={
-            startIndex
-          }
-          endIndex={
-            endIndex
-          }
-          totalQuestions={
-            totalQuestions
-          }
-          currentPage={
-            currentPage
-          }
-          unansweredCount={
-            unansweredCount
-          }
+          startIndex={c.startIndex}
+          endIndex={c.endIndex}
+          totalQuestions={c.totalQuestions}
+          currentPage={c.currentPage}
+          unansweredCount={c.unansweredCount}
         />
 
-        {/* =================================================
-            QUESTIONS
-        ================================================= */}
-
-        <ExamQuestions
-          questions={
-            currentQuestions
+        <div
+          className={
+            c.saving ||
+              c.paused ||
+              handoff ||
+              c.submitted
+              ? "pointer-events-none"
+              : ""
           }
-          startIndex={
-            startIndex
-          }
-          answers={
-            answers
-          }
-          submitted={
-            submitted
-          }
-          imagePath={
-            imagePath
-          }
-          onAnswer={
-            handleAnswer
-          }
-        />
-
-        {/* =================================================
-            PAGINATION
-        ================================================= */}
-
-        {!timerFinished && (
-          <ExamPagination
-            currentPage={
-              currentPage
-            }
-            totalPages={
-              totalPages
-            }
-            onPrevious={
-              handlePreviousPage
-            }
-            onNext={
-              handleNextPage
-            }
-            onPageChange={
-              handlePageChange
-            }
+        >
+          <ExamQuestions
+            questions={c.currentQuestions}
+            startIndex={c.startIndex}
+            answers={c.answers}
+            submitted={c.submitted}
+            imagePath={imagePath}
+            onAnswer={c.handleAnswer}
           />
+        </div>
+
+        <ExamPagination
+          currentPage={c.currentPage}
+          totalPages={c.totalPages}
+          onPrevious={c.handlePreviousPage}
+          onNext={c.handleNextPage}
+          onPageChange={c.handlePageChange}
+        />
+
+        {!c.submitted && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            {guestAction !== "submit" && (
+              <ExamPause
+                paused={c.paused}
+                disabled={
+                  c.timerFinished || c.saving
+                }
+                onPause={c.handlePause}
+                saving={c.saving}
+              />
+            )}
+
+            <ExamSubmit
+              answeredCount={c.answeredCount}
+              totalQuestions={c.totalQuestions}
+              onSubmit={c.handleSubmit}
+              saving={c.saving}
+            />
+          </div>
         )}
 
-        {/* =================================================
-            ACTIONS
-        ================================================= */}
+        {c.timerFinished && !c.submitted && (
+          <p
+            role="status"
+            className="rounded-xl bg-red-50 p-4 text-red-700"
+          >
+            Exam time has ended.{" "}
+            {c.saveError
+              ? "Use Submit & Finish to retry."
+              : "Saving your exam…"}
+          </p>
+        )}
 
-        {!submitted &&
-          !timerFinished && (
-            <div
-              className="
-                flex
-                flex-col
-                gap-3
-                sm:flex-row
-                sm:items-center
-                sm:justify-end
-              "
-            >
-              {/* PAUSE */}
-
-              <ExamPause
-                onPause={
-                  handleExamPause
-                }
-                saving={
-                  saving
-                }
-              />
-
-              {/* SUBMIT */}
-
-              <ExamSubmit
-                answeredCount={
-                  answeredCount
-                }
-                totalQuestions={
-                  totalQuestions
-                }
-                onSubmit={
-                  handleExamSubmit
-                }
-                saving={
-                  saving
-                }
-              />
-            </div>
-          )}
-
-        {/* =================================================
-            TIME FINISHED MESSAGE
-        ================================================= */}
-
-        {timerFinished &&
-          !submitted && (
-            <div
-              className="
-                rounded-2xl
-                border
-                border-red-200
-                bg-red-50
-                px-5
-                py-4
-                text-center
-              "
-            >
-              <p
-                className="
-                  text-sm
-                  font-black
-                  text-red-700
-                "
-              >
-                Exam time has ended.
-              </p>
-
-              <p
-                className="
-                  mt-1
-                  text-xs
-                  font-medium
-                  text-red-500
-                "
-              >
-                Your exam is being
-                submitted automatically.
-              </p>
-            </div>
-          )}
+        {c.submitted && (
+          <button
+            type="button"
+            onClick={() => c.handleSubmit()}
+            className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white"
+          >
+            Show Result
+          </button>
+        )}
       </section>
 
-      {/* =====================================================
-          LOGIN REQUIRED MODAL
-      ===================================================== */}
-
-      <LoginRequiredModal
-        open={
-          showLoginModal
+      <PyqResultModal
+        open={c.resultModalOpen}
+        result={c.submittedResult}
+        examTitle={
+          exam?.exam_name ??
+          exam?.title ??
+          "Previous Questions"
         }
-        onClose={() =>
-          setShowLoginModal(
-            false
-          )
-        }
-        onLogin={
-          handleLoginRedirect
-        }
+        onClose={c.closeResultModal}
+        onViewAnalysis={viewAttempted}
       />
     </>
   );

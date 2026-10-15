@@ -24,6 +24,7 @@ import CourseChoiceModal from "@/app/(public)/profile-setup/components/CourseCho
 export default function OtpVerification({
   authData,
   onBack,
+  redirectTo = "",
 }) {
   const router =
     useRouter();
@@ -191,6 +192,12 @@ export default function OtpVerification({
         result?.stage ===
         "completed"
       ) {
+        if (redirectTo) {
+          router.replace(redirectTo);
+          router.refresh();
+          return;
+        }
+
         setShowCourseModal(
           true
         );
@@ -210,9 +217,11 @@ export default function OtpVerification({
          corresponding dashboard
       ===================================================== */
 
-      router.replace(
-        "/profile-setup"
-      );
+      const profileSetupPath = redirectTo
+        ? `/profile-setup?redirect=${encodeURIComponent(redirectTo)}`
+        : "/profile-setup";
+
+      router.replace(profileSetupPath);
 
       router.refresh();
     } catch (error) {

@@ -17,6 +17,7 @@ export default function ScertInstructions({
   testSlug,
   classId,
   examId,
+  governmentExamsSlug = "kerala-psc",
 }) {
   const totalQuestions =
     Number(
@@ -43,12 +44,12 @@ export default function ScertInstructions({
 
   const backHref =
     classId
-      ? `/government-exams-coaching/kerala-psc/scert-tests/classes/${classId}`
-      : "/government-exams-coaching/kerala-psc/scert-tests";
+      ? `/government-exams-coaching/${governmentExamsSlug}/scert-tests/classes/${classId}`
+      : `/government-exams-coaching/${governmentExamsSlug}/scert-tests`;
 
   const startHref = {
     pathname:
-      `/government-exams-coaching/kerala-psc/scert-tests/tests/${testSlug}/start`,
+      `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}/start`,
 
     query: {
       classId:

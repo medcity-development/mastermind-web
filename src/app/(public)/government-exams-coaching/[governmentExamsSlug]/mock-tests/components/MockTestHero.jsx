@@ -154,11 +154,10 @@ export default function MockTestHero({
               lg:text-[34px]
             "
           >
-            {content.headingPrefix}
+            {content.headingPrefix}{" "}
 
             <span
               className="
-                ml-2
                 text-[#ffe0ef]
               "
             >

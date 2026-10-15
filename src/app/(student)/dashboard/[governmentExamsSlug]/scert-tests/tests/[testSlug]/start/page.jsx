@@ -1,10 +1,11 @@
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
   getScertFolders,
-  getScertTestsByClassId,
+  getScertTestsPage,
   getScertExamDetails,
   getScertQuestions,
 } from "@/lib/scertHelper";
@@ -19,94 +20,127 @@ import {
 
 import ScertExamClient from "../../../start/components/ScertExamClient";
 
-
+export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title:
-    "SCERT Exam | MasterMind Academy",
-
+  title: "SCERT Exam | MasterMind Academy",
   robots: {
     index: false,
     follow: false,
   },
 };
 
-function createSlug(
-  value = ""
-) {
-  return String(value)
-    .toLowerCase()
-    .trim()
-    .replace(
-      /[^a-z0-9]+/g,
-      "-"
-    )
-    .replace(
-      /^-+|-+$/g,
-      ""
-    );
+function id(value) {
+  const number = Number(value);
+
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : null;
 }
 
-async function findScertTestBySlug(
+function slugOf(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function nextOffset(result) {
+  return (
+    result?.nextOffset ??
+    result?.nextoffset ??
+    null
+  );
+}
+
+async function collectPages(fetchPage) {
+  const rows = [];
+  const seen = new Set();
+
+  let offset = 0;
+
+  while (!seen.has(String(offset))) {
+    seen.add(String(offset));
+
+    const result = await fetchPage(offset);
+
+    if (
+      [false, "false", 0, "0"].includes(
+        result?.status
+      )
+    ) {
+      throw new Error(
+        "SCERT listing could not be loaded."
+      );
+    }
+
+    rows.push(
+      ...(Array.isArray(result?.data)
+        ? result.data
+        : [])
+    );
+
+    const next = nextOffset(result);
+
+    if (
+      next == null ||
+      next === "" ||
+      Number(next) <= 0 ||
+      !Number.isFinite(Number(next))
+    ) {
+      break;
+    }
+
+    offset = Number(next);
+  }
+
+  return rows;
+}
+
+async function findTest(
   testSlug,
   {
     uid,
     cid,
+    selectedClassId,
   }
 ) {
-  const foldersResult =
-    await getScertFolders({
-      uid,
-      cid,
-      offset: 0,
-    });
+  const folders = selectedClassId
+    ? [{ id: selectedClassId }]
+    : await collectPages(
+      (offset) =>
+        getScertFolders({
+          uid,
+          cid,
+          offset,
+        })
+    );
 
-  const folders =
-    Array.isArray(
-      foldersResult?.data
-    )
-      ? foldersResult.data
-      : [];
+  for (const folder of folders) {
+    const classId = id(folder?.id);
 
-  for (
-    const folder of folders
-  ) {
-    const classId =
-      folder?.id;
+    if (!classId) continue;
 
-    if (!classId) {
-      continue;
-    }
+    const tests = await collectPages(
+      (offset) =>
+        getScertTestsPage({
+          uid,
+          classId,
+          offset,
+          filter: 0,
+        })
+    );
 
-    const result =
-      await getScertTestsByClassId({
-        uid,
-        classId,
-        filter: 0,
-      });
+    const test = tests.find(
+      (item) =>
+        slugOf(item?.exam_name) === testSlug
+    );
 
-    const tests =
-      Array.isArray(
-        result?.data
-      )
-        ? result.data
-        : [];
-
-    const test =
-      tests.find(
-        (item) =>
-          createSlug(
-            item?.exam_name
-          ) ===
-          testSlug
-      );
-
-    if (test) {
+    if (test && id(test.id)) {
       return {
         classId,
-        test,
-        examId:
-          test.id,
+        examId: id(test.id),
       };
     }
   }
@@ -119,132 +153,141 @@ export default async function ScertStartPage({
   searchParams,
 }) {
   const {
-    testSlug,
     governmentExamsSlug,
+    testSlug,
   } = await params;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const query = await searchParams;
+
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
   if (!config) {
     notFound();
   }
 
-  const session =
-    await getStudentSession();
+  const session = await getStudentSession();
 
-  const uid =
-    session?.uid;
-
-  const query =
-    await searchParams;
+  const uid = id(session?.uid) || 0;
+  const cid = Number(config.cid);
 
   const mode =
-    query?.mode ===
-    "resume"
+    query?.mode === "resume"
       ? "resume"
       : "new";
 
-  const initialPauseId =
-    query?.pauseId ||
-    null;
+  const pauseId = id(query?.pauseId);
+
+  const directExamId = id(query?.examId);
+  const directClassId = id(query?.classId);
 
   const selected =
-    await findScertTestBySlug(
-      testSlug,
-      {
-        uid,
-        cid:
-          config.cid,
+    directExamId && directClassId
+      ? {
+        examId: directExamId,
+        classId: directClassId,
       }
-    );
+      : await findTest(testSlug, {
+        uid,
+        cid,
+        selectedClassId: directClassId,
+      });
 
   if (!selected) {
     notFound();
   }
 
   const {
-    classId,
     examId,
+    classId,
   } = selected;
 
-  const [
-    detailsResult,
-    questionsResult,
-  ] = await Promise.all([
+  if (mode === "resume" && !uid) {
+    const target = new URLSearchParams({
+      examId: String(examId),
+      classId: String(classId),
+      mode,
+      ...(pauseId
+        ? { pauseId: String(pauseId) }
+        : {}),
+    });
+
+    const returnPath =
+      `/government-exams-coaching/${governmentExamsSlug}` +
+      `/scert-tests/start?${target}`;
+
+    redirect(
+      `/login?redirect=${encodeURIComponent(returnPath)}`
+    );
+  }
+
+  const [details, paper] = await Promise.all([
     getScertExamDetails({
       uid,
-      cid:
-        classId,
+      cid,
       examId,
     }),
 
     getScertQuestions({
       uid,
-      cid:
-        classId,
+      cid,
       examId,
     }),
   ]);
 
-  const exam =
-    detailsResult?.exam;
+  const questions = Array.isArray(paper?.data)
+    ? paper.data
+    : [];
 
-  const questions =
-    Array.isArray(
-      questionsResult?.data
-    )
-      ? questionsResult.data
-      : [];
-
-  if (
-    !exam ||
-    !questions.length
-  ) {
-    notFound();
+  if (!details?.exam || !questions.length) {
+    return (
+      <p
+        role="alert"
+        className="p-6 text-red-700"
+      >
+        Unable to load this SCERT exam.
+        Refresh and try again.
+      </p>
+    );
   }
+
+  const guestAction = [
+    "pause",
+    "submit",
+  ].includes(query?.guestAction)
+    ? query.guestAction
+    : "";
 
   return (
     <ScertExamClient
-      exam={exam}
-      questions={
-        questions
-      }
-      imagePath={
-        questionsResult?.imagePath ||
-        ""
-      }
+      key={`${examId}-${uid}-${mode}-${guestAction}`}
+      exam={{
+        ...details.exam,
+        id: examId,
+      }}
+      examId={examId}
+      questions={questions}
+      imagePath={paper.imagePath || ""}
       uid={uid}
-      cid={
-        classId
-      }
-      classId={
-        classId
-      }
-      testSlug={
-        testSlug
-      }
+
+      // Dashboard course ID.
+      cid={cid}
+
+      // SCERT class ID.
+      classId={classId}
+
+      testSlug={testSlug}
       examType="scert"
       lastPosition="scert"
       durationMinutes={
-        Number(
-          exam?.total_minutes
-        ) || 90
+        Number(details.exam.total_minutes) || 90
       }
-      questionsPerPage={
-        10
-      }
-      mode={
-        mode
-      }
-      initialPauseId={
-        initialPauseId
-      }
-      governmentExamsSlug={
-        governmentExamsSlug
-      }
+      questionsPerPage={10}
+      mode={mode}
+      initialPauseId={pauseId}
+      governmentExamsSlug={governmentExamsSlug}
+      guestAction={guestAction}
     />
   );
 }

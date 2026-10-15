@@ -30,12 +30,15 @@ import ExamClient from "./components/ExamClient";
 
 export default async function StatementTypeExamStartPage({
   params,
+  searchParams,
 }) {
   const {
     governmentExamsSlug,
     statementTypeSlug,
     examSlug,
   } = await params;
+  const query =
+    await searchParams;
 
   /* =======================================================
      MAIN COURSE
@@ -292,6 +295,9 @@ export default async function StatementTypeExamStartPage({
       }
       examType={
         examType
+      }
+      guestAction={
+        query?.guestAction || ""
       }
     />
   );

@@ -17,7 +17,7 @@ export default function PreviousQuestionsHero({
     <section
       className="
         relative
-        mt-20
+        mt-0
         mb-5
         overflow-hidden
         rounded-[28px]

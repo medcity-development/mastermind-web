@@ -3,6 +3,7 @@
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 
@@ -11,6 +12,8 @@ import useMockExamAnswers from "./useMockExamAnswers";
 import useMockExamPagination from "./useMockExamPagination";
 import useMockExamTimer from "./useMockExamTimer";
 import useMockExamAttempt from "./useMockExamAttempt";
+import { readGuestExamHandoff } from "@/lib/guestExamHandoff";
+import { timestampToMilliseconds } from "@/lib/examAttemptData";
 
 /* =========================================================
    HELPERS
@@ -65,6 +68,7 @@ export default function useMockTestExam({
     cid,
     examTitle = "",
     governmentExamsSlug = "",
+    guestAction = "",
 }) {
     /* =======================================================
        EXAM STATE
@@ -104,6 +108,10 @@ export default function useMockTestExam({
         initialPauseId,
         setInitialPauseId,
     ] = useState(null);
+    const [
+        attemptStartTime,
+        setAttemptStartTime,
+    ] = useState(0);
 
     /* =======================================================
        ATTEMPT STATE
@@ -123,6 +131,13 @@ export default function useMockTestExam({
         isPaused,
         setIsPaused,
     ] = useState(false);
+
+    const [
+        restoredPage,
+        setRestoredPage,
+    ] = useState(1);
+    const guestHandoffActionRef = useRef("");
+    const guestActionHandledRef = useRef(false);
 
     /* =======================================================
        ANSWERS
@@ -159,6 +174,9 @@ export default function useMockTestExam({
             saving,
             isPaused,
         });
+    const restoreAnswers = answersApi.restoreAnswers;
+    const startTimer = timer.startTimer;
+    const stopTimer = timer.stopTimer;
 
     /* =======================================================
        REAL EXAM TITLE
@@ -214,6 +232,7 @@ export default function useMockTestExam({
                 setInitialPauseId(
                     null
                 );
+                setAttemptStartTime(0);
 
                 setSubmitted(
                     false
@@ -226,6 +245,8 @@ export default function useMockTestExam({
                 setIsPaused(
                     false
                 );
+                guestHandoffActionRef.current = "";
+                guestActionHandledRef.current = false;
 
                 /* ===============================================
                    API
@@ -234,9 +255,20 @@ export default function useMockTestExam({
                 const data =
                     await loadMockExam();
 
+                const guestAttempt =
+                    readGuestExamHandoff({
+                        examId,
+                        examType: "mock",
+                        governmentExamsSlug,
+                    });
+
                 if (cancelled) {
                     return;
                 }
+                const matchingGuestAttempt =
+                    guestAttempt?.action === guestAction
+                        ? guestAttempt
+                        : null;
 
                 /* ===============================================
                    EXAM
@@ -302,17 +334,23 @@ export default function useMockTestExam({
                 setInitialPauseId(
                     loadedPauseId
                 );
+                setAttemptStartTime(
+                    timestampToMilliseconds(matchingGuestAttempt?.startTime) ??
+                    timestampToMilliseconds(data?.startTime) ??
+                    Date.now()
+                );
 
                 /* ===============================================
                    RESTORE ANSWERS
                 =============================================== */
 
-                answersApi.restoreAnswers(
-                    Array.isArray(
-                        data?.restoredAnswers
-                    )
-                        ? data.restoredAnswers
-                        : []
+                restoreAnswers(
+                    guestAttempt?.answers ||
+                    data?.restoredAnswers ||
+                    {}
+                );
+                setRestoredPage(
+                    Number(guestAttempt?.currentPage ?? data?.currentPage) || 1
                 );
 
                 /* ===============================================
@@ -323,16 +361,26 @@ export default function useMockTestExam({
                     Number(
                         data?.initialRemaining
                     );
+                const guestRemaining =
+                    Number(
+                        guestAttempt?.remainingSeconds
+                    );
 
-                timer.startTimer(
+                startTimer(
                     Number.isFinite(
-                        initialRemaining
+                        guestRemaining
                     ) &&
-                        initialRemaining >=
+                        guestRemaining >=
                         0
-                        ? initialRemaining
-                        : 0
+                        ? guestRemaining
+                        : Number.isFinite(initialRemaining) && initialRemaining >= 0
+                            ? initialRemaining
+                            : 0
                 );
+
+                if (guestAttempt?.action === "pause" || guestAttempt?.action === "submit") {
+                    guestHandoffActionRef.current = guestAttempt.action;
+                }
             } catch (
             loadError
             ) {
@@ -369,25 +417,29 @@ export default function useMockTestExam({
         ) {
             load();
         } else {
-            setLoading(
-                false
-            );
-
-            setError(
-                "Required exam information is missing."
-            );
+            Promise.resolve().then(() => {
+                if (!cancelled) {
+                    setLoading(false);
+                    setError("Required exam information is missing.");
+                }
+            });
         }
 
         return () => {
             cancelled = true;
 
-            timer.stopTimer?.();
+            stopTimer?.();
         };
     }, [
         examId,
         uid,
         cid,
+        guestAction,
         loadMockExam,
+        restoreAnswers,
+        startTimer,
+        stopTimer,
+        governmentExamsSlug,
     ]);
 
     /* =======================================================
@@ -405,12 +457,35 @@ export default function useMockTestExam({
                 timer.timeEnded,
         });
 
+    const setPaginationPage =
+        pagination.setCurrentPage;
+    const paginationPageCount =
+        pagination.totalPages;
+
+    useEffect(() => {
+        if (!loading) {
+            setPaginationPage(
+                Math.max(
+                    1,
+                    Math.min(restoredPage, paginationPageCount)
+                )
+            );
+        }
+    }, [
+        loading,
+        restoredPage,
+        paginationPageCount,
+        setPaginationPage,
+    ]);
+
     /* =======================================================
        ATTEMPT ACTIONS
     ======================================================= */
 
     const attempt =
         useMockExamAttempt({
+            uid,
+
             cid,
 
             examId,
@@ -429,8 +504,12 @@ export default function useMockTestExam({
             remainingSeconds:
                 timer.remainingSeconds,
 
-            initialPauseId,
+            currentPage:
+                pagination.currentPage,
 
+            initialPauseId,
+            startTime:
+                attemptStartTime,
             /* ===============================================
                THIS IS THE REAL EXAM NAME
             =============================================== */
@@ -439,6 +518,7 @@ export default function useMockTestExam({
                 resolvedExamTitle,
 
             governmentExamsSlug,
+            guestAction,
 
             stopTimer:
                 timer.stopTimer,
@@ -452,6 +532,37 @@ export default function useMockTestExam({
             onPausedChange:
                 setIsPaused,
         });
+    const {
+        handlePause: pauseAttempt,
+        handleSubmit: submitAttempt,
+        finishExam: finishExamAttempt,
+    } = attempt;
+
+    useEffect(() => {
+        if (
+            loading ||
+            guestActionHandledRef.current ||
+            guestHandoffActionRef.current !== guestAction ||
+            (guestAction !== "pause" && guestAction !== "submit")
+        ) {
+            return;
+        }
+
+        guestActionHandledRef.current = true;
+        if (guestAction === "pause") {
+            pauseAttempt();
+        } else {
+            finishExamAttempt({
+                timeout: timer.remainingSeconds <= 0,
+            });
+        }
+    }, [
+        loading,
+        guestAction,
+        pauseAttempt,
+        finishExamAttempt,
+        timer.remainingSeconds,
+    ]);
 
     /* =======================================================
        DISABLE INTERACTION
