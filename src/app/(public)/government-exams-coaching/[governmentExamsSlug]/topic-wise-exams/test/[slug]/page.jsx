@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -5,27 +6,11 @@ import {
   getAllTopicWiseTests,
   getTopicWiseExams,
 } from "@/lib/topicWiseExamHelper";
-
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
-
-import {
-  getUserExamsList,
-} from "@/lib/examAttemptHelper";
-
-import {
-  getPausedAttemptIds,
-} from "@/lib/pausedExamAttempts";
-
-import {
-  createSlug,
-  formatSlug,
-} from "@/lib/pscSlug";
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { getUserExamsList } from "@/lib/examAttemptHelper";
+import { getPausedAttemptIds } from "@/lib/pausedExamAttempts";
+import { createSlug, formatSlug } from "@/lib/pscSlug";
 
 import PremiumExamButton from "./components/PremiumExamButton";
 
@@ -33,35 +18,27 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-
   return {
-    title:
-      `${formatSlug(slug)} Topic Wise Exams | MasterMind Academy`,
+    title: `${formatSlug(slug)} Topic Wise Exams | MasterMind Academy`,
   };
 }
 
-export default async function TopicWiseTestListPage({
-  params,
-}) {
-  const {
-    slug,
-    governmentExamsSlug,
-  } = await params;
+function getAccess(test) {
+  return String(test?.access ?? "").trim().toLowerCase();
+}
 
-  const config = getGovernmentExamConfig(
-    governmentExamsSlug
-  );
+export default async function TopicWiseTestListPage({ params }) {
+  const { slug, governmentExamsSlug } = await params;
 
+  const config = getGovernmentExamConfig(governmentExamsSlug);
   if (!config) notFound();
 
   const session = await getStudentSession();
-
   const uid = Number(session?.uid) || 0;
   const cid = Number(config.cid);
 
   const root =
-    `${uid > 0 ? "/dashboard" : "/government-exams-coaching"}` +
-    `/${governmentExamsSlug}/topic-wise-exams`;
+    `/government-exams-coaching/${governmentExamsSlug}/topic-wise-exams`;
 
   const topicsResult = await getTopicWiseExams({
     uid,
@@ -69,9 +46,11 @@ export default async function TopicWiseTestListPage({
     type: "twe",
   });
 
-  const selectedTopic = (
-    topicsResult?.data || []
-  ).find(
+  const topics = Array.isArray(topicsResult?.data)
+    ? topicsResult.data
+    : [];
+
+  const selectedTopic = topics.find(
     (item) => createSlug(item.subject) === slug
   );
 
@@ -82,7 +61,6 @@ export default async function TopicWiseTestListPage({
       uid,
       topicId: selectedTopic.id,
     }),
-
     uid > 0
       ? getUserExamsList({
         uid,
@@ -99,17 +77,15 @@ export default async function TopicWiseTestListPage({
     ? result.data
     : [];
 
-  const pausedAttempts = uid > 0
-    ? getPausedAttemptIds(attemptsResult)
-    : {};
+  const pausedAttempts =
+    uid > 0 && attemptsResult?.status !== false
+      ? getPausedAttemptIds(attemptsResult)
+      : {};
 
   return (
     <main className="min-h-screen bg-[#f8fafc] py-6">
       <div className="mx-auto max-w-[1450px] px-4 sm:px-6 lg:px-8">
-        <Link
-          href={root}
-          className="font-bold text-blue-700"
-        >
+        <Link href={root} className="font-bold text-blue-700">
           ← Back to Topics
         </Link>
 
@@ -117,11 +93,9 @@ export default async function TopicWiseTestListPage({
           <p className="text-xs font-bold uppercase tracking-widest">
             {config.name}
           </p>
-
           <h1 className="mt-2 text-3xl font-black">
             {selectedTopic.subject || formatSlug(slug)}
           </h1>
-
           <p className="mt-3 text-sm text-blue-100">
             Select an exam to begin your topic-wise practice.
           </p>
@@ -139,35 +113,47 @@ export default async function TopicWiseTestListPage({
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {tests.map((test) => {
-            const paid =
-              String(test.access || "").toLowerCase() ===
-              "paid";
+            const access = getAccess(test);
+            const isFree = access === "free";
+            const isPaid = access === "paid";
 
-            const examSlug = createSlug(test.exam_name);
+            const examId = Number(test.id);
+            const validId =
+              Number.isSafeInteger(examId) && examId > 0;
 
-            const pauseId =
-              pausedAttempts[String(test.id)];
+            const pauseId = Number(
+              pausedAttempts[String(test.id)]
+            );
+            const hasPausedAttempt =
+              uid > 0 &&
+              Number.isSafeInteger(pauseId) &&
+              pauseId > 0;
 
+            // Use the backend exam ID, not the exam-name slug.
             const detailsHref =
-              `${root}/test/${slug}/${examSlug}`;
+              `${root}/test/${slug}/${test.id}`;
 
             const resumeHref =
               `${detailsHref}/start?` +
               new URLSearchParams({
                 mode: "resume",
                 pauseId: String(pauseId),
-              });
+              }).toString();
 
             return (
               <article
                 key={test.id}
-                className={`flex flex-col rounded-3xl border p-5 ${paid
-                    ? "border-amber-200 bg-amber-50"
-                    : "border-green-200 bg-green-50"
+                className={`flex flex-col rounded-3xl border p-5 ${isFree
+                    ? "border-green-200 bg-green-50"
+                    : "border-amber-200 bg-amber-50"
                   }`}
               >
                 <p className="text-xs font-black uppercase text-slate-500">
-                  {paid ? "Premium" : "Free"}
+                  {isFree
+                    ? "Free"
+                    : isPaid
+                      ? "Premium"
+                      : "Access Unavailable"}
                 </p>
 
                 <h3 className="mt-3 text-lg font-black text-[#071f55]">
@@ -178,37 +164,30 @@ export default async function TopicWiseTestListPage({
                   <p className="rounded-xl bg-white p-3 text-sm">
                     Questions
                     <br />
-                    <strong>
-                      {test.total_questions ?? 0}
-                    </strong>
+                    <strong>{test.total_questions ?? 0}</strong>
                   </p>
-
                   <p className="rounded-xl bg-white p-3 text-sm">
                     Marks
                     <br />
-                    <strong>
-                      {test.total_mark ?? 0}
-                    </strong>
+                    <strong>{test.total_mark ?? 0}</strong>
                   </p>
                 </div>
 
-                {paid && !pauseId ? (
+                {validId && (isFree || hasPausedAttempt) ? (
+                  <Link
+                    href={hasPausedAttempt ? resumeHref : detailsHref}
+                    className="mt-auto rounded-xl bg-[#017dc0] px-5 py-3 text-center text-sm font-bold text-white"
+                  >
+                    {hasPausedAttempt ? "Resume Exam" : "View Exam"}
+                  </Link>
+                ) : isPaid ? (
                   <PremiumExamButton
                     governmentExamsSlug={governmentExamsSlug}
                   />
                 ) : (
-                  <Link
-                    href={
-                      pauseId
-                        ? resumeHref
-                        : detailsHref
-                    }
-                    className="mt-auto rounded-xl bg-[#017dc0] px-5 py-3 text-center text-sm font-bold text-white"
-                  >
-                    {pauseId
-                      ? "Resume Exam"
-                      : "View Exam"}
-                  </Link>
+                  <p className="mt-auto rounded-xl bg-slate-100 px-5 py-3 text-center text-sm font-bold text-slate-500">
+                    Access Unavailable
+                  </p>
                 )}
               </article>
             );

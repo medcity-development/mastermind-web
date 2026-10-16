@@ -1,9 +1,6 @@
-import Link from "next/link";
 
-import {
-  notFound,
-  redirect,
-} from "next/navigation";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import {
   getAllTopicWiseTests,
@@ -11,53 +8,37 @@ import {
   getTopicWiseExams,
 } from "@/lib/topicWiseExamHelper";
 
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
-
-import {
-  createSlug,
-  formatSlug,
-} from "@/lib/pscSlug";
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { createSlug, formatSlug } from "@/lib/pscSlug";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { examSlug } = await params;
-
   return {
-    title:
-      `${formatSlug(examSlug)} | MasterMind Academy`,
+    title: `${formatSlug(examSlug)} | MasterMind Academy`,
   };
 }
 
-export default async function TopicWiseExamDetailsPage({
-  params,
-}) {
+export default async function TopicWiseExamDetailsPage({ params }) {
   const {
     slug,
     examSlug,
     governmentExamsSlug,
   } = await params;
 
-  const config = getGovernmentExamConfig(
-    governmentExamsSlug
-  );
-
+  const config = getGovernmentExamConfig(governmentExamsSlug);
   if (!config) notFound();
 
   const session = await getStudentSession();
-
   const uid = Number(session?.uid) || 0;
   const cid = Number(config.cid);
 
   const root =
-    `${uid > 0 ? "/dashboard" : "/government-exams-coaching"}` +
-    `/${governmentExamsSlug}/topic-wise-exams`;
+    `/government-exams-coaching/${governmentExamsSlug}/topic-wise-exams`;
+
+  const listHref = `${root}/test/${slug}`;
 
   const topicsResult = await getTopicWiseExams({
     uid,
@@ -65,9 +46,11 @@ export default async function TopicWiseExamDetailsPage({
     type: "twe",
   });
 
-  const topic = (
-    topicsResult?.data || []
-  ).find(
+  const topics = Array.isArray(topicsResult?.data)
+    ? topicsResult.data
+    : [];
+
+  const topic = topics.find(
     (item) => createSlug(item.subject) === slug
   );
 
@@ -78,27 +61,60 @@ export default async function TopicWiseExamDetailsPage({
     topicId: topic.id,
   });
 
-  const selected = (
-    testsResult?.data || []
-  ).find(
-    (item) => createSlug(item.exam_name) === examSlug
-  );
+  const tests = Array.isArray(testsResult?.data)
+    ? testsResult.data
+    : [];
+
+  const selected = tests.find((item) => {
+    return (
+      String(item.id) === String(examSlug) ||
+      createSlug(item.exam_name || "") === examSlug
+    );
+  });
 
   if (!selected) notFound();
 
-  if (
-    String(selected.access || "").toLowerCase() ===
-    "paid"
-  ) {
-    redirect(
-      `/dashboard/${governmentExamsSlug}/premium-packages`
+  const examId = Number(selected.id);
+
+  if (!Number.isSafeInteger(examId) || examId <= 0) {
+    notFound();
+  }
+
+  const access = String(selected.access ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (access !== "free") {
+    return (
+      <main className="min-h-screen bg-[#f5f9ff] p-6">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-white p-8">
+          <h1 className="text-xl font-black text-[#071f55]">
+            {access === "paid"
+              ? "Premium Exam"
+              : "Exam Access Unavailable"}
+          </h1>
+
+          <p className="mt-3 text-slate-600">
+            {access === "paid"
+              ? "This exam requires premium access."
+              : "Unable to verify access to this exam."}
+          </p>
+
+          <Link
+            href={listHref}
+            className="mt-6 inline-block rounded-xl bg-[#017dc0] px-6 py-3 font-bold text-white"
+          >
+            Back to Exams
+          </Link>
+        </div>
+      </main>
     );
   }
 
   const result = await getTopicWiseExamDetails({
     uid,
     cid,
-    examId: selected.id,
+    examId,
     type: "twe",
     offset: 0,
   });
@@ -107,17 +123,18 @@ export default async function TopicWiseExamDetailsPage({
 
   const exam = result.exam;
 
-  const instructions = Array.isArray(
-    result.instructions
-  )
+  const instructions = Array.isArray(result.instructions)
     ? result.instructions
     : [];
+
+  const startHref =
+    `${root}/test/${slug}/${examId}/start`;
 
   return (
     <main className="min-h-screen bg-[#f5f9ff] py-6">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <Link
-          href={`${root}/test/${slug}`}
+          href={listHref}
           className="font-bold text-blue-700"
         >
           ← Back to Exams
@@ -148,9 +165,8 @@ export default async function TopicWiseExamDetailsPage({
                 <p className="text-xs text-blue-100">
                   {label}
                 </p>
-
                 <p className="mt-2 text-xl font-black">
-                  {value}
+                  {value ?? 0}
                 </p>
               </div>
             ))}
@@ -163,19 +179,28 @@ export default async function TopicWiseExamDetailsPage({
           </h2>
 
           <div className="mt-5 space-y-3">
-            {instructions.map((item, index) => (
-              <p
-                key={index}
-                className="rounded-xl bg-blue-50 p-4 text-sm leading-7 text-slate-600"
-              >
-                {index + 1}. {item.instructions}
+            {instructions.length ? (
+              instructions.map((item, index) => (
+                <p
+                  key={index}
+                  className="rounded-xl bg-blue-50 p-4 text-sm leading-7 text-slate-600"
+                >
+                  {index + 1}.{" "}
+                  {typeof item === "string"
+                    ? item
+                    : item?.instructions ?? ""}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">
+                Read each question carefully before submitting.
               </p>
-            ))}
+            )}
           </div>
 
           <div className="mt-7 flex justify-end">
             <Link
-              href={`${root}/test/${slug}/${examSlug}/start`}
+              href={startHref}
               className="rounded-xl bg-[#017dc0] px-7 py-3 font-bold text-white"
             >
               Start Exam

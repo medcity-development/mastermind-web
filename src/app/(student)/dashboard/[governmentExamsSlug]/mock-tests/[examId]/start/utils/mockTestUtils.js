@@ -56,17 +56,17 @@ export function normalizeAnswer(
    CORRECT ANSWER
 ========================================================= */
 
-export function getCorrectAnswer(
-    question
-) {
+export function getCorrectAnswer(question = {}) {
     return (
-        question?.answer ??
+        question?.answerkey ??
+        question?.answer_key ??
         question?.correct_answer ??
         question?.correctAnswer ??
         question?.right_answer ??
         question?.rightAnswer ??
         question?.correct_option ??
         question?.correctOption ??
+        question?.answer ??
         question?.ans ??
         ""
     );

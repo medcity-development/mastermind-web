@@ -148,113 +148,39 @@ export function getQuestionOptions(question = {}) {
   if (Array.isArray(source)) {
     return source
       .map((item, index) => {
-        const key =
-          answerKey(
-            item && typeof item === "object"
-              ? first(
-                item.key,
-                item.option_key,
-                item.label
-              )
-              : null
-          ) || LETTERS[index];
-
-        return optionData(key, item);
+        const key = answerKey(
+          item && typeof item === "object"
+            ? first(item.key, item.option_key, item.label)
+            : null
+        ) || LETTERS[index];
+        return key ? optionData(key, item) : null;
       })
-      .filter(
-        (option) =>
-          option.text ||
-          option.image ||
-          /<img\b/i.test(option.html)
-      );
+      .filter((option) => option && (option.text || option.image || /<img\b/i.test(option.html)));
   }
 
   if (source && typeof source === "object") {
     return Object.entries(source)
-      .map(([key, value]) =>
-        optionData(
-          answerKey(key) || key.toUpperCase(),
-          value
-        )
-      )
-      .filter(
-        (option) =>
-          option.text ||
-          option.image ||
-          /<img\b/i.test(option.html)
-      );
+      .map(([key, value]) => {
+        const label = answerKey(key) ||
+          (/^\d+$/.test(key) ? LETTERS[Number(key) - 1] : key.toUpperCase());
+        return label ? optionData(label, value) : null;
+      })
+      .filter((option) => option && (option.text || option.image || /<img\b/i.test(option.html)));
   }
 
-  const fields = [
-    [
-      "A",
-      first(
-        question.option_a,
-        question.optionA,
-        question.option1,
-        question.option_1,
-        question.a,
-        question.A,
-        question.answer1
-      ),
-    ],
-    [
-      "B",
-      first(
-        question.option_b,
-        question.optionB,
-        question.option2,
-        question.option_2,
-        question.b,
-        question.B,
-        question.answer2
-      ),
-    ],
-    [
-      "C",
-      first(
-        question.option_c,
-        question.optionC,
-        question.option3,
-        question.option_3,
-        question.c,
-        question.C,
-        question.answer3
-      ),
-    ],
-    [
-      "D",
-      first(
-        question.option_d,
-        question.optionD,
-        question.option4,
-        question.option_4,
-        question.d,
-        question.D,
-        question.answer4
-      ),
-    ],
-    [
-      "E",
-      first(
-        question.option_e,
-        question.optionE,
-        question.option5,
-        question.option_5,
-        question.e,
-        question.E
-      ),
-    ],
-  ];
-
-  return fields
-    .filter(
-      ([, value]) =>
-        value !== null &&
-        value !== undefined &&
-        value !== ""
-    )
-    .map(([key, value]) => optionData(key, value));
+  const collected = new Map();
+  for (const [field, value] of Object.entries(question)) {
+    if (value == null || value === "") continue;
+    const match = field.match(/^(?:option_?([a-z])|option_?(\d+)|answer_?(\d+))$/i);
+    if (!match) continue;
+    const key = match[1]
+      ? match[1].toUpperCase()
+      : LETTERS[Number(match[2] ?? match[3]) - 1];
+    if (key && !collected.has(key)) collected.set(key, optionData(key, value));
+  }
+  return [...collected.values()]
+    .filter((option) => option.text || option.image || /<img\b/i.test(option.html))
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 function savedArray(...values) {
@@ -407,6 +333,9 @@ export function buildQuestionRows({
       const userAnswerKey = answerKey(rawUserAnswer);
 
       const questionCorrect = first(
+        question?.answerkey,
+        question?.answer_key,
+        question?.answer,
         question?.correct_answer,
         question?.correctAnswer,
         question?.answer_key,

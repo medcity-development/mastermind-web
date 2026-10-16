@@ -12,17 +12,9 @@ import {
   getTopicWiseExams,
 } from "@/lib/topicWiseExamHelper";
 
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
-
-import {
-  createSlug,
-} from "@/lib/pscSlug";
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { createSlug } from "@/lib/pscSlug";
 
 import ExamClient from "./components/ExamClient";
 
@@ -37,6 +29,10 @@ export const metadata = {
 };
 
 function positiveId(value) {
+  if (value == null || String(value).trim() === "") {
+    return null;
+  }
+
   const number = Number(value);
 
   return Number.isSafeInteger(number) && number > 0
@@ -86,34 +82,25 @@ export default async function TopicWiseExamStartPage({
     governmentExamsSlug
   );
 
-  if (!config) {
-    notFound();
-  }
+  if (!config) notFound();
 
   const session = await getStudentSession();
 
   const uid = positiveId(session?.uid) || 0;
   const cid = positiveId(config.cid);
 
-  if (!cid) {
-    notFound();
-  }
+  if (!cid) notFound();
 
   const examType = "twe";
 
   const mode =
-    query?.mode === "resume"
-      ? "resume"
-      : "new";
+    query?.mode === "resume" ? "resume" : "new";
 
-  const initialPauseId = positiveId(
-    query?.pauseId
-  );
+  const initialPauseId = positiveId(query?.pauseId);
 
-  const guestAction = [
-    "pause",
-    "submit",
-  ].includes(query?.guestAction)
+  const guestAction = ["pause", "submit"].includes(
+    query?.guestAction
+  )
     ? query.guestAction
     : "";
 
@@ -123,11 +110,20 @@ export default async function TopicWiseExamStartPage({
   const listHref = `${root}/test/${slug}`;
 
   if (!uid) {
+    const params = new URLSearchParams();
+
+    if (mode === "resume" && initialPauseId) {
+      params.set("mode", "resume");
+      params.set("pauseId", String(initialPauseId));
+    }
+
+    if (guestAction) {
+      params.set("guestAction", guestAction);
+    }
+
     const target =
       `${root}/test/${slug}/${examSlug}/start` +
-      (mode === "resume" && initialPauseId
-        ? `?mode=resume&pauseId=${initialPauseId}`
-        : "");
+      (params.size ? `?${params}` : "");
 
     redirect(
       `/login?redirect=${encodeURIComponent(target)}`
@@ -143,7 +139,6 @@ export default async function TopicWiseExamStartPage({
     );
   }
 
-  // Load topic.
   const topicsResult = await getTopicWiseExams({
     uid,
     cid,
@@ -158,11 +153,8 @@ export default async function TopicWiseExamStartPage({
     (item) => createSlug(item.subject) === slug
   );
 
-  if (!topic) {
-    notFound();
-  }
+  if (!topic) notFound();
 
-  // Load exams belonging to this topic.
   const testsResult = await getAllTopicWiseTests({
     uid,
     topicId: topic.id,
@@ -172,23 +164,16 @@ export default async function TopicWiseExamStartPage({
     ? testsResult.data
     : [];
 
-  // IMPORTANT:
-  // Numeric ID and exam-name slug are both supported.
-  //
-  // /world-history/1/start
-  // /world-history/world-history-exam-1/start
+  const requestedId = positiveId(examSlug);
 
-  const selected = tests.find((item) => {
-    const id = String(item.id ?? "");
-    const nameSlug = createSlug(
-      item.exam_name || ""
+  const selected = requestedId
+    ? tests.find(
+      (item) => positiveId(item.id) === requestedId
+    )
+    : tests.find(
+      (item) =>
+        createSlug(item.exam_name || "") === examSlug
     );
-
-    return (
-      id === String(examSlug) ||
-      nameSlug === examSlug
-    );
-  });
 
   if (!selected) {
     return (
@@ -201,22 +186,49 @@ export default async function TopicWiseExamStartPage({
 
   const examId = positiveId(selected.id);
 
-  if (!examId) {
-    notFound();
-  }
+  if (!examId) notFound();
 
-  const access = String(
-    selected.access ?? ""
-  ).trim().toLowerCase();
+  const access = String(selected.access ?? "")
+    .trim()
+    .toLowerCase();
 
-  // Preserve the existing free-exam restriction.
-  // Premium entitlement needs separate backend validation.
+  console.log("TOPIC WISE START ACCESS:", {
+    examId,
+    examName: selected.exam_name,
+    access,
+    mode,
+  });
+
   if (access !== "free") {
     return (
       <ErrorPage
-        message="This exam requires premium access."
+        message={
+          access === "paid"
+            ? "This exam requires premium access."
+            : "Unable to verify access to this exam."
+        }
         href={listHref}
       />
+    );
+  }
+
+  const canonicalPath =
+    `${root}/test/${slug}/${examId}/start`;
+
+  if (String(examSlug) !== String(examId)) {
+    const params = new URLSearchParams();
+
+    if (mode === "resume" && initialPauseId) {
+      params.set("mode", "resume");
+      params.set("pauseId", String(initialPauseId));
+    }
+
+    if (guestAction) {
+      params.set("guestAction", guestAction);
+    }
+
+    redirect(
+      canonicalPath + (params.size ? `?${params}` : "")
     );
   }
 
@@ -237,10 +249,6 @@ export default async function TopicWiseExamStartPage({
     }),
   ]);
 
-  const questions = Array.isArray(paper?.data)
-    ? paper.data
-    : [];
-
   if (!details?.exam) {
     return (
       <ErrorPage
@@ -249,6 +257,10 @@ export default async function TopicWiseExamStartPage({
       />
     );
   }
+
+  const questions = Array.isArray(paper?.data)
+    ? paper.data
+    : [];
 
   if (!questions.length) {
     return (

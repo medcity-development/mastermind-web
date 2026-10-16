@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -7,15 +8,12 @@ import {
     useState,
 } from "react";
 
-import {
-    useRouter,
-} from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import {
     calculateMockResult,
     getAttemptId,
     getDatabaseResult,
-    getExamType,
     getExamTotalMark,
     postJson,
 } from "../utils/mockTestUtils";
@@ -24,103 +22,68 @@ import {
     buildMockAttemptPayload,
     getMockExamTitle,
 } from "../utils/mockAttemptUtils";
-import { clearGuestExamHandoff } from "@/lib/guestExamHandoff";
+
+import {
+    clearGuestExamHandoff,
+} from "@/lib/guestExamHandoff";
 
 export default function useMockExamAttempt({
     uid,
     cid,
     examId,
-    examType,
-
+    examType = "mock",
     exam,
     questions = [],
-
     answersRef,
-
     remainingSeconds,
     currentPage,
-
     initialPauseId = null,
     startTime = 0,
-
     examTitle = "",
-
-    governmentExamsSlug,
+    governmentExamsSlug = "",
     guestAction = "",
-
     stopTimer,
-
     onSavingChange,
     onSubmittedChange,
     onPausedChange,
 }) {
-    const router =
-        useRouter();
+    const router = useRouter();
 
-    /* =======================================================
+    /* =========================================
        REFS
-    ======================================================= */
+    ========================================= */
 
-    const requestRef =
-        useRef(false);
+    const requestRef = useRef(false);
+    const timeoutHandledRef = useRef(false);
 
-    const timeoutHandledRef =
-        useRef(false);
-
-    /* =======================================================
+    /* =========================================
        STATE
-    ======================================================= */
+    ========================================= */
 
-    const [
-        saving,
-        setSaving,
-    ] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
 
-    const [
-        submitted,
-        setSubmitted,
-    ] = useState(false);
-
-    const [
-        pauseId,
-        setPauseId,
-    ] = useState(
+    const [pauseId, setPauseId] = useState(
         initialPauseId || null
     );
 
-    const [
-        isPaused,
-        setIsPaused,
-    ] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
 
-    const [
-        saveMessage,
-        setSaveMessage,
-    ] = useState("");
+    const [saveMessage, setSaveMessage] = useState("");
+    const [saveError, setSaveError] = useState("");
 
-    const [
-        saveError,
-        setSaveError,
-    ] = useState("");
+    const [resultModalOpen, setResultModalOpen] =
+        useState(false);
 
-    const [
-        resultModalOpen,
-        setResultModalOpen,
-    ] = useState(false);
+    const [submittedResult, setSubmittedResult] =
+        useState(null);
 
-    const [
-        submittedResult,
-        setSubmittedResult,
-    ] = useState(null);
+    const [resultLoading, setResultLoading] =
+        useState(false);
 
-    const [
-        resultLoading,
-        setResultLoading,
-    ] = useState(false);
-
-    /* =======================================================
-       SYNC EXTERNAL STATES
-    ======================================================= */
+    /* =========================================
+       UPDATE STATES
+    ========================================= */
 
     const updateSaving = useCallback(
         (value) => {
@@ -146,53 +109,30 @@ export default function useMockExamAttempt({
         [onPausedChange]
     );
 
-    /* =======================================================
-       CALCULATE
-    ======================================================= */
+    /* =========================================
+       CALCULATE RESULT
+    ========================================= */
 
-    const getCurrentResult =
-        useCallback(
-            () =>
-                calculateMockResult({
-                    questions,
-
-                    answers:
-                        answersRef?.current ||
-                        {},
-                }),
-            [
+    const getCurrentResult = useCallback(
+        () =>
+            calculateMockResult({
                 questions,
-                answersRef,
-            ]
-        );
+                answers: answersRef?.current || {},
+            }),
+        [questions, answersRef]
+    );
 
-    /* =======================================================
-       PAYLOAD
-    ======================================================= */
+    /* =========================================
+       BUILD ATTEMPT PAYLOAD
+    ========================================= */
 
-    const buildPayload =
-        useCallback(
-            ({
-                examStatus,
-                result,
-                completedAt,
-            }) =>
-                buildMockAttemptPayload({
-                    cid,
-                    examId,
-                    examType,
-
-                    exam,
-                    questions,
-
-                    remainingSeconds,
-
-                    startTime,
-                    completedAt,
-                    examStatus,
-                    result,
-                }),
-            [
+    const buildPayload = useCallback(
+        ({
+            examStatus,
+            result,
+            completedAt,
+        }) =>
+            buildMockAttemptPayload({
                 cid,
                 examId,
                 examType,
@@ -200,438 +140,404 @@ export default function useMockExamAttempt({
                 questions,
                 remainingSeconds,
                 startTime,
-            ]
-        );
+                completedAt,
+                examStatus,
+                result,
+            }),
+        [
+            cid,
+            examId,
+            examType,
+            exam,
+            questions,
+            remainingSeconds,
+            startTime,
+        ]
+    );
 
-    /* =======================================================
-       FETCH SAVED DB RESULT
-    ======================================================= */
+    /* =========================================
+       FETCH SAVED RESULT
+    ========================================= */
 
-    const fetchDatabaseResult =
-        useCallback(
-            async (
-                savedAttemptId
-            ) => {
-                setResultLoading(
-                    true
+    const fetchDatabaseResult = useCallback(
+        async (savedAttemptId) => {
+            setResultLoading(true);
+
+            try {
+                const response = await postJson(
+                    "/api/exam-attempt/analytics-details",
+                    {
+                        cid,
+                        id: savedAttemptId,
+                        exam_type: examType,
+                    }
                 );
 
-                try {
-                    const response =
-                        await postJson(
-                            "/api/exam-attempt/analytics-details",
-                            {
-                                cid,
+                const databaseResult =
+                    getDatabaseResult(response);
 
-                                id:
-                                    savedAttemptId,
+                if (!databaseResult) {
+                    throw new Error(
+                        "Saved result was not returned."
+                    );
+                }
 
-                                exam_type:
-                                    examType,
-                            }
-                        );
+                return databaseResult;
+            } finally {
+                setResultLoading(false);
+            }
+        },
+        [cid, examType]
+    );
 
-                    const databaseResult =
-                        getDatabaseResult(
-                            response
-                        );
+    /* =========================================
+       SAVE PAUSE
+    ========================================= */
 
-                    if (
-                        !databaseResult
-                    ) {
-                        throw new Error(
-                            "Saved result was not returned."
-                        );
+    const savePause = useCallback(async () => {
+        if (
+            requestRef.current ||
+            submitted ||
+            remainingSeconds <= 0
+        ) {
+            return;
+        }
+
+        requestRef.current = true;
+        updateSaving(true);
+
+        setSaveError("");
+        setSaveMessage("");
+
+        try {
+            const calculated = getCurrentResult();
+
+            const payload = buildPayload({
+                examStatus: "pause",
+                result: calculated,
+            });
+
+            let savedPauseId = pauseId;
+
+            if (savedPauseId) {
+                await postJson(
+                    "/api/exam-attempt/update",
+                    {
+                        ...payload,
+                        pauseid: String(savedPauseId),
                     }
+                );
+            } else {
+                const created = await postJson(
+                    "/api/exam-attempt/create",
+                    payload
+                );
 
-                    return databaseResult;
-                } finally {
-                    setResultLoading(
-                        false
+                savedPauseId = getAttemptId(created);
+
+                if (!savedPauseId) {
+                    throw new Error(
+                        "Pause ID was not returned."
                     );
                 }
-            },
-            [
-                cid,
-                examType,
-            ]
-        );
 
-    /* =======================================================
-       PAUSE
-    ======================================================= */
+                setPauseId(savedPauseId);
+            }
 
-    const savePause =
-        useCallback(
-            async () => {
-                if (
-                    requestRef.current ||
-                    submitted ||
-                    remainingSeconds <= 0
-                ) {
-                    return;
-                }
+            try {
+                localStorage.setItem(
+                    `exam_draft_${uid}_${cid}_${examType}_${examId}`,
+                    JSON.stringify({
+                        pauseId: savedPauseId,
+                        answers: answersRef?.current || {},
+                        remainingSeconds,
+                        currentPage,
+                    })
+                );
+            } catch (storageError) {
+                console.warn(
+                    "Unable to save local exam draft:",
+                    storageError
+                );
+            }
 
-                try {
-                    requestRef.current =
-                        true;
+            updatePaused(true);
+            clearGuestExamHandoff();
 
-                    updateSaving(
-                        true
-                    );
+            setSaveMessage(
+                "Exam paused successfully."
+            );
+        } catch (error) {
+            console.error(
+                "PAUSE MOCK TEST:",
+                error
+            );
 
-                    setSaveError("");
-                    setSaveMessage("");
+            setSaveError(
+                error?.message ||
+                "Unable to pause exam."
+            );
+        } finally {
+            requestRef.current = false;
+            updateSaving(false);
+        }
+    }, [
+        submitted,
+        remainingSeconds,
+        getCurrentResult,
+        buildPayload,
+        pauseId,
+        answersRef,
+        uid,
+        cid,
+        examType,
+        examId,
+        currentPage,
+        updatePaused,
+        updateSaving,
+    ]);
 
-                    const calculated =
-                        getCurrentResult();
+    /* =========================================
+       FINISH EXAM
+    ========================================= */
 
-                    const payload =
+    const finishExam = useCallback(
+        async ({ timeout = false } = {}) => {
+            if (
+                requestRef.current ||
+                submitted
+            ) {
+                return;
+            }
+
+            requestRef.current = true;
+            updateSaving(true);
+
+            setSaveError("");
+            setSaveMessage("");
+
+            try {
+                /* =================================
+                   CALCULATE SCORE
+                ================================= */
+
+                const calculated =
+                    getCurrentResult();
+
+                /* =================================
+                   GET OR CREATE ATTEMPT ID
+                ================================= */
+
+                let finalPauseId = pauseId;
+
+                if (!finalPauseId) {
+                    const createPayload =
                         buildPayload({
-                            examStatus:
-                                "pause",
-
-                            result:
-                                calculated,
+                            examStatus: "pause",
+                            result: calculated,
                         });
 
-                    let savedPauseId = pauseId;
-                    if (pauseId) {
+                    const createResult =
                         await postJson(
-                            "/api/exam-attempt/update",
-                            {
-                                ...payload,
-
-                                pauseid:
-                                    pauseId,
-                            }
+                            "/api/exam-attempt/create",
+                            createPayload
                         );
-                    } else {
-                        const created =
-                            await postJson(
-                                "/api/exam-attempt/create",
-                                payload
-                            );
 
-                        const createdId =
-                            getAttemptId(
-                                created
-                            );
+                    finalPauseId =
+                        getAttemptId(createResult);
 
-                        if (!createdId) {
-                            throw new Error(
-                                "Pause id was not returned."
-                            );
-                        }
-
-                        setPauseId(
-                            createdId
+                    if (!finalPauseId) {
+                        throw new Error(
+                            "Saved attempt ID was not returned."
                         );
-                        savedPauseId = createdId;
                     }
 
-                    try {
-                        localStorage.setItem(
-                            `exam_draft_${uid}_${cid}_${examType}_${examId}`,
-                            JSON.stringify({
-                                pauseId: savedPauseId,
-                                answers: answersRef?.current || {},
-                                remainingSeconds,
-                                currentPage,
-                            })
-                        );
-                    } catch (error) {
-                        console.warn("Save mock exam resume draft:", error);
-                    }
+                    setPauseId(finalPauseId);
+                }
 
-                    updatePaused(
-                        true
-                    );
+                /* =================================
+                   FINISH SAVED ATTEMPT
+                ================================= */
+
+                const finalPayload =
+                    buildPayload({
+                        examStatus: "finish",
+                        result: calculated,
+                        completedAt: Date.now(),
+                    });
+
+                await postJson(
+                    "/api/exam-attempt/update",
+                    {
+                        ...finalPayload,
+                        pauseid: String(finalPauseId),
+                    }
+                );
+
+                /* =================================
+                   SUBMISSION SUCCESSFUL
+                ================================= */
+
+                updateSubmitted(true);
+                updatePaused(false);
+
+                stopTimer?.();
+
+                try {
                     clearGuestExamHandoff();
-
-                    setSaveMessage(
-                        "Exam paused successfully."
+                } catch (storageError) {
+                    console.warn(
+                        "Unable to clear guest handoff:",
+                        storageError
                     );
-                } catch (
-                error
-                ) {
-                    console.error(
-                        "PAUSE MOCK TEST:",
-                        error
-                    );
-
-                    setSaveError(
-                        error?.message ||
-                        "Unable to pause exam."
-                    );
-                } finally {
-                    requestRef.current =
-                        false;
-
-                    updateSaving(
-                        false
-                    );
-                }
-            },
-            [
-                submitted,
-                remainingSeconds,
-                getCurrentResult,
-                buildPayload,
-                pauseId,
-                answersRef,
-                uid,
-                cid,
-                examType,
-                examId,
-                currentPage,
-                updatePaused,
-                updateSaving,
-            ]
-        );
-
-    /* =======================================================
-       FINISH EXAM
-    ======================================================= */
-
-    const finishExam =
-        useCallback(
-            async ({
-                timeout = false,
-            } = {}) => {
-                if (
-                    requestRef.current ||
-                    submitted
-                ) {
-                    return;
-                }
-
-                if (
-                    !timeout &&
-                    remainingSeconds <= 0
-                ) {
-                    return;
                 }
 
                 try {
-                    requestRef.current =
-                        true;
-
-                    updateSaving(
-                        true
+                    localStorage.removeItem(
+                        `exam_draft_${uid}_${cid}_${examType}_${examId}`
                     );
+                } catch (storageError) {
+                    console.warn(
+                        "Unable to clear exam draft:",
+                        storageError
+                    );
+                }
 
-                    setSaveError("");
-                    setSaveMessage("");
+                /* =================================
+                   LOCAL RESULT
+                ================================= */
 
-                    /* ===============================================
-                       CALCULATE CURRENT RESULT
-                    =============================================== */
+                const localResult = {
+                    id: finalPauseId,
+                    pauseid: finalPauseId,
+                    exam_id: examId,
+                    exam_type: examType,
+                    exam_status: "finish",
 
-                    const calculated =
-                        getCurrentResult();
+                    exam_name: getMockExamTitle({
+                        exam,
+                        fallback: examTitle,
+                    }),
 
-                    /* ===============================================
-                       ENSURE ATTEMPT ID
-                    =============================================== */
+                    total_questions: questions.length,
 
-                    let finalPauseId =
-                        pauseId;
+                    total_mark: getExamTotalMark(
+                        exam,
+                        questions.length
+                    ),
 
-                    if (
-                        !finalPauseId
-                    ) {
-                        const createPayload =
-                            buildPayload({
-                                examStatus:
-                                    "pause",
+                    total_attempted:
+                        calculated.totalAttempted,
 
-                                result:
-                                    calculated,
-                            });
+                    total_correct:
+                        calculated.totalCorrect,
 
-                        const createResult =
-                            await postJson(
-                                "/api/exam-attempt/create",
-                                createPayload
-                            );
+                    total_wrong:
+                        calculated.totalWrong,
 
-                        finalPauseId =
-                            getAttemptId(
-                                createResult
-                            );
+                    user_score:
+                        calculated.userScore,
 
-                        if (
-                            !finalPauseId
-                        ) {
-                            throw new Error(
-                                "Saved attempt id was not returned."
-                            );
-                        }
+                    minus_mark:
+                        calculated.minusMark,
+                };
 
-                        setPauseId(
+                /* =================================
+                   GET DATABASE RESULT
+                ================================= */
+
+                let resultForModal = localResult;
+                let resultDetailsLoaded = true;
+
+                try {
+                    const databaseResult =
+                        await fetchDatabaseResult(
                             finalPauseId
                         );
-                    }
 
-                    /* ===============================================
-                       FINAL UPDATE
-                    =============================================== */
+                    resultForModal = {
+                        ...localResult,
+                        ...databaseResult,
 
-                    const finalPayload =
-                        buildPayload({
-                            examStatus:
-                                "finish",
-
-                            result:
-                                calculated,
-
-                            completedAt:
-                                Date.now(),
-                        });
-
-                    const updatePayload = {
-                        ...finalPayload,
-
-                        pauseid:
-                            String(
-                                finalPauseId
-                            ),
-                    };
-
-                    console.log(
-                        "FINAL MOCK RESULT PAYLOAD:",
-                        updatePayload
-                    );
-
-                    await postJson(
-                        "/api/exam-attempt/update",
-                        updatePayload
-                    );
-                    clearGuestExamHandoff();
-
-                    /* ===============================================
-                       STOP EXAM
-                    =============================================== */
-
-                    updateSubmitted(
-                        true
-                    );
-
-                    updatePaused(
-                        false
-                    );
-
-                    stopTimer?.();
-
-                    /* ===============================================
-                       READ SAVED RESULT
-                    =============================================== */
-
-                    const localResult = {
+                        // Preserve the actual saved
+                        // attempt ID for navigation.
                         id: finalPauseId,
-                        exam_id: examId,
-                        exam_type: examType,
-                        exam_name: getMockExamTitle({
-                            exam,
-                            fallback: examTitle,
-                        }),
-                        total_questions: questions.length,
-                        total_mark: getExamTotalMark(exam, questions.length),
-                        total_attempted: calculated.totalAttempted,
-                        total_correct: calculated.totalCorrect,
-                        total_wrong: calculated.totalWrong,
-                        user_score: calculated.userScore,
-                        minus_mark: calculated.minusMark,
+                        pauseid: finalPauseId,
                     };
-                    let resultForModal = localResult;
-                    let resultDetailsLoaded = true;
-                    try {
-                        resultForModal = {
-                            ...localResult,
-                            ...await fetchDatabaseResult(finalPauseId),
-                        };
-                    } catch (resultError) {
-                        console.error(
-                            "MOCK TEST SAVED BUT RESULT DETAILS COULD NOT BE LOADED:",
-                            resultError
-                        );
-                        resultDetailsLoaded = false;
-                        setSaveMessage(
-                            "Exam submitted. Showing the calculated result; saved analytics details are unavailable."
-                        );
-                    }
-
-                    setSubmittedResult(resultForModal);
-
-                    if (resultDetailsLoaded) {
-                        setSaveMessage(
-                            timeout
-                                ? "Time is over. Exam submitted automatically."
-                                : "Exam submitted successfully."
-                        );
-                    }
-
-                    setResultModalOpen(
-                        true
-                    );
-                } catch (
-                error
-                ) {
+                } catch (resultError) {
                     console.error(
-                        "FINISH MOCK TEST:",
-                        error
+                        "RESULT DETAILS ERROR:",
+                        resultError
                     );
 
-                    if (timeout) {
-                        timeoutHandledRef.current =
-                            false;
-                    }
+                    resultDetailsLoaded = false;
 
-                    setSaveError(
-                        error?.message ||
-                        "Unable to submit exam."
-                    );
-                } finally {
-                    requestRef.current =
-                        false;
-
-                    updateSaving(
-                        false
+                    setSaveMessage(
+                        "Exam submitted. Showing the calculated result; saved analytics details are unavailable."
                     );
                 }
-            },
-            [
-                submitted,
-                remainingSeconds,
 
-                getCurrentResult,
+                /* =================================
+                   SHOW RESULT MODAL
+                ================================= */
 
-                pauseId,
+                setSubmittedResult(resultForModal);
 
-                buildPayload,
-                fetchDatabaseResult,
+                if (resultDetailsLoaded) {
+                    setSaveMessage(
+                        timeout
+                            ? "Time is over. Exam submitted automatically."
+                            : "Exam submitted successfully."
+                    );
+                }
 
-                stopTimer,
-                exam,
-                examId,
-                examTitle,
-                examType,
-                questions.length,
-                updatePaused,
-                updateSaving,
-                updateSubmitted,
-            ]
-        );
+                setResultModalOpen(true);
+            } catch (error) {
+                console.error(
+                    "FINISH MOCK TEST:",
+                    error
+                );
 
-    /* =======================================================
-       TIMER AUTO SUBMIT
-    ======================================================= */
+                if (timeout) {
+                    timeoutHandledRef.current = false;
+                }
+
+                setSaveError(
+                    error?.message ||
+                    "Unable to submit exam."
+                );
+            } finally {
+                requestRef.current = false;
+                updateSaving(false);
+            }
+        },
+        [
+            submitted,
+            getCurrentResult,
+            pauseId,
+            buildPayload,
+            fetchDatabaseResult,
+            stopTimer,
+            exam,
+            examId,
+            examTitle,
+            examType,
+            questions.length,
+            uid,
+            cid,
+            updatePaused,
+            updateSaving,
+            updateSubmitted,
+        ]
+    );
+
+    /* =========================================
+       AUTO SUBMIT WHEN TIMER ENDS
+    ========================================= */
 
     useEffect(() => {
         if (
-            remainingSeconds !==
-            0 ||
+            remainingSeconds !== 0 ||
             submitted ||
             saving ||
             isPaused ||
@@ -640,22 +546,21 @@ export default function useMockExamAttempt({
             return;
         }
 
-        if (
-            !exam ||
-            !questions.length
-        ) {
+        if (!exam || !questions.length) {
             return;
         }
 
-        timeoutHandledRef.current =
-            true;
+        timeoutHandledRef.current = true;
 
         const timer = window.setTimeout(() => {
             void finishExam({
                 timeout: true,
             });
         }, 0);
-        return () => window.clearTimeout(timer);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
     }, [
         remainingSeconds,
         submitted,
@@ -666,9 +571,9 @@ export default function useMockExamAttempt({
         finishExam,
     ]);
 
-    /* =======================================================
-       PAUSE / RESUME
-    ======================================================= */
+    /* =========================================
+       PAUSE / RESUME BUTTON
+    ========================================= */
 
     function handlePause() {
         if (
@@ -680,9 +585,7 @@ export default function useMockExamAttempt({
         }
 
         if (isPaused) {
-            updatePaused(
-                false
-            );
+            updatePaused(false);
 
             setSaveError("");
 
@@ -693,93 +596,88 @@ export default function useMockExamAttempt({
             return;
         }
 
-        savePause();
+        void savePause();
     }
 
-    /* =======================================================
-       SUBMIT
-    ======================================================= */
+    /* =========================================
+       SUBMIT BUTTON
+    ========================================= */
 
     function handleSubmit() {
-        finishExam({
+        if (
+            saving ||
+            submitted ||
+            requestRef.current
+        ) {
+            return;
+        }
+
+        void finishExam({
             timeout: false,
         });
     }
 
-    /* =======================================================
-       RESULT CLOSE
-    ======================================================= */
+    /* =========================================
+       CLOSE RESULT MODAL
+    ========================================= */
 
     function handleResultClose() {
-        setResultModalOpen(
-            false
-        );
+        // Close only.
+        // Do not navigate automatically.
+        setResultModalOpen(false);
+    }
 
-        if (guestAction === "submit") {
-            router.replace(`/dashboard/${governmentExamsSlug}`);
+    /* =========================================
+       VIEW EXAM ANALYSIS
+    ========================================= */
+
+    function handleViewAnalysis() {
+        const savedAttemptId =
+            pauseId ||
+            getAttemptId(submittedResult);
+
+        if (!savedAttemptId) {
+            setSaveError(
+                "Saved attempt ID is missing. Unable to open exam analysis."
+            );
             return;
         }
-
-        const savedAttemptId =
-            getAttemptId(
-                submittedResult
-            ) ??
-            pauseId;
-
-        const savedExamType =
-            getExamType(
-                submittedResult
-            ) ||
-            examType;
 
         const resolvedExamTitle =
             getMockExamTitle({
                 exam,
                 submittedResult,
-                fallback:
-                    examTitle,
+                fallback: examTitle,
             });
-
-        if (
-            !savedAttemptId ||
-            !savedExamType
-        ) {
-            router.replace(
-                `/dashboard/${governmentExamsSlug}/exam-analysis`
-            );
-
-            return;
-        }
 
         const params =
             new URLSearchParams({
-                attemptId:
-                    String(
-                        savedAttemptId
-                    ),
+                attemptId: String(
+                    savedAttemptId
+                ),
 
-                examType:
-                    savedExamType,
+                examType: "mock",
 
                 ...(resolvedExamTitle
                     ? {
-                        title:
-                            resolvedExamTitle,
+                        title: resolvedExamTitle,
                     }
                     : {}),
             });
 
-        router.replace(
-            `/dashboard/${governmentExamsSlug}/exam-analysis?${params.toString()}`
-        );
+        const analysisPath =
+            `/dashboard/${governmentExamsSlug}` +
+            `/exam-analysis?${params.toString()}`;
+
+        setSaveError("");
+        setResultModalOpen(false);
+
+        router.push(analysisPath);
     }
 
-    function handleViewAnalysis() {
-        setResultModalOpen(false);
-        router.replace(
-            `/dashboard/${governmentExamsSlug}/exam-attempted`
-        );
-    }
+    /* =========================================
+       RETURN
+    ========================================= */
 
     return {
         saving,
@@ -797,6 +695,7 @@ export default function useMockExamAttempt({
 
         handlePause,
         handleSubmit,
+
         handleResultClose,
         handleViewAnalysis,
 

@@ -1,7 +1,6 @@
-import {
-  notFound,
-  redirect,
-} from "next/navigation";
+
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 
 import {
   getAllTopicWiseTests,
@@ -10,14 +9,8 @@ import {
   getTopicWiseExams,
 } from "@/lib/topicWiseExamHelper";
 
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
-
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
 import { createSlug } from "@/lib/pscSlug";
 
 import ExamClient from "./components/ExamClient";
@@ -31,6 +24,40 @@ export const metadata = {
     follow: false,
   },
 };
+
+function positiveId(value) {
+  const number = Number(value);
+
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : null;
+}
+
+function ErrorPage({ message, href }) {
+  return (
+    <main className="min-h-screen bg-[#f5f9ff] p-6">
+      <div
+        role="alert"
+        className="mx-auto max-w-2xl rounded-2xl border border-red-200 bg-white p-8"
+      >
+        <h1 className="text-xl font-black text-red-600">
+          Unable to Open Exam
+        </h1>
+
+        <p className="mt-3 text-slate-600">
+          {message}
+        </p>
+
+        <Link
+          href={href}
+          className="mt-6 inline-block rounded-xl bg-[#017dc0] px-6 py-3 font-bold text-white"
+        >
+          Back to Exams
+        </Link>
+      </div>
+    </main>
+  );
+}
 
 export default async function TopicWiseExamStartPage({
   params,
@@ -52,88 +79,125 @@ export default async function TopicWiseExamStartPage({
 
   const session = await getStudentSession();
 
-  const uid = Number(session?.uid) || 0;
-  const cid = Number(config.cid);
+  const uid = positiveId(session?.uid) || 0;
+  const cid = positiveId(config.cid);
+
+  if (!cid) notFound();
+
   const examType = "twe";
 
   const mode =
-    query?.mode === "resume"
-      ? "resume"
-      : "new";
+    query?.mode === "resume" ? "resume" : "new";
 
-  const pauseId = Number(query?.pauseId);
+  const initialPauseId = positiveId(query?.pauseId);
 
-  const initialPauseId =
-    Number.isSafeInteger(pauseId) && pauseId > 0
-      ? pauseId
-      : null;
+  const guestAction =
+    ["pause", "submit"].includes(query?.guestAction)
+      ? query.guestAction
+      : "";
 
-  const guestAction = [
-    "pause",
-    "submit",
-  ].includes(query?.guestAction)
-    ? query.guestAction
-    : "";
+  const root =
+    `/government-exams-coaching/${governmentExamsSlug}/topic-wise-exams`;
 
+  const listHref = `${root}/test/${slug}`;
+
+  // Guests can start free exams.
+  // Only resuming an existing server-side attempt requires login.
   if (mode === "resume" && !uid) {
     const search = new URLSearchParams({
-      mode,
-
+      mode: "resume",
       ...(initialPauseId
         ? { pauseId: String(initialPauseId) }
         : {}),
-
-      ...(guestAction
-        ? { guestAction }
-        : {}),
+      ...(guestAction ? { guestAction } : {}),
     });
 
     const target =
-      `/government-exams-coaching/${governmentExamsSlug}` +
-      `/topic-wise-exams/test/${slug}/${examSlug}/start?${search}`;
+      `${root}/test/${slug}/${examSlug}/start?${search}`;
 
     redirect(
       `/login?redirect=${encodeURIComponent(target)}`
     );
   }
 
+  if (mode === "resume" && !initialPauseId) {
+    return (
+      <ErrorPage
+        message="The resume link has no valid saved attempt ID."
+        href={listHref}
+      />
+    );
+  }
+
+  // Load topic.
   const topicsResult = await getTopicWiseExams({
     uid,
     cid,
     type: examType,
   });
 
-  const topic = (
-    topicsResult?.data || []
-  ).find(
+  const topics = Array.isArray(topicsResult?.data)
+    ? topicsResult.data
+    : [];
+
+  const topic = topics.find(
     (item) => createSlug(item.subject) === slug
   );
 
   if (!topic) notFound();
 
+  // Load all exams in this topic.
   const testsResult = await getAllTopicWiseTests({
     uid,
     topicId: topic.id,
   });
 
-  const selected = (
-    testsResult?.data || []
-  ).find(
-    (item) => createSlug(item.exam_name) === examSlug
-  );
+  const tests = Array.isArray(testsResult?.data)
+    ? testsResult.data
+    : [];
 
-  if (!selected) notFound();
+  // Support numeric IDs and legacy exam-name slugs.
+  const selected = tests.find((item) => {
+    const id = String(item.id ?? "");
+    const nameSlug = createSlug(item.exam_name || "");
 
-  if (
-    String(selected.access || "").toLowerCase() ===
-    "paid"
-  ) {
-    redirect(
-      `/dashboard/${governmentExamsSlug}/premium-packages`
+    return (
+      id === String(examSlug) ||
+      nameSlug === examSlug
+    );
+  });
+
+  if (!selected) {
+    return (
+      <ErrorPage
+        message="The requested exam was not found in this topic."
+        href={listHref}
+      />
     );
   }
 
-  const examId = selected.id;
+  const examId = positiveId(selected.id);
+
+  if (!examId) notFound();
+
+  const access = String(selected.access ?? "")
+    .trim()
+    .toLowerCase();
+
+  // Do not allow unverified access.
+  // Premium entitlement requires backend validation.
+  if (access !== "free") {
+    return (
+      <ErrorPage
+        message={
+          access === "paid"
+            ? "This exam requires premium access."
+            : "Unable to verify access to this exam."
+        }
+        href={listHref}
+      />
+    );
+  }
 
   const [details, paper] = await Promise.all([
     getTopicWiseExamDetails({
@@ -143,7 +207,6 @@ export default async function TopicWiseExamStartPage({
       type: examType,
       offset: 0,
     }),
-
     getTopicWiseExamQuestions({
       uid,
       cid,
@@ -158,29 +221,37 @@ export default async function TopicWiseExamStartPage({
 
   if (!details?.exam || !questions.length) {
     return (
-      <p role="alert" className="p-6 text-red-700">
-        Unable to load the exam. Refresh and try again.
-      </p>
+      <ErrorPage
+        message="The exam questions could not be loaded. Please refresh and try again."
+        href={listHref}
+      />
     );
   }
 
+  const exam = {
+    ...details.exam,
+    id: examId,
+    total_minutes:
+      Number(details.exam.total_minutes) || 0,
+  };
+
   return (
     <ExamClient
-      key={`${examId}-${uid}-${mode}-${guestAction}`}
-      exam={{
-        ...details.exam,
-        id: examId,
-        total_minutes:
-          Number(details.exam.total_minutes) || 0,
-      }}
+      key={`${examId}-${uid}-${mode}-${initialPauseId || "new"}-${guestAction}`}
+      exam={exam}
       examId={examId}
       questions={questions}
-      imagePath={paper.imagePath || ""}
+      imagePath={
+        paper?.imagePath ||
+        paper?.img_path ||
+        paper?.image_path ||
+        ""
+      }
       uid={uid}
       cid={cid}
       examType={examType}
       slug={slug}
-      examSlug={examSlug}
+      examSlug={String(examId)}
       governmentExamsSlug={governmentExamsSlug}
       mode={mode}
       initialPauseId={initialPauseId}

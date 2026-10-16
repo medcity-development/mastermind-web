@@ -440,48 +440,15 @@ export default function ExamAnalysisClient(props) {
         record.correct_answers,
     });
 
-    const backendMinusMark = numberOrNull(
-      record.minus_mark
-    );
-
-    const calculatedMinusMark = numberOrNull(
-      calculated.minusMark
-    );
-
-    const minusMark =
-      backendMinusMark !== null &&
-        backendMinusMark !== 0
-        ? Math.abs(backendMinusMark)
-        : calculatedMinusMark !== null
-          ? Math.abs(calculatedMinusMark)
-          : backendMinusMark !== null
-            ? 0
-            : null;
-
+    // The shared calculator applies Android rounding to saved counts.
+    // Do not override its result with stale backend score fields.
     return {
-      score: first(
-        record.user_score,
-        record.score,
-        calculated.score
-      ),
-      total: first(
-        record.total_mark,
-        record.total_marks,
-        calculated.totalMark
-      ),
-      attempted: first(
-        record.total_attempted,
-        calculated.attempted
-      ),
-      correct: first(
-        record.total_correct,
-        calculated.correct
-      ),
-      wrong: first(
-        record.total_wrong,
-        calculated.wrong
-      ),
-      minusMark,
+      score: calculated.score,
+      total: calculated.totalMark,
+      attempted: calculated.attempted,
+      correct: calculated.correct,
+      wrong: calculated.wrong,
+      minusMark: calculated.minusMark,
     };
   }, [record]);
 

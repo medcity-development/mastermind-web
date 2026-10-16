@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import {
   getAllTopicWiseTests,
@@ -8,18 +8,9 @@ import {
   getTopicWiseExams,
 } from "@/lib/topicWiseExamHelper";
 
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
-
-import {
-  createSlug,
-  formatSlug,
-} from "@/lib/pscSlug";
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { createSlug, formatSlug } from "@/lib/pscSlug";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +20,41 @@ export async function generateMetadata({ params }) {
   return {
     title: `${formatSlug(examSlug)} | MasterMind Academy`,
   };
+}
+
+function positiveId(value) {
+  if (value == null || String(value).trim() === "") {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : null;
+}
+
+function MessagePage({ title, message, href }) {
+  return (
+    <main className="min-h-screen bg-[#f5f9ff] p-6">
+      <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-white p-8">
+        <h1 className="text-xl font-black text-[#071f55]">
+          {title}
+        </h1>
+
+        <p className="mt-3 text-slate-600">
+          {message}
+        </p>
+
+        <Link
+          href={href}
+          className="mt-6 inline-block rounded-xl bg-[#017dc0] px-6 py-3 font-bold text-white"
+        >
+          Back to Exams
+        </Link>
+      </div>
+    </main>
+  );
 }
 
 export default async function TopicWiseExamDetailsPage({
@@ -44,14 +70,14 @@ export default async function TopicWiseExamDetailsPage({
     governmentExamsSlug
   );
 
-  if (!config) {
-    notFound();
-  }
+  if (!config) notFound();
 
   const session = await getStudentSession();
 
-  const uid = Number(session?.uid) || 0;
-  const cid = Number(config.cid);
+  const uid = positiveId(session?.uid) || 0;
+  const cid = positiveId(config.cid);
+
+  if (!cid) notFound();
 
   const root =
     `/dashboard/${governmentExamsSlug}/topic-wise-exams`;
@@ -72,9 +98,7 @@ export default async function TopicWiseExamDetailsPage({
     (item) => createSlug(item.subject) === slug
   );
 
-  if (!topic) {
-    notFound();
-  }
+  if (!topic) notFound();
 
   const testsResult = await getAllTopicWiseTests({
     uid,
@@ -85,59 +109,56 @@ export default async function TopicWiseExamDetailsPage({
     ? testsResult.data
     : [];
 
-  // Supports both:
-  // /world-history/1
-  // /world-history/world-history-exam-1
+  const requestedId = positiveId(examSlug);
 
-  const selected = tests.find((item) => {
-    const id = String(item.id ?? "");
-    const nameSlug = createSlug(
-      item.exam_name || ""
+  const selected = requestedId
+    ? tests.find(
+      (item) => positiveId(item.id) === requestedId
+    )
+    : tests.find(
+      (item) =>
+        createSlug(item.exam_name || "") === examSlug
     );
 
-    return (
-      id === String(examSlug) ||
-      nameSlug === examSlug
-    );
+  if (!selected) notFound();
+
+  const examId = positiveId(selected.id);
+
+  if (!examId) notFound();
+
+  const canonicalHref =
+    `${root}/test/${slug}/${examId}`;
+
+  if (String(examSlug) !== String(examId)) {
+    redirect(canonicalHref);
+  }
+
+  const access = String(selected.access ?? "")
+    .trim()
+    .toLowerCase();
+
+  console.log("TOPIC WISE SELECTED EXAM:", {
+    requestedSlug: examSlug,
+    examId,
+    examName: selected.exam_name,
+    access,
   });
-
-  if (!selected) {
-    notFound();
-  }
-
-  const examId = Number(selected.id);
-
-  if (
-    !Number.isSafeInteger(examId) ||
-    examId <= 0
-  ) {
-    notFound();
-  }
-
-  const access = String(
-    selected.access ?? ""
-  ).trim().toLowerCase();
 
   if (access !== "free") {
     return (
-      <main className="min-h-screen bg-[#f5f9ff] p-6">
-        <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-white p-8">
-          <h1 className="text-xl font-bold text-[#071f55]">
-            Premium Exam
-          </h1>
-
-          <p className="mt-3 text-slate-600">
-            This exam requires premium access.
-          </p>
-
-          <Link
-            href={listHref}
-            className="mt-6 inline-block rounded-xl bg-[#017dc0] px-6 py-3 font-bold text-white"
-          >
-            Back to Exams
-          </Link>
-        </div>
-      </main>
+      <MessagePage
+        title={
+          access === "paid"
+            ? "Premium Exam"
+            : "Exam Access Unavailable"
+        }
+        message={
+          access === "paid"
+            ? "This exam requires premium access."
+            : "Unable to verify access to this exam."
+        }
+        href={listHref}
+      />
     );
   }
 
@@ -150,20 +171,22 @@ export default async function TopicWiseExamDetailsPage({
   });
 
   if (!result?.exam) {
-    notFound();
+    return (
+      <MessagePage
+        title="Exam Unavailable"
+        message="Unable to load exam details. Please try again."
+        href={listHref}
+      />
+    );
   }
 
   const exam = result.exam;
 
-  const instructions = Array.isArray(
-    result.instructions
-  )
+  const instructions = Array.isArray(result.instructions)
     ? result.instructions
     : [];
 
-  // Use the actual exam ID for consistent navigation.
-  const startHref =
-    `${root}/test/${slug}/${examId}/start`;
+  const startHref = `${canonicalHref}/start`;
 
   return (
     <main className="min-h-screen bg-[#f5f9ff] py-6">
@@ -183,6 +206,10 @@ export default async function TopicWiseExamDetailsPage({
           <h1 className="mt-3 text-3xl font-black">
             {exam.exam_name || selected.exam_name}
           </h1>
+
+          <span className="mt-4 inline-flex rounded-full bg-emerald-500/20 px-4 py-2 text-xs font-black text-emerald-100">
+            Free Exam
+          </span>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {[
@@ -209,7 +236,7 @@ export default async function TopicWiseExamDetailsPage({
           </div>
         </section>
 
-        <section className="mt-6 rounded-3xl border bg-white p-7">
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-7">
           <h2 className="text-xl font-black text-[#071f55]">
             Exam Instructions
           </h2>
@@ -224,13 +251,12 @@ export default async function TopicWiseExamDetailsPage({
                   {index + 1}.{" "}
                   {typeof item === "string"
                     ? item
-                    : item.instructions ?? ""}
+                    : item?.instructions ?? ""}
                 </p>
               ))
             ) : (
               <p className="text-sm text-slate-500">
-                Read each question carefully before
-                submitting your answers.
+                Read each question carefully before submitting your answers.
               </p>
             )}
           </div>
@@ -238,7 +264,7 @@ export default async function TopicWiseExamDetailsPage({
           <div className="mt-7 flex justify-end">
             <Link
               href={startHref}
-              className="rounded-xl bg-[#017dc0] px-7 py-3 font-bold text-white"
+              className="rounded-xl bg-[#017dc0] px-7 py-3 font-bold text-white hover:bg-[#164fa5]"
             >
               Start Exam
             </Link>
