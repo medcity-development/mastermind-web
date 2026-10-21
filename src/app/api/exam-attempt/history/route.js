@@ -7,12 +7,11 @@ import {
 
 import {
   getCourseExamHistory,
-  getHistoryCourseId,
+  filterExamHistoryByCourse,
   normalizeHistoryType,
 } from "@/lib/examHistoryApi";
 
 import {
-  verifyExamHistoryCourse,
   resolveExamHistoryName,
 } from "@/lib/examHistoryHelper";
 
@@ -153,68 +152,6 @@ function existingName(row) {
 }
 
 /* =========================================================
-   VERIFY COURSE
-========================================================= */
-
-async function verifyCourse({
-  row,
-  uid,
-  cid,
-  examId,
-  attemptId,
-  examType,
-}) {
-  const recordCid =
-    getHistoryCourseId(row);
-
-  if (
-    recordCid != null &&
-    String(recordCid).trim() !== ""
-  ) {
-    return Number(recordCid) === cid
-      ? "verified"
-      : "mismatch";
-  }
-
-  // Only trust backend CID filtering
-  // when the backend contract guarantees it.
-
-  if (
-    process.env
-      .PSC_HISTORY_CID_FILTER_GUARANTEED ===
-    "true"
-  ) {
-    return "verified";
-  }
-
-  if (!examId || !attemptId) {
-    return "unknown";
-  }
-
-  try {
-    const verified =
-      await verifyExamHistoryCourse({
-        cid,
-        uid,
-        examId,
-        examType,
-        attemptId,
-      });
-
-    return verified === true
-      ? "verified"
-      : "unknown";
-  } catch (error) {
-    console.error(
-      "Exam history course verification failed",
-      error
-    );
-
-    return "unknown";
-  }
-}
-
-/* =========================================================
    POST - EXAM HISTORY
 ========================================================= */
 
@@ -328,6 +265,8 @@ export async function POST(request) {
         : Array.isArray(result.data)
           ? result.data
           : [];
+    const courseRows =
+      filterExamHistoryByCourse(rows, cid);
 
     const accepted = [];
 
@@ -335,15 +274,15 @@ export async function POST(request) {
 
     const nameCache = new Map();
 
-    let unresolvedCount = 0;
-    let excludedCourseCount = 0;
+    const excludedCourseCount =
+      rows.length - courseRows.length;
     let excludedTypeCount = 0;
 
     /* -------------------------------
        FILTER ATTEMPTS
     -------------------------------- */
 
-    for (const row of rows) {
+    for (const row of courseRows) {
       if (
         !row ||
         typeof row !== "object" ||
@@ -379,34 +318,6 @@ export async function POST(request) {
         key &&
         seen.has(key)
       ) {
-        continue;
-      }
-
-      /* -----------------------------
-         COURSE VERIFICATION
-      ----------------------------- */
-
-      const verification =
-        await verifyCourse({
-          row,
-          uid,
-          cid,
-          examId,
-          attemptId,
-          examType,
-        });
-
-      if (
-        verification === "mismatch"
-      ) {
-        excludedCourseCount++;
-        continue;
-      }
-
-      if (
-        verification !== "verified"
-      ) {
-        unresolvedCount++;
         continue;
       }
 
@@ -496,19 +407,9 @@ export async function POST(request) {
 
       total: accepted.length,
 
-      courseFilterVerified:
-        unresolvedCount === 0 &&
-        (
-          process.env
-            .PSC_HISTORY_CID_FILTER_GUARANTEED ===
-            "true" ||
-          rows.length > 0
-        ),
-
-      partialVerification:
-        unresolvedCount > 0,
-
-      unresolvedCount,
+      courseFilterVerified: true,
+      partialVerification: false,
+      unresolvedCount: 0,
       excludedCourseCount,
       excludedTypeCount,
     });

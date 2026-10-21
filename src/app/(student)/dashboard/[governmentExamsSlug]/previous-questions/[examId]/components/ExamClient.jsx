@@ -79,6 +79,16 @@ export default function ExamClient({
     guestAction,
   });
 
+  async function handlePauseAndReturn() {
+    const saved = await controller.handlePause();
+
+    if (saved) {
+      router.replace(
+        `/dashboard/${governmentExamsSlug}/previous-questions`
+      );
+    }
+  }
+
   useEffect(() => {
     restoredOnce.current = false;
     appliedOnce.current = false;
@@ -193,7 +203,7 @@ export default function ExamClient({
     if (guestAction === "submit") {
       controller.handleSubmit();
     } else {
-      controller.handlePause();
+      handlePauseAndReturn();
     }
   }, [
     handoff,
@@ -204,6 +214,7 @@ export default function ExamClient({
     controller.submitted,
     controller.handleSubmit,
     controller.handlePause,
+    handlePauseAndReturn,
   ]);
 
   /* AUTOMATIC FINISH */
@@ -391,9 +402,11 @@ export default function ExamClient({
               <ExamPause
                 paused={c.paused}
                 disabled={
-                  c.timerFinished || c.saving
+                  !c.restoreReady ||
+                  c.timerFinished ||
+                  c.saving
                 }
-                onPause={c.handlePause}
+                onPause={handlePauseAndReturn}
                 saving={c.saving}
               />
             )}

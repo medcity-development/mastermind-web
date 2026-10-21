@@ -9,6 +9,7 @@ import {
   Crown,
   FileQuestion,
   Gift,
+  Pause,
   Target,
   X,
 } from "lucide-react";
@@ -110,7 +111,29 @@ export default function PreviousQuestionCard({
             />
           </div>
 
-          {isPaid && !pauseId ? (
+          {pauseId ? (
+            <span
+              className="
+                inline-flex
+                items-center
+                gap-1.5
+                rounded-full
+                border
+                border-amber-200
+                bg-amber-50
+                px-3
+                py-1.5
+                text-[10px]
+                font-bold
+                uppercase
+                tracking-[0.06em]
+                text-amber-700
+              "
+            >
+              <Pause size={12} />
+              Paused
+            </span>
+          ) : isPaid ? (
             <span
               className="
                 inline-flex
@@ -263,7 +286,7 @@ export default function PreviousQuestionCard({
         </div>
 
         <div className="mt-auto pt-5">
-          {isPaid ? (
+          {isPaid && !pauseId ? (
             <button
               type="button"
               onClick={
