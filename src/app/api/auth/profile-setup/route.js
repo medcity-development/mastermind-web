@@ -1,114 +1,85 @@
-// src/app/api/auth/profile-setup/route.js
 
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { SignJWT } from "jose";
+
 import {
-  SignJWT,
-  jwtVerify,
-} from "jose";
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
 
-import { setUserProfile } from "@/lib/auth/authApi";
+import {
+  setUserProfile,
+} from "@/lib/auth/authApi";
 
-const AUTH_SECRET =
-  process.env.STUDENT_AUTH_SECRET;
+import {
+  getStudentProfile,
+} from "@/lib/studentProfileHelper";
+
+export const dynamic = "force-dynamic";
 
 function getSecret() {
-  if (!AUTH_SECRET) {
-    throw new Error(
-      "STUDENT_AUTH_SECRET is missing."
-    );
+  const secret = process.env.STUDENT_AUTH_SECRET;
+
+  if (!secret) {
+    throw new Error("STUDENT_AUTH_SECRET is missing.");
   }
 
-  return new TextEncoder().encode(
-    AUTH_SECRET
+  return new TextEncoder().encode(secret);
+}
+
+function fail(message, status = 400) {
+  return NextResponse.json(
+    {
+      status: false,
+      message,
+    },
+    { status }
   );
 }
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 30,
+};
+
 export async function POST(request) {
   try {
-    const cookieStore = await cookies();
-
-    const authToken =
-      cookieStore.get(
-        "student_auth_token"
-      )?.value;
-
-    let session = null;
-
-    if (authToken) {
-      try {
-        const { payload } =
-          await jwtVerify(
-            authToken,
-            getSecret()
-          );
-
-        if (payload?.uid) {
-          session = {
-            uid:
-              String(
-                payload.uid
-              ),
-
-            email:
-              String(
-                payload.email || ""
-              ),
-
-            name:
-              String(
-                payload.name || ""
-              ),
-          };
-        }
-      } catch {
-        session = null;
-      }
-    }
-
-    /* =========================================================
-       USER MUST BE AUTHENTICATED
-    ========================================================= */
+    const session = await getStudentSession();
 
     if (!session?.uid || !session?.email) {
-      return NextResponse.json(
-        {
-          status: false,
-          message:
-            "Your login session is missing or expired. Please login again.",
-        },
-        {
-          status: 401,
-        }
+      return fail(
+        "Your login session is missing or expired. Please login again.",
+        401
       );
     }
 
-    const body = await request.json();
+    let body;
 
-    const name = String(
-      body?.name ?? ""
-    ).trim();
+    try {
+      body = await request.json();
+    } catch {
+      return fail("Invalid request body.");
+    }
 
-    const email = String(
-      body?.email ??
-      session.email
+    const name = String(body?.name ?? "").trim();
+
+    const email = String(session.email)
+      .trim()
+      .toLowerCase();
+
+    const requestedEmail = String(
+      body?.email ?? email
     )
       .trim()
       .toLowerCase();
 
-    const mobile = String(
-      body?.mobile ?? ""
-    )
-      .replace(/\D/g, "")
-      .trim();
+    const mobile = String(body?.mobile ?? "")
+      .replace(/\D/g, "");
 
-    const dob = String(
-      body?.dob ?? ""
-    ).trim();
-
-    const place = String(
-      body?.place ?? ""
-    ).trim();
+    const dob = String(body?.dob ?? "").trim();
+    const place = String(body?.place ?? "").trim();
 
     const promocode = String(
       body?.promocode ?? ""
@@ -122,149 +93,106 @@ export async function POST(request) {
       body?.avatar ?? ""
     ).trim();
 
-    /* =========================================================
-       VALIDATION
-    ========================================================= */
-
     if (!name) {
-      return NextResponse.json(
-        {
-          status: false,
-          message:
-            "Name is required.",
-        },
-        {
-          status: 400,
-        }
+      return fail("Name is required.");
+    }
+
+    if (!email || requestedEmail !== email) {
+      return fail(
+        "Please use your verified login email."
       );
     }
 
-    if (!email) {
-      return NextResponse.json(
-        {
-          status: false,
-          message:
-            "Email is required.",
-        },
-        {
-          status: 400,
-        }
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      return fail(
+        "Enter a valid 10-digit mobile number."
       );
     }
 
-    /* =========================================================
-       SAVE PROFILE
-    ========================================================= */
+    if (!place) {
+      return fail("District is required.");
+    }
 
-    const result =
-      await setUserProfile({
-        name,
+    const result = await setUserProfile({
+      uid: session.uid,
+      name,
+      email,
+      mobile,
+      dob,
+      place,
+      promocode,
+      code,
+      avatar,
+    });
+
+    if (result?.status !== true) {
+      return fail(
+        result?.msg ||
+        result?.message ||
+        "Unable to save profile."
+      );
+    }
+
+    // Re-fetch from the shared mobile/web backend.
+
+    const verified = await getStudentProfile({
+      uid: session.uid,
+      cid: 1,
+    });
+
+    if (!verified.status) {
+      return fail(
+        "Profile saved, but verification failed.",
+        502
+      );
+    }
+
+    if (verified.profileCompleted !== true) {
+      return fail(
+        "Profile saved, but the backend has not marked it completed.",
+        409
+      );
+    }
+
+    const verifiedProfile = verified.profile;
+
+    const verifiedName = String(
+      verifiedProfile?.name || name
+    ).trim();
+
+    const token = await new SignJWT({
+      uid: String(session.uid),
+      email,
+      name: verifiedName,
+      stage: "completed",
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("30d")
+      .sign(getSecret());
+
+    const response = NextResponse.json(
+      {
+        status: true,
+        uid: String(session.uid),
         email,
-        mobile,
-        dob,
-        place,
-        promocode,
-        code,
-        uid: session.uid,
-        avatar,
-      });
-
-    console.log(
-      "SET PROFILE BACKEND RESULT:",
-      result
-    );
-
-    /* =========================================================
-       PROFILE SAVE FAILED
-    ========================================================= */
-
-    if (
-      result?.status !== true
-    ) {
-      return NextResponse.json(
-        {
-          ...result,
-
-          status: false,
-
-          message:
-            result?.msg ||
-            result?.message ||
-            "Unable to save profile.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /* =========================================================
-       SUCCESS RESPONSE
-    ========================================================= */
-
-    const response =
-      NextResponse.json(
-        {
-          ...result,
-
-          status: true,
-
-          uid: session.uid,
-
-          message:
-            result?.msg ||
-            result?.message ||
-            "Profile saved successfully.",
-        },
-        {
-          status: 200,
-        }
-      );
-
-    /* =========================================================
-       COMMON COOKIE OPTIONS
-    ========================================================= */
-
-    const cookieOptions = {
-      httpOnly: true,
-
-      secure:
-        process.env.NODE_ENV ===
-        "production",
-
-      sameSite: "lax",
-
-      path: "/",
-
-      maxAge:
-        60 * 60 * 24 * 30,
-    };
-
-    /* =========================================================
-       PROFILE IS NOW COMPLETED
-    ========================================================= */
-
-    const updatedAuthToken =
-      await new SignJWT({
-        uid: session.uid,
-        email,
-        name,
+        name: verifiedName,
         stage: "completed",
-      })
-        .setProtectedHeader({
-          alg: "HS256",
-        })
-        .setIssuedAt()
-        .setExpirationTime(
-          "30d"
-        )
-        .sign(
-          getSecret()
-        );
+        profileCompleted: true,
+        profile: verifiedProfile,
+        message:
+          "Profile completed successfully.",
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
 
     response.cookies.set(
       "student_auth_token",
-      updatedAuthToken,
+      token,
       cookieOptions
     );
 
@@ -273,11 +201,6 @@ export async function POST(request) {
       "completed",
       cookieOptions
     );
-
-    /*
-     * Keep email synchronized in case the
-     * profile form allows the user to change it.
-     */
 
     response.cookies.set(
       "mastermind_email",
@@ -288,21 +211,13 @@ export async function POST(request) {
     return response;
   } catch (error) {
     console.error(
-      "PROFILE SETUP ROUTE ERROR:",
+      "PROFILE SETUP ERROR:",
       error
     );
 
-    return NextResponse.json(
-      {
-        status: false,
-
-        message:
-          error?.message ||
-          "Unable to save profile.",
-      },
-      {
-        status: 500,
-      }
+    return fail(
+      "Unable to complete profile setup.",
+      500
     );
   }
 }

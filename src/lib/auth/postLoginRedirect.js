@@ -1,3 +1,12 @@
+
+const BASE_URL = "https://mastermind.local";
+
+const BLOCKED_PATHS = new Set([
+  "/login",
+  "/otp-verify",
+  "/profile-setup",
+]);
+
 export function getPostLoginRedirectPath(value) {
   if (
     typeof value !== "string" ||
@@ -9,21 +18,16 @@ export function getPostLoginRedirectPath(value) {
   }
 
   try {
-    const url = new URL(
-      value,
-      "https://mastermind.local"
-    );
+    const url = new URL(value, BASE_URL);
 
-    const pathname = url.pathname.replace(/\/$/, "");
+    if (url.origin !== BASE_URL) {
+      return "";
+    }
 
-    if (
-      url.origin !== "https://mastermind.local" ||
-      [
-        "/login",
-        "/otp-verify",
-        "/profile-setup",
-      ].includes(pathname)
-    ) {
+    const pathname =
+      url.pathname.replace(/\/+$/, "") || "/";
+
+    if (BLOCKED_PATHS.has(pathname)) {
       return "";
     }
 

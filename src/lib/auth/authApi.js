@@ -1,286 +1,151 @@
-// src/lib/auth/authApi.js
 
 import "server-only";
 
-const API_BASE_URL =
-  process.env.PSC_API_BASE_URL;
-
-const API_KEY =
-  process.env.PSC_API_KEY;
-
-/* =========================================================
-   CONFIG
-========================================================= */
-
 function getConfig() {
-  if (!API_BASE_URL) {
-    throw new Error(
-      "PSC_API_BASE_URL is missing."
-    );
+  const baseUrl = String(
+    process.env.PSC_API_BASE_URL ?? ""
+  )
+    .trim()
+    .replace(/\/+$/, "");
+
+  const apiKey = String(
+    process.env.PSC_API_KEY ?? ""
+  ).trim();
+
+  if (!baseUrl) {
+    throw new Error("PSC_API_BASE_URL is missing.");
   }
 
-  if (!API_KEY) {
-    throw new Error(
-      "PSC_API_KEY is missing."
-    );
+  if (!apiKey) {
+    throw new Error("PSC_API_KEY is missing.");
   }
 
-  return {
-    baseUrl:
-      String(
-        API_BASE_URL
-      )
-        .trim()
-        .replace(
-          /\/+$/,
-          ""
-        ),
-
-    apiKey:
-      String(
-        API_KEY
-      ).trim(),
-  };
+  return { baseUrl, apiKey };
 }
 
-/* =========================================================
-   COMMON POST REQUEST
-========================================================= */
+async function postAuthRequest(endpoint, fields = {}) {
+  const { baseUrl, apiKey } = getConfig();
 
-async function postAuthRequest(
-  endpoint,
-  fields = {}
-) {
-  const {
-    baseUrl,
-    apiKey,
-  } = getConfig();
+  const formData = new FormData();
 
-  const formData =
-    new FormData();
+  formData.append("api", apiKey);
 
-  formData.append(
-    "api",
-    apiKey
-  );
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
 
-  Object.entries(
-    fields
-  ).forEach(
-    ([key, value]) => {
-      if (
-        value ===
-          undefined ||
-        value === null
-      ) {
-        return;
-      }
+    formData.append(key, String(value));
+  }
 
-      formData.append(
-        key,
-        String(value)
-      );
+  const response = await fetch(
+    `${baseUrl}/${endpoint}`,
+    {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
     }
   );
 
-  const response =
-    await fetch(
-      `${baseUrl}/${endpoint}`,
-      {
-        method: "POST",
+  const raw = await response.text();
 
-        body:
-          formData,
-
-        cache:
-          "no-store",
-
-        headers: {
-          Accept:
-            "application/json",
-        },
-      }
-    );
-
-  const text =
-    await response.text();
-
-  let result = {};
+  let result;
 
   try {
-    result =
-      text
-        ? JSON.parse(
-            text
-          )
-        : {};
+    result = raw ? JSON.parse(raw) : {};
   } catch {
-    console.error(
-      `${endpoint} RAW RESPONSE:`,
-      text
-    );
-
     throw new Error(
-      `${endpoint} returned invalid JSON.`
+      `${endpoint} returned an invalid JSON response.`
     );
   }
 
   if (!response.ok) {
     throw new Error(
       result?.msg ||
-        result?.message ||
-        `${endpoint} failed with status ${response.status}.`
+      result?.message ||
+      `${endpoint} failed with HTTP ${response.status}.`
     );
   }
 
   return result;
 }
 
-/* =========================================================
-   SEND LOGIN OTP
-
-   Backend:
-   sendOTPforLogin
-
-   Fields:
-   api
-   type
-   mobile
-   code
-   email
-========================================================= */
+// =====================================================
+// SEND LOGIN OTP
+// Backend: sendOTPforLogin
+// =====================================================
 
 export async function sendLoginOtp({
   email,
 } = {}) {
-  const cleanEmail =
-    String(
-      email || ""
-    )
-      .trim()
-      .toLowerCase();
+  const cleanEmail = String(email ?? "")
+    .trim()
+    .toLowerCase();
 
   if (!cleanEmail) {
-    throw new Error(
-      "Email is required."
-    );
+    throw new Error("Email is required.");
   }
 
   return postAuthRequest(
     "sendOTPforLogin",
     {
       type: "email",
-
       mobile: "",
-
       code: "+91",
-
-      email:
-        cleanEmail,
+      email: cleanEmail,
     }
   );
 }
 
-/* =========================================================
-   VERIFY OTP
-
-   Backend:
-   VerifyOTP
-
-   Fields:
-   api
-   email
-   otp
-   type
-   model
-   manufacture
-   brand
-   sdk
-   release
-   token
-========================================================= */
+// =====================================================
+// VERIFY OTP
+// Backend: VerifyOTP
+// =====================================================
 
 export async function verifyLoginOtp({
   email,
   otp,
 } = {}) {
-  const cleanEmail =
-    String(
-      email || ""
-    )
-      .trim()
-      .toLowerCase();
+  const cleanEmail = String(email ?? "")
+    .trim()
+    .toLowerCase();
 
-  const cleanOtp =
-    String(
-      otp || ""
-    ).trim();
+  const cleanOtp = String(otp ?? "").trim();
 
   if (!cleanEmail) {
-    throw new Error(
-      "Email is required."
-    );
+    throw new Error("Email is required.");
   }
 
-  if (!cleanOtp) {
-    throw new Error(
-      "OTP is required."
-    );
+  if (!/^\d{4,6}$/.test(cleanOtp)) {
+    throw new Error("Enter a valid OTP.");
   }
 
   return postAuthRequest(
     "VerifyOTP",
     {
-      email:
-        cleanEmail,
-
-      otp:
-        cleanOtp,
-
-      type:
-        "email",
-
-      model:
-        "desktop",
-
-      manufacture:
-        "desktop",
-
-      brand:
-        "desktop",
-
-      sdk:
-        "desktop",
-
-      release:
-        "1.0.0",
-
-      token:
-        "web_login",
+      email: cleanEmail,
+      otp: cleanOtp,
+      type: "email",
+      model: "desktop",
+      manufacture: "desktop",
+      brand: "desktop",
+      sdk: "desktop",
+      release: "1.0.0",
+      token: "web_login",
     }
   );
 }
 
-/* =========================================================
-   SET USER PROFILE
-
-   Backend:
-   setUserProfile
-
-   Fields:
-   api
-   name
-   email
-   mobile
-   dob
-   place
-   promocode
-   code
-   uid
-   avatar
-========================================================= */
+// =====================================================
+// SET USER PROFILE
+// Backend: setUserProfile
+// =====================================================
 
 export async function setUserProfile({
+  uid,
   name,
   email,
   mobile,
@@ -288,47 +153,43 @@ export async function setUserProfile({
   place,
   promocode = "",
   code = "+91",
-  uid,
-  avatar,
+  avatar = "",
 } = {}) {
-  if (!uid) {
-    throw new Error(
-      "User ID is required."
-    );
+  const studentId = Number(uid);
+
+  if (
+    !Number.isInteger(studentId) ||
+    studentId <= 0
+  ) {
+    throw new Error("Valid student ID is required.");
   }
 
-  if (!name) {
-    throw new Error(
-      "Name is required."
-    );
+  const cleanName = String(name ?? "").trim();
+
+  const cleanEmail = String(email ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!cleanName) {
+    throw new Error("Name is required.");
   }
 
-  if (!email) {
-    throw new Error(
-      "Email is required."
-    );
+  if (!cleanEmail) {
+    throw new Error("Email is required.");
   }
 
   return postAuthRequest(
     "setUserProfile",
     {
-      name,
-
-      email,
-
-      mobile,
-
-      dob,
-
-      place,
-
-      promocode,
-
-      code,
-
-      uid,
-
-      avatar,
+      uid: studentId,
+      name: cleanName,
+      email: cleanEmail,
+      mobile: String(mobile ?? "").replace(/\D/g, ""),
+      dob: String(dob ?? "").trim(),
+      place: String(place ?? "").trim(),
+      promocode: String(promocode ?? "").trim(),
+      code: String(code ?? "+91").trim(),
+      avatar: String(avatar ?? "").trim(),
     }
   );
 }

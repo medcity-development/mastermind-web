@@ -1,19 +1,15 @@
-// src/app/(public)/login/components/OtpVerification.jsx
 
 "use client";
 
-import {
-  useState,
-} from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   ArrowLeft,
   ShieldCheck,
+  LockKeyhole,
+  MailCheck,
 } from "lucide-react";
-
-import {
-  useRouter,
-} from "next/navigation";
 
 import Swal from "sweetalert2";
 
@@ -26,504 +22,229 @@ export default function OtpVerification({
   onBack,
   redirectTo = "",
 }) {
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  const [
-    otp,
-    setOtp,
-  ] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
+  const [showCourseModal, setShowCourseModal] =
+    useState(false);
 
-  const [
-    showCourseModal,
-    setShowCourseModal,
-  ] = useState(false);
+  const busy = useRef(false);
 
-  /* =========================================================
-     VERIFY OTP
-  ========================================================= */
-
-  async function handleSubmit(
-    event
-  ) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
-    const cleanOtp =
-      otp.trim();
+    if (busy.current) return;
 
-    /* =======================================================
-       VALIDATION
-    ======================================================= */
+    const cleanOtp = otp.trim();
 
-    if (!cleanOtp) {
+    if (!/^\d{4,6}$/.test(cleanOtp)) {
       await Swal.fire({
-        icon:
-          "warning",
-
-        title:
-          "Enter OTP",
-
+        icon: "warning",
+        title: "Invalid OTP",
         text:
-          "Please enter the verification code sent to your email.",
-
-        confirmButtonColor:
-          "#2468f2",
+          "Enter the verification code sent to your email.",
+        confirmButtonColor: "#2468f2",
       });
 
       return;
     }
 
-    if (
-      cleanOtp.length < 4
-    ) {
-      await Swal.fire({
-        icon:
-          "warning",
-
-        title:
-          "Invalid OTP",
-
-        text:
-          "Please enter a valid OTP.",
-
-        confirmButtonColor:
-          "#2468f2",
-      });
-
-      return;
-    }
+    busy.current = true;
+    setLoading(true);
 
     try {
-      setLoading(true);
-
-      /* =====================================================
-         VERIFY OTP API
-      ===================================================== */
-
-      const response =
-        await fetch(
-          "/api/auth/verify-otp",
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                email:
-                  authData?.email,
-
-                otp:
-                  cleanOtp,
-              }),
-          }
-        );
-
-      const result =
-        await response.json();
-
-      console.log(
-        "VERIFY OTP CLIENT RESULT:",
-        result
+      const response = await fetch(
+        "/api/auth/verify-otp",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: authData?.email,
+            otp: cleanOtp,
+          }),
+        }
       );
 
-      /* =====================================================
-         API ERROR
-      ===================================================== */
+      const result = await response.json();
 
-      if (
-        !response.ok ||
-        result?.status !==
-          true
-      ) {
+      if (!response.ok || result?.status !== true) {
         throw new Error(
           result?.message ||
-            result?.msg ||
-            "OTP verification failed."
+          result?.msg ||
+          "OTP verification failed."
         );
       }
 
-      /* =====================================================
-         SUCCESS MESSAGE
-      ===================================================== */
+      // The OTP API has already checked
+      // getStudentProfile against the backend.
 
-      await Swal.fire({
-        icon:
-          "success",
+      const profileCompleted =
+        result?.profileCompleted === true;
 
-        title:
-          "OTP Verified",
-
-        text:
-          "Your email has been verified successfully.",
-
-        timer:
-          900,
-
-        showConfirmButton:
-          false,
-
-        timerProgressBar:
-          true,
+      console.log("LOGIN PROFILE STATUS:", {
+        uid: result?.uid,
+        stage: result?.stage,
+        profileCompleted,
       });
 
-      /* =====================================================
-         EXISTING REGISTERED USER
+      if (profileCompleted) {
+        // Existing mobile or web user.
 
-         stage === "completed"
-
-         OTP
-          ↓
-         course modal
-          ↓
-         corresponding dashboard
-      ===================================================== */
-
-      if (
-        result?.stage ===
-        "completed"
-      ) {
         if (redirectTo) {
           router.replace(redirectTo);
           router.refresh();
           return;
         }
 
-        setShowCourseModal(
-          true
-        );
-
+        setShowCourseModal(true);
+        router.refresh();
         return;
       }
 
-      /* =====================================================
-         NEW USER
+      // Only incomplete profiles go to setup.
 
-         OTP
-          ↓
-         profile setup
-          ↓
-         course modal
-          ↓
-         corresponding dashboard
-      ===================================================== */
-
-      const profileSetupPath = redirectTo
-        ? `/profile-setup?redirect=${encodeURIComponent(redirectTo)}`
+      const setupPath = redirectTo
+        ? `/profile-setup?redirect=${encodeURIComponent(
+            redirectTo
+          )}`
         : "/profile-setup";
 
-      router.replace(profileSetupPath);
-
+      router.replace(setupPath);
       router.refresh();
     } catch (error) {
-      console.error(
-        "VERIFY OTP ERROR:",
-        error
-      );
+      console.error("OTP LOGIN ERROR:", error);
 
       await Swal.fire({
-        icon:
-          "error",
-
-        title:
-          "Verification Failed",
-
+        icon: "error",
+        title: "Unable to continue",
         text:
           error?.message ||
-          "The OTP is incorrect or expired. Please try again.",
-
-        confirmButtonText:
-          "Try Again",
-
-        confirmButtonColor:
-          "#ef4444",
+          "Please try again.",
+        confirmButtonColor: "#2468f2",
       });
     } finally {
+      busy.current = false;
       setLoading(false);
     }
   }
 
-  /* =========================================================
-     OTP INPUT
-  ========================================================= */
-
-  function handleOtpChange(
-    event
-  ) {
-    const value =
+  function handleOtpChange(event) {
+    setOtp(
       event.target.value
-        .replace(
-          /\D/g,
-          ""
-        )
-        .slice(
-          0,
-          6
-        );
-
-    setOtp(value);
+        .replace(/\D/g, "")
+        .slice(0, 6)
+    );
   }
-
-  /* =========================================================
-     UI
-  ========================================================= */
 
   return (
     <>
-      <div
-        className="
-          w-full
-          rounded-[30px]
-          border
-          border-white/10
-          bg-white
-          px-6
-          py-8
-          shadow-[0_30px_90px_rgba(0,0,0,0.30)]
-
-          sm:px-8
-          sm:py-10
-
-          xl:px-10
-        "
-      >
-        {/* BACK */}
+      <section className="relative overflow-hidden rounded-[30px] border border-white/70 bg-white px-6 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.3)] sm:px-9 sm:py-10">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-100/60 blur-3xl" />
 
         <button
           type="button"
           onClick={onBack}
           disabled={loading}
-          className="
-            inline-flex
-            items-center
-            gap-2
-            text-[12px]
-            font-semibold
-            text-slate-500
-            transition
-
-            hover:text-[#2468f2]
-
-            disabled:cursor-not-allowed
-            disabled:opacity-50
-          "
+          className="relative inline-flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-blue-600 disabled:opacity-50"
         >
-          <ArrowLeft
-            size={15}
-          />
-
-          Change Email
+          <ArrowLeft size={16} />
+          Change email
         </button>
 
-        {/* HEADER */}
-
-        <div
-          className="
-            mt-5
-            text-center
-          "
-        >
-          <div
-            className="
-              mx-auto
-              flex
-              h-14
-              w-14
-              items-center
-              justify-center
-              rounded-2xl
-              bg-gradient-to-br
-              from-[#eaf2ff]
-              to-[#f1ebff]
-              text-[#2468f2]
-            "
-          >
+        <div className="relative mt-7 text-center">
+          <div className="mx-auto flex h-[70px] w-[70px] items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-50 to-violet-100 text-blue-600 shadow-inner">
             <ShieldCheck
-              size={27}
-              strokeWidth={1.9}
+              size={32}
+              strokeWidth={1.8}
             />
           </div>
 
-          <p
-            className="
-              mt-4
-              text-[10px]
-              font-bold
-              uppercase
-              tracking-[0.22em]
-              text-[#3854e8]
-            "
-          >
-            Secure Verification
+          <p className="mt-6 text-[10px] font-extrabold uppercase tracking-[0.25em] text-blue-600">
+            Secure Student Login
           </p>
 
-          <h2
-            className="
-              mt-2
-              text-[30px]
-              font-extrabold
-              tracking-[-0.04em]
-              text-[#071b59]
-
-              sm:text-[34px]
-            "
-          >
-            Verify{" "}
-
-            <span
-              className="
-                bg-gradient-to-r
-                from-[#246fff]
-                to-[#7c3cff]
-                bg-clip-text
-                text-transparent
-              "
-            >
-              OTP
+          <h1 className="mt-2 text-[32px] font-black tracking-tight text-[#071b59] sm:text-[36px]">
+            Verify your{" "}
+            <span className="bg-gradient-to-r from-[#246fff] to-[#7c3cff] bg-clip-text text-transparent">
+              identity
             </span>
-          </h2>
+          </h1>
 
-          <p
-            className="
-              mx-auto
-              mt-2
-              max-w-[330px]
-              text-[13px]
-              leading-5
-              text-slate-500
-            "
-          >
-            We sent a
-            verification code to
+          <p className="mx-auto mt-3 max-w-[330px] text-[13px] leading-6 text-slate-500">
+            Enter the verification code sent to your
+            registered email.
           </p>
 
-          <p
-            className="
-              mt-1
-              break-all
-              text-[13px]
-              font-bold
-              text-[#071b59]
-            "
-          >
-            {authData?.email ||
-              "your email"}
-          </p>
+          <div className="mx-auto mt-5 flex w-fit max-w-full items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2.5">
+            <MailCheck
+              size={16}
+              className="shrink-0 text-blue-600"
+            />
+
+            <span className="break-all text-xs font-bold text-[#071b59]">
+              {authData?.email || "Your email"}
+            </span>
+          </div>
         </div>
 
-        {/* OTP FORM */}
-
         <form
-          onSubmit={
-            handleSubmit
-          }
-          className="mt-7"
+          onSubmit={handleSubmit}
+          className="relative mt-8"
         >
           <label
-            htmlFor="otp"
-            className="
-              mb-2
-              block
-              text-[12px]
-              font-bold
-              text-[#071b59]
-            "
+            htmlFor="login-otp"
+            className="mb-2 block text-xs font-bold text-[#071b59]"
           >
-            Verification Code
+            Verification code
           </label>
 
           <input
-            id="otp"
+            id="login-otp"
             name="otp"
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
             autoFocus
+            required
+            maxLength={6}
             value={otp}
-            onChange={
-              handleOtpChange
-            }
-            placeholder="Enter OTP"
+            onChange={handleOtpChange}
             disabled={loading}
-            className="
-              h-[58px]
-              w-full
-              rounded-[14px]
-              border
-              border-slate-200
-              bg-[#f8faff]
-              px-4
-              text-center
-              text-[22px]
-              font-extrabold
-              tracking-[0.35em]
-              text-[#071b59]
-              outline-none
-              transition-all
-              duration-200
-
-              placeholder:text-[13px]
-              placeholder:font-medium
-              placeholder:tracking-normal
-              placeholder:text-slate-400
-
-              focus:border-[#4f6cf7]
-              focus:bg-white
-              focus:shadow-[0_0_0_4px_rgba(79,108,247,0.08)]
-
-              disabled:cursor-not-allowed
-              disabled:opacity-60
-            "
+            placeholder="Enter OTP"
+            className="h-[62px] w-full rounded-2xl border border-slate-200 bg-[#f8faff] px-4 text-center text-[24px] font-extrabold tracking-[0.35em] text-[#071b59] outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 placeholder:text-sm placeholder:font-medium placeholder:tracking-normal placeholder:text-slate-400 disabled:opacity-60"
           />
 
           <div className="mt-5">
             <LoginButton
-              loading={
-                loading
-              }
-              label="Verify OTP"
-              loadingLabel="Verifying..."
+              loading={loading}
+              label="Verify & Continue"
+              loadingLabel="Checking your account..."
             />
           </div>
         </form>
 
-        <p
-          className="
-            mt-5
-            text-center
-            text-[11px]
-            leading-5
-            text-slate-400
-          "
-        >
-          Enter the OTP sent
-          to your registered
-          email address.
-        </p>
-      </div>
-
-      {/* ================================================
-          EXISTING USER COURSE SELECTION
-      ================================================= */}
+        <div className="relative mt-7 flex items-center justify-center gap-2 border-t border-slate-100 pt-5 text-[11px] font-medium text-slate-400">
+          <LockKeyhole
+            size={14}
+            className="text-blue-500"
+          />
+          Secure account verification
+        </div>
+      </section>
 
       <CourseChoiceModal
-        open={
-          showCourseModal
-        }
-        onClose={() =>
-          setShowCourseModal(
-            false
-          )
-        }
+        open={showCourseModal}
+        onClose={() => {
+          setShowCourseModal(false);
+          router.replace("/");
+          router.refresh();
+        }}
       />
     </>
   );

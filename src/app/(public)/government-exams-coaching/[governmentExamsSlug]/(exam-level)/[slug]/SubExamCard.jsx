@@ -108,7 +108,7 @@ export default function SubExamCard({
               33vw
             "
             className="
-              object-contain
+              object-contain unoptimized
               p-3
               transition-transform
               duration-300

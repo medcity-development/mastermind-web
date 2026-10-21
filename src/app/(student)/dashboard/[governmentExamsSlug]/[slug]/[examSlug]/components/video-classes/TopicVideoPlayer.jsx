@@ -13,6 +13,7 @@ import TopicVideoLoading from "./TopicVideoLoading";
 import TopicVideoEmpty from "./TopicVideoEmpty";
 import TopicVideoPlayerCard from "./TopicVideoPlayerCard";
 import TopicVideoPlaylist from "./TopicVideoPlaylist";
+import StudyPlanMockTests from "./StudyPlanMockTests";
 
 const PAID_PREVIEW_SECONDS =
   240;
@@ -24,6 +25,9 @@ export default function TopicVideoPlayer({
   loading = false,
   error = "",
   onBack,
+  mockTestId,
+  cid,
+  onStartMockTest,
 }) {
   const videoRef =
     useRef(null);
@@ -533,6 +537,7 @@ export default function TopicVideoPlayer({
             }
           />
         </div>
+        <StudyPlanMockTests mockTestId={mockTestId} cid={cid} onStartTest={onStartMockTest} />
       </section>
 
       {/* LOGIN MODAL */}

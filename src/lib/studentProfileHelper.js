@@ -1,251 +1,169 @@
+
 import "server-only";
 
-const API_BASE_URL =
-    process.env.PSC_API_BASE_URL;
-
-const API_KEY =
-    process.env.PSC_API_KEY;
-
-/* =========================================================
-   CONFIG
-========================================================= */
+const API_BASE_URL = process.env.PSC_API_BASE_URL;
+const API_KEY = process.env.PSC_API_KEY;
 
 function getConfig() {
-    if (!API_BASE_URL) {
-        throw new Error(
-            "PSC_API_BASE_URL is missing."
-        );
-    }
+  if (!API_BASE_URL) {
+    throw new Error("PSC_API_BASE_URL is missing.");
+  }
 
-    if (!API_KEY) {
-        throw new Error(
-            "PSC_API_KEY is missing."
-        );
-    }
+  if (!API_KEY) {
+    throw new Error("PSC_API_KEY is missing.");
+  }
 
-    return {
-        baseUrl:
-            String(
-                API_BASE_URL
-            )
-                .trim()
-                .replace(
-                    /\/+$/,
-                    ""
-                ),
-
-        apiKey:
-            String(
-                API_KEY
-            ).trim(),
-    };
+  return {
+    baseUrl: String(API_BASE_URL)
+      .trim()
+      .replace(/\/+$/, ""),
+    apiKey: String(API_KEY).trim(),
+  };
 }
 
-/* =========================================================
-   COMMON POST
-========================================================= */
+async function postProfileRequest(endpoint, fields = {}) {
+  const { baseUrl, apiKey } = getConfig();
 
-async function postProfileRequest(
-    endpoint,
-    fields = {}
-) {
-    const {
-        baseUrl,
-        apiKey,
-    } = getConfig();
+  const formData = new FormData();
+  formData.append("api", apiKey);
 
-    const formData =
-        new FormData();
-
-    formData.append(
-        "api",
-        apiKey
-    );
-
-    Object.entries(
-        fields
-    ).forEach(
-        ([key, value]) => {
-            if (
-                value === undefined ||
-                value === null
-            ) {
-                return;
-            }
-
-            formData.append(
-                key,
-                String(value)
-            );
-        }
-    );
-
-    const response =
-        await fetch(
-            `${baseUrl}/${endpoint}`,
-            {
-                method:
-                    "POST",
-
-                body:
-                    formData,
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    Accept:
-                        "application/json",
-                },
-            }
-        );
-
-    const text =
-        await response.text();
-
-    let result = {};
-
-    try {
-        result =
-            text
-                ? JSON.parse(
-                    text
-                )
-                : {};
-    } catch {
-        throw new Error(
-            `${endpoint} returned invalid JSON.`
-        );
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) {
+      continue;
     }
 
-    if (!response.ok) {
-        throw new Error(
-            result?.msg ||
-            result?.message ||
-            `${endpoint} failed.`
-        );
-    }
+    formData.append(key, String(value));
+  }
 
-    return result;
+  const response = await fetch(
+    `${baseUrl}/${endpoint}`,
+    {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+    }
+  );
+
+  const raw = await response.text();
+
+  let result;
+
+  try {
+    result = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error(
+      `${endpoint} returned invalid JSON.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      result?.msg ||
+      result?.message ||
+      `${endpoint} failed with HTTP ${response.status}.`
+    );
+  }
+
+  return result;
 }
 
-/* =========================================================
-   GET STUDENT PROFILE
-========================================================= */
+export function normalizeStudentProfile(result) {
+  const data = result?.data;
 
-const profileCache = new Map();
+  if (Array.isArray(data)) {
+    return data[0] ?? null;
+  }
+
+  if (data && typeof data === "object") {
+    return data;
+  }
+
+  return null;
+}
+
+export function isStudentProfileCompleted(profile) {
+  if (!profile || typeof profile !== "object") {
+    return false;
+  }
+
+  return (
+    String(profile.stage ?? "")
+      .trim()
+      .toLowerCase() === "completed"
+  );
+}
 
 export async function getStudentProfile({
-    uid,
-    cid,
+  uid,
+  cid = 1,
 } = {}) {
-    if (!uid) {
-        throw new Error(
-            "Student ID is required."
-        );
+  const studentId = Number(uid);
+  const courseId = Number(cid);
+
+  if (!Number.isInteger(studentId) || studentId <= 0) {
+    throw new Error("Valid student ID is required.");
+  }
+
+  if (!Number.isInteger(courseId) || courseId <= 0) {
+    throw new Error("Valid course ID is required.");
+  }
+
+  const result = await postProfileRequest(
+    "getStudentProfile",
+    {
+      uid: studentId,
+      cid: courseId,
     }
+  );
 
-    if (!cid) {
-        throw new Error(
-            "Course ID is required."
-        );
-    }
+  const profile = normalizeStudentProfile(result);
 
-    const key = `${uid}_${cid}`;
-    const cached = profileCache.get(key);
-
-    if (cached && Date.now() - cached.timestamp < 60000) {
-        return cached.data;
-    }
-
-    try {
-        const result =
-            await postProfileRequest(
-                "getStudentProfile",
-                {
-                    uid,
-                    cid,
-                }
-            );
-
-        const profile =
-            Array.isArray(
-                result?.data
-            )
-                ? result.data[0] ??
-                null
-                : result?.data ??
-                null;
-
-        const res = {
-            status:
-                result?.status ===
-                true,
-
-            profile,
-
-            message:
-                result?.msg ||
-                result?.message ||
-                "",
-        };
-
-        profileCache.set(key, { data: res, timestamp: Date.now() });
-        return res;
-    } catch (error) {
-        if (cached?.data) {
-            console.warn("Returning cached student profile after error:", error?.message);
-            return cached.data;
-        }
-        throw error;
-    }
+  return {
+    status: result?.status === true,
+    profile,
+    profileCompleted: isStudentProfileCompleted(profile),
+    message: result?.msg || result?.message || "",
+  };
 }
 
-/* =========================================================
-   UPDATE STUDENT PROFILE
-========================================================= */
-
 export async function updateStudentProfile({
-    uid,
-    name,
-    email,
-    mobile,
-    dob,
-    place,
-    promocode = "",
-    code = "+91",
-    avatar = "",
+  uid,
+  name,
+  email,
+  mobile,
+  dob,
+  place,
+  promocode = "",
+  code = "+91",
+  avatar = "",
 } = {}) {
-    if (!uid) {
-        throw new Error(
-            "Student ID is required."
-        );
-    }
+  if (!uid) {
+    throw new Error("Student ID is required.");
+  }
 
-    if (!name) {
-        throw new Error(
-            "Name is required."
-        );
-    }
+  if (!String(name ?? "").trim()) {
+    throw new Error("Name is required.");
+  }
 
-    if (!email) {
-        throw new Error(
-            "Email is required."
-        );
-    }
+  if (!String(email ?? "").trim()) {
+    throw new Error("Email is required.");
+  }
 
-    return postProfileRequest(
-        "updateUserProfile",
-        {
-            name,
-            email,
-            mobile,
-            dob,
-            place,
-            promocode,
-            code,
-            uid,
-            avatar,
-        }
-    );
+  return postProfileRequest(
+    "updateUserProfile",
+    {
+      uid,
+      name,
+      email,
+      mobile,
+      dob,
+      place,
+      promocode,
+      code,
+      avatar,
+    }
+  );
 }

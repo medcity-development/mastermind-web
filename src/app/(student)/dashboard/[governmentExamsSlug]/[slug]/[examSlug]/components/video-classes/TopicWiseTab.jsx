@@ -11,9 +11,13 @@ import {
   ChevronRight,
   LoaderCircle,
   PlayCircle,
+  Crown,
+  ClipboardList,
+  LockKeyhole,
 } from "lucide-react";
 
 import TopicChapterList from "./TopicChapterList";
+
 
 /* =========================================================
    NORMALIZE CATEGORY
@@ -97,6 +101,8 @@ export default function TopicWiseTab({
   cid = 1,
   uid = 0,
   examId,
+  onLoginRequired,
+  onStartMockTest,
 }) {
   const [
     categories,
@@ -122,6 +128,8 @@ export default function TopicWiseTab({
     chapters,
     setChapters,
   ] = useState([]);
+
+  const [mockTestId, setMockTestId] = useState(null);
 
   const [
     loadingCategories,
@@ -183,6 +191,7 @@ export default function TopicWiseTab({
         );
 
         setChapters([]);
+       setMockTestId(null);
 
         const params =
           new URLSearchParams({
@@ -547,8 +556,12 @@ export default function TopicWiseTab({
     selectedTopic
   ) {
     return (
+      <div>
       <TopicChapterList
         topic={selectedTopic}
+        mockTestId={mockTestId}
+        cid={cid}
+        onStartMockTest={onStartMockTest}
         chapters={
           chapters
         }
@@ -562,10 +575,13 @@ export default function TopicWiseTab({
           );
 
           setChapters([]);
+       setMockTestId(null);
 
           setError("");
         }}
       />
+
+      </div>
     );
   }
 
