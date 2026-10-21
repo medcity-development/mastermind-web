@@ -64,6 +64,7 @@ export default function ExamClient({
   const restoredOnce = useRef(false);
   const appliedOnce = useRef(false);
   const autoSubmitted = useRef(false);
+  const resumedQuestionScrolled = useRef(false);
 
   const controller = useExamController({
     exam,
@@ -82,13 +83,42 @@ export default function ExamClient({
     restoredOnce.current = false;
     appliedOnce.current = false;
     autoSubmitted.current = false;
-
-    setRestored(!handoff);
-    setRestoreError("");
+    resumedQuestionScrolled.current = false;
   }, [
     id,
     guestAction,
     handoff,
+  ]);
+
+  useEffect(() => {
+    if (
+      !initialPauseId ||
+      !controller.restoreReady ||
+      !controller.lastAnsweredQuestionId ||
+      resumedQuestionScrolled.current
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const question = document.getElementById(
+        `exam-question-${controller.lastAnsweredQuestionId}`
+      );
+
+      if (question) {
+        question.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        resumedQuestionScrolled.current = true;
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    initialPauseId,
+    controller.restoreReady,
+    controller.lastAnsweredQuestionId,
   ]);
 
   /* RESTORE BEFORE SAVING */
@@ -235,12 +265,27 @@ export default function ExamClient({
     !controller.restoreReady
   ) {
     return (
-      <p
-        role="status"
+      <div
+        role={controller.saveError ? "alert" : "status"}
         className="rounded-xl bg-white p-5"
       >
-        Restoring your completed exam…
-      </p>
+        {controller.saveError ? (
+          <>
+            <p className="text-red-700">
+              {controller.saveError}
+            </p>
+            <button
+              type="button"
+              className="mt-3 font-semibold text-blue-700 underline"
+              onClick={() => window.location.reload()}
+            >
+              Retry loading saved exam
+            </button>
+          </>
+        ) : (
+          "Restoring your saved exam…"
+        )}
+      </div>
     );
   }
 

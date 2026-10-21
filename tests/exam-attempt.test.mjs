@@ -779,6 +779,12 @@ test(
             createdId,
         });
 
+      await helper.getUserExamsList({
+        uid: "1",
+        cid: "1",
+        exam_type: "pqp",
+      });
+
       /* =====================================================
          CREATE REQUEST
       ===================================================== */
@@ -861,6 +867,61 @@ test(
           .fields
           .exam_status,
         "finish"
+      );
+
+      assert.equal(
+        requests[2].url,
+        "https://exam.invalid/getUserExamsList"
+      );
+
+      assert.equal(
+        requests[2].fields.cid,
+        "1"
+      );
+
+      assert.equal(
+        requests[2].fields.uid,
+        "1"
+      );
+
+      assert.equal(
+        requests[2].fields.exam_type,
+        "pqp"
+      );
+
+      globalThis.fetch = async () =>
+        Response.json({
+          status: false,
+        });
+
+      const emptyAttempts =
+        await helper.getUserExamsList({
+          uid: "1",
+          cid: "1",
+          exam_type: "pqp",
+        });
+
+      assert.equal(emptyAttempts.status, true);
+      assert.equal(emptyAttempts.empty, true);
+      assert.deepEqual(emptyAttempts.details, []);
+
+      globalThis.fetch = async () =>
+        Response.json({
+          status: false,
+          message: "History service unavailable.",
+        });
+
+      const failedAttempts =
+        await helper.getUserExamsList({
+          uid: "1",
+          cid: "1",
+          exam_type: "pqp",
+        });
+
+      assert.equal(failedAttempts.status, false);
+      assert.equal(
+        failedAttempts.message,
+        "History service unavailable."
       );
 
       /* =====================================================

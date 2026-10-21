@@ -314,6 +314,7 @@ export async function POST(request) {
 
     const result = await getUserExamsList({
       uid,
+      cid,
       exam_type: examType,
     });
 

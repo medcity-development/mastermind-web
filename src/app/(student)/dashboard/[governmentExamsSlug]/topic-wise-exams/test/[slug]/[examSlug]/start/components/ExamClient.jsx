@@ -615,16 +615,23 @@ export default function ExamClient({
         },
       };
 
-      if (!current.pauseId) {
-        const result = await post(
-          "/api/topicwise-attempt",
-          {
-            ...payload,
-            action: "create",
-            exam_status: "pause",
-          }
-        );
+      const isResuming = Boolean(current.pauseId);
+      const result = await post(
+        "/api/topicwise-attempt",
+        {
+          ...payload,
+          action: isResuming ? "update" : "create",
+          exam_status:
+            action === "submit"
+              ? "finish"
+              : "pause",
+          ...(isResuming
+            ? { pauseid: current.pauseId }
+            : {}),
+        }
+      );
 
+      if (!isResuming) {
         const createdId = positiveId(
           getAttemptId(result)
         );
@@ -638,24 +645,9 @@ export default function ExamClient({
         current.pauseId = createdId;
         current.boundUid = Number(uid);
 
-        storeDraft();
-
+        if (action !== "submit") storeDraft();
         if (isHandoff) checkpoint(action);
       }
-
-      const result = await post(
-        "/api/topicwise-attempt",
-        {
-          ...payload,
-          action: "update",
-          pauseid: current.pauseId,
-
-          exam_status:
-            action === "submit"
-              ? "finish"
-              : "pause",
-        }
-      );
 
       if (action === "submit") {
         const finalResult = {

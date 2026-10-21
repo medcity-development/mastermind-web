@@ -629,16 +629,23 @@ export default function ScertExamClient({
         },
       };
 
-      if (!current.pauseId) {
-        const result = await post(
-          "/api/scert-attempt",
-          {
-            ...payload,
-            action: "create",
-            exam_status: "pause",
-          }
-        );
+      const isResuming = Boolean(current.pauseId);
+      const result = await post(
+        "/api/scert-attempt",
+        {
+          ...payload,
+          action: isResuming ? "update" : "create",
+          exam_status:
+            action === "submit"
+              ? "finish"
+              : "pause",
+          ...(isResuming
+            ? { pauseid: current.pauseId }
+            : {}),
+        }
+      );
 
+      if (!isResuming) {
         const createdId = positiveId(
           getAttemptId(result)
         );
@@ -652,26 +659,9 @@ export default function ScertExamClient({
         current.pauseId = createdId;
         current.boundUid = Number(uid);
 
-        storeDraft();
-
-        if (isHandoff) {
-          checkpoint(action);
-        }
+        if (action !== "submit") storeDraft();
+        if (isHandoff) checkpoint(action);
       }
-
-      const result = await post(
-        "/api/scert-attempt",
-        {
-          ...payload,
-          action: "update",
-          pauseid: current.pauseId,
-
-          exam_status:
-            action === "submit"
-              ? "finish"
-              : "pause",
-        }
-      );
 
       if (action === "submit") {
         const finalResult = {

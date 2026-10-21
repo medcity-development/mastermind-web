@@ -46,6 +46,7 @@ export default async function StartExamPage({
   const uid = Number(session?.uid) || 0;
   const cid = Number(config.cid);
   const examType = "pqp";
+  const initialPauseId = Number(query?.pauseId);
 
   const [
     detailsResult,
@@ -99,7 +100,7 @@ export default async function StartExamPage({
     <main className="min-h-screen bg-[#f5f9ff]">
       <div className="mx-auto w-full max-w-[1450px] px-4 py-6 sm:px-6 lg:px-8">
         <ExamClient
-          key={`${examId}-${uid}-${guestAction || "new"}`}
+          key={`${examId}-${uid}-${initialPauseId || "new"}-${guestAction || "new"}`}
           exam={{
             ...detailsResult.exam,
             id: examId,
@@ -113,6 +114,12 @@ export default async function StartExamPage({
           cid={cid}
           examType={examType}
           lastPosition={examType}
+          initialPauseId={
+            Number.isSafeInteger(initialPauseId) &&
+            initialPauseId > 0
+              ? initialPauseId
+              : null
+          }
           governmentExamsSlug={
             governmentExamsSlug
           }

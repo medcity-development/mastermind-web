@@ -15,6 +15,10 @@ import {
 import {
   calculateExamResult,
   getAttemptId,
+  normalizeExamAnswer,
+  parseAnswers,
+  savedPausedTimeToSeconds,
+  timestampToMilliseconds,
 } from "@/lib/examAttemptData";
 
 import {
@@ -41,6 +45,27 @@ function positiveId(value) {
   return Number.isSafeInteger(number) && number > 0
     ? number
     : null;
+}
+
+function getLastAnsweredIndex(questions, answers) {
+  return questions.reduce(
+    (lastIndex, question, index) => {
+      const answer = normalizeExamAnswer(
+        answers?.[question.id]
+      );
+
+      return /^[A-D]$/.test(answer)
+        ? index
+        : lastIndex;
+    },
+    -1
+  );
+}
+
+function getQuestionIndex(questions, questionId) {
+  return questions.findIndex(
+    (question) => String(question.id) === String(questionId)
+  );
 }
 
 async function postAttempt(endpoint, payload) {
@@ -122,8 +147,15 @@ export default function useExamController({
     durationMinutes * 60
   );
 
+  const draftKey =
+    `exam_draft_${uid}_${cid}_${type}_${id}`;
+
   const [currentPage, setCurrentPage] = useState(1);
   const [answers, setAnswers] = useState({});
+  const [
+    lastAnsweredQuestionId,
+    setLastAnsweredQuestionId,
+  ] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -148,6 +180,7 @@ export default function useExamController({
     restoreReady,
     setRestoreReady,
   ] = useState(
+    !initialPauseId &&
     !["pause", "submit"].includes(guestAction)
   );
 
@@ -160,6 +193,7 @@ export default function useExamController({
    */
   const attempt = useRef({
     answers: {},
+    lastAnsweredQuestionId: null,
     remainingSeconds: totalDurationSeconds,
     startTime: 0,
     endTime: null,
@@ -170,34 +204,278 @@ export default function useExamController({
   });
 
   useEffect(() => {
-    attempt.current = {
-      answers: {},
-      remainingSeconds: totalDurationSeconds,
-      startTime: Date.now(),
-      endTime: null,
-      pauseId: initialPauseId,
-      boundUid: null,
-      submittedResult: null,
-      frozen: ["pause", "submit"].includes(
-        guestAction
-      ),
+    let cancelled = false;
+
+    const timer = window.setTimeout(async () => {
+      let savedDraft = null;
+      let restoreFailure = "";
+
+      if (initialPauseId) {
+        try {
+          const draft = JSON.parse(
+            localStorage.getItem(draftKey) || "null"
+          );
+
+          if (
+            draft &&
+            String(draft.pauseId) === String(initialPauseId)
+          ) {
+            savedDraft = draft;
+          }
+        } catch (error) {
+          console.warn(
+            "Unable to restore paused PYQ draft:",
+            error
+          );
+        }
+      }
+
+      if (initialPauseId && !savedDraft) {
+        try {
+          const response = await fetch(
+            "/api/exam-attempt/analytics-details",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              cache: "no-store",
+              body: JSON.stringify({
+                cid,
+                id: initialPauseId,
+                exam_type: type,
+              }),
+            }
+          );
+          const result = await response.json();
+
+          if (!response.ok || result?.status === false) {
+            throw new Error(
+              result?.message ||
+              "Unable to load the saved attempt."
+            );
+          }
+
+          const candidates = [
+            result?.details,
+            result?.data,
+            result?.result,
+            result?.results,
+          ];
+          const rows = candidates.find(Array.isArray);
+          const savedAttempt =
+            rows?.find(
+              (row) =>
+                String(
+                  row?.pauseid ??
+                  row?.pause_id ??
+                  row?.attempt_id ??
+                  row?.id
+                ) === String(initialPauseId)
+            ) ??
+            (result?.data &&
+            !Array.isArray(result.data) &&
+            typeof result.data === "object"
+              ? result.data
+              : null);
+
+          if (!savedAttempt) {
+            throw new Error(
+              "Saved attempt details were not returned."
+            );
+          }
+
+          const savedAnswers = parseAnswers(
+            savedAttempt.user_answers ??
+            savedAttempt.answers
+          );
+          const restoredAnswers = {};
+
+          normalizedQuestions.forEach((question, index) => {
+            const answer = normalizeExamAnswer(
+              savedAnswers[index]
+            );
+
+            if (/^[A-D]$/.test(answer)) {
+              restoredAnswers[question.id] = answer;
+            }
+          });
+
+          const savedPage = Number(
+            savedAttempt.current_page ??
+            savedAttempt.currentPage
+          );
+          const savedQuestionPosition = Number(
+            savedAttempt.lastposition ??
+            savedAttempt.last_position
+          );
+          const savedLastAnsweredQuestionId =
+            Number.isSafeInteger(savedQuestionPosition) &&
+            savedQuestionPosition > 0
+              ? normalizedQuestions[
+                savedQuestionPosition - 1
+              ]?.id ?? null
+              : null;
+          const lastAnsweredIndex = savedAnswers.reduce(
+            (lastIndex, answer, index) =>
+              /^[A-D]$/.test(normalizeExamAnswer(answer))
+                ? index
+                : lastIndex,
+            -1
+          );
+
+          savedDraft = {
+            answers: restoredAnswers,
+            lastAnsweredQuestionId:
+              savedLastAnsweredQuestionId,
+            pauseId: initialPauseId,
+            remainingSeconds:
+              savedAttempt.paused_time == null
+                ? totalDurationSeconds
+                : savedPausedTimeToSeconds(
+                  savedAttempt.paused_time,
+                  totalDurationSeconds
+                ),
+            currentPage:
+              Number.isSafeInteger(savedPage) &&
+              savedPage > 0
+                ? savedPage
+                : Math.floor(
+                  Math.max(0, lastAnsweredIndex) /
+                  QUESTIONS_PER_PAGE
+                ) + 1,
+            startTime:
+              timestampToMilliseconds(
+                savedAttempt.start_time ??
+                savedAttempt.startTime ??
+                savedAttempt.started_at
+              ) ?? Date.now(),
+          };
+
+          try {
+            localStorage.setItem(
+              draftKey,
+              JSON.stringify(savedDraft)
+            );
+          } catch (storageError) {
+            console.warn(
+              "Unable to cache restored PYQ attempt:",
+              storageError
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Unable to restore saved PYQ attempt:",
+            error
+          );
+
+          restoreFailure =
+            error?.message ||
+            "Unable to restore the saved attempt.";
+        }
+      }
+
+      const restoredAnswers =
+        savedDraft?.answers &&
+        typeof savedDraft.answers === "object" &&
+        !Array.isArray(savedDraft.answers)
+          ? savedDraft.answers
+          : {};
+      const savedQuestionIndex = getQuestionIndex(
+        normalizedQuestions,
+        savedDraft?.lastAnsweredQuestionId
+      );
+      const lastAnsweredIndex =
+        savedQuestionIndex >= 0
+          ? savedQuestionIndex
+          : getLastAnsweredIndex(
+            normalizedQuestions,
+            restoredAnswers
+          );
+      const restoredLastAnsweredQuestionId =
+        lastAnsweredIndex >= 0
+          ? normalizedQuestions[lastAnsweredIndex]?.id ?? null
+          : null;
+      const resumePage = lastAnsweredIndex >= 0
+        ? Math.floor(
+          lastAnsweredIndex / QUESTIONS_PER_PAGE
+        ) + 1
+        : Number(savedDraft?.currentPage) || 1;
+      const restoredPage = Math.min(
+        Math.max(resumePage, 1),
+        Math.max(
+          1,
+          Math.ceil(totalQuestions / QUESTIONS_PER_PAGE)
+        )
+      );
+      const savedRemainingSeconds = Number(
+        savedDraft?.remainingSeconds
+      );
+      const restoredRemainingSeconds =
+        Number.isFinite(savedRemainingSeconds)
+          ? Math.min(
+            totalDurationSeconds,
+            Math.max(0, savedRemainingSeconds)
+          )
+          : totalDurationSeconds;
+
+      if (cancelled) return;
+
+      attempt.current = {
+        answers: restoredAnswers,
+        lastAnsweredQuestionId:
+          restoredLastAnsweredQuestionId,
+        remainingSeconds: restoredRemainingSeconds,
+        startTime:
+          Number(savedDraft?.startTime) || Date.now(),
+        endTime: null,
+        pauseId: initialPauseId,
+        boundUid: null,
+        submittedResult: null,
+        frozen: ["pause", "submit"].includes(
+          guestAction
+        ),
+      };
+
+      setAnswers(restoredAnswers);
+      setLastAnsweredQuestionId(
+        restoredLastAnsweredQuestionId
+      );
+      setCurrentPage(restoredPage);
+      setRemainingSeconds(restoredRemainingSeconds);
+      setSubmitted(false);
+      setPaused(false);
+      setSaving(false);
+      setSaveError(restoreFailure);
+      setSubmittedResult(null);
+      setResultModalOpen(false);
+
+      setRestoreReady(
+        Boolean(
+          savedDraft ||
+          (
+            !initialPauseId &&
+            !["pause", "submit"].includes(guestAction)
+          )
+        )
+      );
+
+      if (initialPauseId && savedDraft) {
+        attempt.current.frozen = false;
+      }
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
-
-    setAnswers({});
-    setCurrentPage(1);
-    setRemainingSeconds(totalDurationSeconds);
-    setSubmitted(false);
-    setPaused(false);
-    setSaving(false);
-    setSaveError("");
-    setSubmittedResult(null);
-    setResultModalOpen(false);
-
-    setRestoreReady(
-      !["pause", "submit"].includes(guestAction)
-    );
   }, [
     id,
+    draftKey,
+    cid,
+    type,
+    normalizedQuestions,
+    totalQuestions,
     totalDurationSeconds,
     initialPauseId,
     guestAction,
@@ -377,8 +655,26 @@ export default function useExamController({
         );
       }
 
+      const savedQuestionIndex = getQuestionIndex(
+        normalizedQuestions,
+        saved.lastAnsweredQuestionId
+      );
+      const lastQuestionIndex =
+        savedQuestionIndex >= 0
+          ? savedQuestionIndex
+          : getLastAnsweredIndex(
+            normalizedQuestions,
+            saved.answers
+          );
+      const restoredLastAnsweredQuestionId =
+        lastQuestionIndex >= 0
+          ? normalizedQuestions[lastQuestionIndex]?.id ?? null
+          : null;
+
       attempt.current = {
         answers: { ...saved.answers },
+        lastAnsweredQuestionId:
+          restoredLastAnsweredQuestionId,
         remainingSeconds: saved.remainingSeconds,
         startTime: saved.startTime,
         endTime: saved.endTime ?? null,
@@ -390,6 +686,16 @@ export default function useExamController({
       };
 
       setAnswers(attempt.current.answers);
+      setLastAnsweredQuestionId(
+        restoredLastAnsweredQuestionId
+      );
+      if (lastQuestionIndex >= 0) {
+        setCurrentPage(
+          Math.floor(
+            lastQuestionIndex / QUESTIONS_PER_PAGE
+          ) + 1
+        );
+      }
       setRemainingSeconds(saved.remainingSeconds);
       setRestoreReady(true);
 
@@ -472,12 +778,19 @@ export default function useExamController({
       const resultStats = statsFor(
         current.answers
       );
+      const lastAnsweredIndex = getQuestionIndex(
+        normalizedQuestions,
+        current.lastAnsweredQuestionId
+      );
+      const resumePosition = lastAnsweredIndex >= 0
+        ? lastAnsweredIndex + 1
+        : (currentPage - 1) * QUESTIONS_PER_PAGE + 1;
 
       const payload = {
         cid,
         exam_id: id,
         exam_type: type,
-        lastposition: lastPosition ?? type,
+        lastposition: resumePosition,
 
         total_questions: totalQuestions,
         total_mark: totalMark,
@@ -522,22 +835,25 @@ export default function useExamController({
         },
       };
 
-      /*
-       * Create an attempt once.
-       * Keep its ID when an update fails.
-       */
-      if (!current.pauseId) {
-        const created = await postAttempt(
-          "/api/pyq-attempt",
-          {
-            ...payload,
-            action: "create",
-            exam_status: "pause",
-          }
-        );
+      const isResuming = Boolean(current.pauseId);
+      const result = await postAttempt(
+        "/api/pyq-attempt",
+        {
+          ...payload,
+          action: isResuming ? "update" : "create",
+          exam_status:
+            action === "submit"
+              ? "finish"
+              : "pause",
+          ...(isResuming
+            ? { pauseid: current.pauseId }
+            : {}),
+        }
+      );
 
+      if (!isResuming) {
         const savedId = positiveId(
-          getAttemptId(created)
+          getAttemptId(result)
         );
 
         if (!savedId) {
@@ -556,19 +872,40 @@ export default function useExamController({
         }
       }
 
-      const result = await postAttempt(
-        "/api/pyq-attempt",
-        {
-          ...payload,
-          action: "update",
-          pauseid: current.pauseId,
-
-          exam_status:
-            action === "submit"
-              ? "finish"
-              : "pause",
+      if (action === "pause") {
+        try {
+          localStorage.setItem(
+            draftKey,
+            JSON.stringify({
+              answers: current.answers,
+              lastAnsweredQuestionId:
+                current.lastAnsweredQuestionId,
+              pauseId: current.pauseId,
+              remainingSeconds: current.remainingSeconds,
+              currentPage:
+                Math.floor(
+                  (resumePosition - 1) /
+                  QUESTIONS_PER_PAGE
+                ) + 1,
+              startTime: current.startTime,
+            })
+          );
+        } catch (storageError) {
+          console.warn(
+            "Unable to save paused PYQ draft:",
+            storageError
+          );
         }
-      );
+      } else {
+        try {
+          localStorage.removeItem(draftKey);
+        } catch (storageError) {
+          console.warn(
+            "Unable to clear submitted PYQ draft:",
+            storageError
+          );
+        }
+      }
 
       if (action === "submit") {
         const finalResult = {
@@ -687,13 +1024,16 @@ export default function useExamController({
     };
 
     attempt.current.answers = next;
+    attempt.current.lastAnsweredQuestionId = questionId;
     setAnswers(next);
+    setLastAnsweredQuestionId(questionId);
   }
 
   return {
     currentPage,
     totalPages,
     startIndex,
+    lastAnsweredQuestionId,
 
     endIndex: Math.min(
       startIndex + QUESTIONS_PER_PAGE,

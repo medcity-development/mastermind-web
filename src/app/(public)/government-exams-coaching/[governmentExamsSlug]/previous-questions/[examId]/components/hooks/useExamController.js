@@ -522,22 +522,25 @@ export default function useExamController({
         },
       };
 
-      /*
-       * Create an attempt once.
-       * Keep its ID when an update fails.
-       */
-      if (!current.pauseId) {
-        const created = await postAttempt(
-          "/api/pyq-attempt",
-          {
-            ...payload,
-            action: "create",
-            exam_status: "pause",
-          }
-        );
+      const isResuming = Boolean(current.pauseId);
+      const result = await postAttempt(
+        "/api/pyq-attempt",
+        {
+          ...payload,
+          action: isResuming ? "update" : "create",
+          exam_status:
+            action === "submit"
+              ? "finish"
+              : "pause",
+          ...(isResuming
+            ? { pauseid: current.pauseId }
+            : {}),
+        }
+      );
 
+      if (!isResuming) {
         const savedId = positiveId(
-          getAttemptId(created)
+          getAttemptId(result)
         );
 
         if (!savedId) {
@@ -555,20 +558,6 @@ export default function useExamController({
           checkpoint(action);
         }
       }
-
-      const result = await postAttempt(
-        "/api/pyq-attempt",
-        {
-          ...payload,
-          action: "update",
-          pauseid: current.pauseId,
-
-          exam_status:
-            action === "submit"
-              ? "finish"
-              : "pause",
-        }
-      );
 
       if (action === "submit") {
         const finalResult = {

@@ -328,19 +328,28 @@ export default function useMockExamAttempt({
                    GET OR CREATE ATTEMPT ID
                 ================================= */
 
+                const finalPayload =
+                    buildPayload({
+                        examStatus: "finish",
+                        result: calculated,
+                        completedAt: Date.now(),
+                    });
+
                 let finalPauseId = pauseId;
 
-                if (!finalPauseId) {
-                    const createPayload =
-                        buildPayload({
-                            examStatus: "pause",
-                            result: calculated,
-                        });
-
+                if (finalPauseId) {
+                    await postJson(
+                        "/api/exam-attempt/update",
+                        {
+                            ...finalPayload,
+                            pauseid: String(finalPauseId),
+                        }
+                    );
+                } else {
                     const createResult =
                         await postJson(
                             "/api/exam-attempt/create",
-                            createPayload
+                            finalPayload
                         );
 
                     finalPauseId =
@@ -354,25 +363,6 @@ export default function useMockExamAttempt({
 
                     setPauseId(finalPauseId);
                 }
-
-                /* =================================
-                   FINISH SAVED ATTEMPT
-                ================================= */
-
-                const finalPayload =
-                    buildPayload({
-                        examStatus: "finish",
-                        result: calculated,
-                        completedAt: Date.now(),
-                    });
-
-                await postJson(
-                    "/api/exam-attempt/update",
-                    {
-                        ...finalPayload,
-                        pauseid: String(finalPauseId),
-                    }
-                );
 
                 /* =================================
                    SUBMISSION SUCCESSFUL

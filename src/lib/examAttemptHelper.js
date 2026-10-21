@@ -376,11 +376,15 @@ export async function updateUserExamAttempt(
 
 export async function getUserExamsList({
   uid,
+  cid,
   exam_type,
 } = {}) {
   try {
     const safeUid =
       getPositiveNumber(uid);
+
+    const safeCid =
+      getPositiveNumber(cid);
 
     const safeExamType =
       normalizeExamType(exam_type);
@@ -401,9 +405,45 @@ export async function getUserExamsList({
       "getUserExamsList",
       {
         uid: safeUid,
+        ...(safeCid ? { cid: safeCid } : {}),
         exam_type: safeExamType,
       }
     );
+
+    const hasAttemptRecords = [
+      result?.details,
+      result?.data,
+      result?.result,
+      result?.results,
+      result?.exams,
+      result?.data?.details,
+      result?.data?.data,
+      result?.result?.details,
+    ].some(
+      (records) =>
+        Array.isArray(records) &&
+        records.length > 0
+    );
+
+    const backendMessage = String(
+      result?.message ??
+      result?.msg ??
+      ""
+    ).trim();
+
+    if (
+      isFailedResponse(result) &&
+      !backendMessage &&
+      !hasAttemptRecords
+    ) {
+      return {
+        ...result,
+        status: true,
+        empty: true,
+        details: [],
+        data: [],
+      };
+    }
 
     const failed = normalizeFailure(
       result,

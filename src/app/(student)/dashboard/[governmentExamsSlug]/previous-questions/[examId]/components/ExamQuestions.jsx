@@ -15,6 +15,7 @@ export default function ExamQuestions({
         (question, index) => (
           <div
             key={question.id}
+            id={`exam-question-${question.id}`}
             className="
               rounded-[24px]
               border

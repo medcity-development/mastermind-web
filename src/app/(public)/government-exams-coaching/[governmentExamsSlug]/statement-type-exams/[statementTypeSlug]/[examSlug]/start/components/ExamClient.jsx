@@ -6,7 +6,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { secondsToMilliseconds } from "@/lib/examAttemptData";
+import {
+  getAttemptId,
+  secondsToMilliseconds,
+} from "@/lib/examAttemptData";
 import { saveGuestExamHandoff } from "@/lib/guestExamHandoff";
 
 import {
@@ -139,8 +142,6 @@ export default function ExamClient({
   cid = 1,
 
   examType = "tst",
-
-  initialAttemptCreated = false,
 }) {
   const router =
     useRouter();
@@ -163,21 +164,13 @@ export default function ExamClient({
     saving,
     setSaving,
   ] = useState(false);
-  const [attemptStartTime] = useState(() => Date.now());
+  const [attemptStartTime, setAttemptStartTime] = useState(() => Date.now());
+  const [pauseId, setPauseId] = useState(null);
 
   const [
     saveError,
     setSaveError,
   ] = useState("");
-
-  const [
-    attemptCreated,
-    setAttemptCreated,
-  ] = useState(
-    Boolean(
-      initialAttemptCreated
-    )
-  );
 
   const [
     modalState,
@@ -196,6 +189,8 @@ export default function ExamClient({
 
   const examId =
     exam?.id;
+  const draftKey =
+    `exam_draft_${uid}_${cid}_${examType}_${examId}`;
 
   const durationMinutes =
     Number(
@@ -232,21 +227,65 @@ export default function ExamClient({
       false;
 
     const timer = window.setTimeout(() => {
+      let draft = null;
+
+      try {
+        draft = JSON.parse(
+          localStorage.getItem(draftKey) || "null"
+        );
+      } catch (error) {
+        console.warn(
+          "Unable to restore statement exam draft:",
+          error
+        );
+      }
+
       if (durationSeconds <= 0) {
         setEndTime(null);
         setTimeLeft(0);
         return;
       }
 
-      const deadline = Date.now() + durationSeconds * 1000;
+      const savedTimeLeft = Number(draft?.timeLeft);
+      const remainingSeconds = Math.max(
+        0,
+        Math.min(
+          durationSeconds,
+          Number.isFinite(savedTimeLeft)
+            ? savedTimeLeft
+            : durationSeconds
+        )
+      );
+
+      if (draft && typeof draft === "object") {
+        setAnswers(
+          draft.answers && typeof draft.answers === "object"
+            ? draft.answers
+            : {}
+        );
+        setPauseId(draft.pauseId || null);
+        setAttemptStartTime(
+          Number(draft.startTime) || Date.now()
+        );
+        setCurrentPage(
+          Math.min(
+            Math.max(Number(draft.currentPage) || 1, 1),
+            Math.max(1, Math.ceil(questions.length / QUESTIONS_PER_PAGE))
+          )
+        );
+      }
+
+      const deadline = Date.now() + remainingSeconds * 1000;
       setEndTime(deadline);
-      setTimeLeft(durationSeconds);
+      setTimeLeft(remainingSeconds);
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [
     examId,
     durationSeconds,
+    draftKey,
+    questions.length,
   ]);
 
   useEffect(() => {
@@ -679,6 +718,7 @@ export default function ExamClient({
 
         wrong_answer_array:
           wrongAnswerArray,
+        ...(pauseId ? { pauseid: pauseId } : {}),
       };
 
       console.log(
@@ -686,40 +726,47 @@ export default function ExamClient({
         payload
       );
 
-      let result;
+      const isResuming = Boolean(pauseId);
+      const result = await sendAttemptRequest({
+        endpoint: isResuming
+          ? "/api/exam-attempt/update"
+          : "/api/exam-attempt/create",
+        payload,
+      });
 
-      /* -----------------------------------------------------
-         CREATE FIRST ATTEMPT
-      ----------------------------------------------------- */
+      const savedAttemptId =
+        pauseId || getAttemptId(result);
 
-      if (
-        !attemptCreated
-      ) {
-        result =
-          await sendAttemptRequest({
-            endpoint:
-              "/api/exam-attempt/create",
-
-            payload,
-          });
-
-        setAttemptCreated(
-          true
+      if (examStatus === "pause" && !savedAttemptId) {
+        throw new Error(
+          "The saved attempt ID was not returned. Please retry."
         );
       }
 
-      /* -----------------------------------------------------
-         UPDATE EXISTING ATTEMPT
-      ----------------------------------------------------- */
+      if (savedAttemptId) {
+        setPauseId(savedAttemptId);
+      }
 
-      else {
-        result =
-          await sendAttemptRequest({
-            endpoint:
-              "/api/exam-attempt/update",
-
-            payload,
-          });
+      try {
+        if (examStatus === "pause") {
+          localStorage.setItem(
+            draftKey,
+            JSON.stringify({
+              answers,
+              pauseId: savedAttemptId,
+              timeLeft,
+              currentPage,
+              startTime: attemptStartTime,
+            })
+          );
+        } else {
+          localStorage.removeItem(draftKey);
+        }
+      } catch (storageError) {
+        console.warn(
+          "Unable to save statement exam draft:",
+          storageError
+        );
       }
 
       console.log(
