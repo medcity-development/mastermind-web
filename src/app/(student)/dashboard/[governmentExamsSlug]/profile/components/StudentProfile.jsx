@@ -10,12 +10,16 @@ import {
 import {
     CalendarDays,
     Edit3,
+    LoaderCircle,
     Mail,
     MapPin,
     Phone,
     ShieldCheck,
+    Trash2,
     UserRound,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 
 import maleAvatar from "@/app/(public)/profile-setup/images/avatar-male.png";
 import femaleAvatar from "@/app/(public)/profile-setup/images/avatar-female.png";
@@ -26,6 +30,7 @@ export default function StudentProfile({
     uid,
     config,
 }) {
+    const router = useRouter();
     const [
         profile,
         setProfile,
@@ -36,6 +41,10 @@ export default function StudentProfile({
     const [
         showModal,
         setShowModal,
+    ] = useState(false);
+    const [
+        deletingAccount,
+        setDeletingAccount,
     ] = useState(false);
     const subscribeToSavedAvatar = useCallback((callback) => {
         window.addEventListener("storage", callback);
@@ -94,6 +103,70 @@ export default function StudentProfile({
     const avatarImage = getAvatarImage(profileAvatar)
         ? getAvatarImage(profileAvatar)
         : getAvatarImage(storedAvatar);
+
+    async function handleDeleteAccount() {
+        if (deletingAccount) {
+            return;
+        }
+
+        const confirmation = await Swal.fire({
+            icon: "warning",
+            title: "Delete your account?",
+            text: "This permanently deletes your account. You will be signed out and cannot undo this action.",
+            showCancelButton: true,
+            confirmButtonText: "Delete account",
+            cancelButtonText: "Keep account",
+            confirmButtonColor: "#dc2626",
+            cancelButtonColor: "#64748b",
+            focusCancel: true,
+        });
+
+        if (!confirmation.isConfirmed) {
+            return;
+        }
+
+        setDeletingAccount(true);
+
+        try {
+            const response = await fetch("/api/student/delete-account", {
+                method: "DELETE",
+                cache: "no-store",
+            });
+            const result = await response.json();
+
+            if (!response.ok || result?.status !== true) {
+                throw new Error(
+                    result?.message || "Unable to delete your account."
+                );
+            }
+
+            try {
+                window.localStorage.removeItem("student-profile-avatar");
+            } catch (storageError) {
+                console.error("Unable to clear saved profile avatar:", storageError);
+            }
+
+            await Swal.fire({
+                icon: "success",
+                title: "Account deleted",
+                text: result.message || "Your account has been deleted.",
+                confirmButtonColor: "#164fa5",
+            });
+
+            router.replace("/login");
+            router.refresh();
+        } catch (error) {
+            console.error("Delete student account:", error);
+            await Swal.fire({
+                icon: "error",
+                title: "Unable to delete account",
+                text: error?.message || "Please try again.",
+                confirmButtonColor: "#dc2626",
+            });
+        } finally {
+            setDeletingAccount(false);
+        }
+    }
 
     return (
         <>
@@ -375,6 +448,30 @@ export default function StudentProfile({
                             }
                         />
                     </div>
+                </section>
+
+                <section className="flex flex-col gap-4 rounded-[26px] border border-red-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                    <div>
+                        <h2 className="text-base font-extrabold text-slate-900">
+                            Delete account
+                        </h2>
+                        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                            Permanently remove your account and sign out. This action cannot be undone.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleDeleteAccount}
+                        disabled={deletingAccount}
+                        className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 text-xs font-extrabold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {deletingAccount ? (
+                            <LoaderCircle size={15} className="animate-spin" />
+                        ) : (
+                            <Trash2 size={15} />
+                        )}
+                        {deletingAccount ? "Deleting account..." : "Delete account"}
+                    </button>
                 </section>
             </div>
 
