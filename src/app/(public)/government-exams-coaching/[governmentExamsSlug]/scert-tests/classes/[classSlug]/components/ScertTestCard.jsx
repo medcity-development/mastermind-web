@@ -5,6 +5,8 @@ import {
 } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 import {
   ArrowRight,
@@ -36,6 +38,7 @@ export default function ScertTestCard({
   classId,
   governmentExamsSlug = "kerala-psc",
 }) {
+  const router = useRouter();
   const [
     showPremiumModal,
     setShowPremiumModal,
@@ -331,18 +334,17 @@ export default function ScertTestCard({
               false
             )
           }
-          redirectPath={
-            `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}` +
-            `?classId=${encodeURIComponent(
-              classId
-            )}` +
-            `&examId=${encodeURIComponent(
-              examId
-            )}` +
-            `&selectedTestTitle=${encodeURIComponent(
-              test?.exam_name || "SCERT Practice Test"
-            )}`
-          }
+          onLogin={() => {
+            continueToPremiumPackages(
+              router,
+              `/government-exams-coaching/${governmentExamsSlug}`
+            ).catch((error) => {
+              console.error(
+                "Unable to open premium plans:",
+                error
+              );
+            });
+          }}
         />
       ) : null}
     </>
@@ -405,15 +407,8 @@ function StatBox({
 
 function PremiumModal({
   onClose,
-  redirectPath,
+  onLogin,
 }) {
-  function handleLogin() {
-    window.location.href =
-      `/login?redirect=${encodeURIComponent(
-        redirectPath
-      )}`;
-  }
-
   return (
     <div
       onClick={onClose}
@@ -491,7 +486,7 @@ function PremiumModal({
         <button
           type="button"
           onClick={
-            handleLogin
+            onLogin
           }
           className="
             mt-6
@@ -506,7 +501,7 @@ function PremiumModal({
             hover:bg-amber-600
           "
         >
-          Login & View Plans
+          OK
         </button>
 
         <button

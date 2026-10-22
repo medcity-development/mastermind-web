@@ -382,4 +382,3 @@ export default async function SubExamDetailsPage({
     </main>
   );
 }
-

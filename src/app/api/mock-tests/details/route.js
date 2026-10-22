@@ -1,6 +1,7 @@
 import {
   NextResponse,
 } from "next/server";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
 
 export async function GET(
   request
@@ -17,15 +18,20 @@ export async function GET(
         "cid"
       );
 
-    const uid =
-      searchParams.get(
-        "uid"
-      ) || "0";
+    const session = await getStudentSession();
+    const uid = String(Number(session?.uid) || 0);
 
     const examId =
       searchParams.get(
         "examid"
       );
+    const requestedType = String(
+      searchParams.get("type") || "mock"
+    ).trim().toLowerCase();
+    const examType =
+      requestedType === "studyplan"
+        ? "studyplan"
+        : "mock";
 
     if (!cid) {
       return NextResponse.json(
@@ -127,7 +133,7 @@ export async function GET(
 
     formData.append(
       "type",
-      "mock"
+      examType
     );
 
     const response =
@@ -196,7 +202,10 @@ export async function GET(
     }
 
     return NextResponse.json(
-      result,
+      {
+        ...result,
+        examType,
+      },
       {
         status: 200,
       }

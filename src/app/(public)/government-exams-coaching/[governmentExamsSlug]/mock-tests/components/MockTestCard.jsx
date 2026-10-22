@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import {
   useRouter,
+  usePathname,
 } from "next/navigation";
 
 import {
@@ -19,9 +20,8 @@ import {
   Trophy,
   X,
 } from "lucide-react";
-import {
-  createSlug,
-} from "@/lib/pscSlug";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
+import { createSlug } from "@/lib/pscSlug";
 
 export default function MockTestCard({
   test,
@@ -33,6 +33,8 @@ export default function MockTestCard({
 }) {
   const router =
     useRouter();
+  const pathname =
+    usePathname();
 
   const [
     showPremiumModal,
@@ -52,6 +54,16 @@ export default function MockTestCard({
   const testTitle =
     test?.exam_name ||
     `${examName} Mock Test`;
+
+  const examPath =
+    `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(testTitle)}`;
+
+  const examQuery = {
+    examId: String(examId),
+    uid: String(uid),
+    title: testTitle,
+    selectedTestTitle: testTitle,
+  };
 
   const totalQuestions =
     test?.total_questions;
@@ -76,16 +88,6 @@ export default function MockTestCard({
   const premium =
     access === "paid";
 
-  const examPath =
-    `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(testTitle)}`;
-
-  const examQuery = {
-    examId: String(examId),
-    uid: String(uid),
-    title: testTitle,
-    selectedTestTitle: testTitle,
-  };
-
   function openPremiumModal(
     event
   ) {
@@ -103,11 +105,42 @@ export default function MockTestCard({
       false
     );
 
-    const returnUrl = `${examPath}?${new URLSearchParams(examQuery).toString()}`;
+    const packageContext = {
+      packageId:
+        test?.package_id ??
+        test?.packageId ??
+        test?.pack_id ??
+        test?.packid ??
+        test?.packageid ??
+        test?.premium_package_id ??
+        test?.pid,
+      packageName:
+        test?.package_name ??
+        test?.packageName ??
+        test?.pack_name ??
+        test?.plan_name,
+      packageCourseId:
+        test?.courseid ??
+        test?.course_id ??
+        test?.courseId ??
+        test?.subcourseid ??
+        test?.subcourse_id ??
+        test?.subcourseId,
+      packageCourseName:
+        test?.subcourse_name ??
+        test?.course_name ??
+        test?.subcourse ??
+        test?.course,
+      packageTestName: testTitle,
+    };
 
-    router.push(
-      `/login?redirect=${encodeURIComponent(returnUrl)}`
-    );
+    continueToPremiumPackages(
+      router,
+      pathname,
+      packageContext
+    ).catch((error) => {
+      console.error("Unable to open premium plans:", error);
+    });
   }
 
   return (

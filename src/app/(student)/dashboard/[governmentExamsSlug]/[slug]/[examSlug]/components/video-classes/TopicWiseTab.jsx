@@ -90,7 +90,33 @@ function normalizeTopic(
           item?.chapter_count ??
           0
       ) || 0,
+
+    mockTestId:
+      item?.mocktest ??
+      item?.mock_test ??
+      item?.mocktest_id ??
+      item?.mockTest ??
+      null,
   };
+}
+
+function resolveMockTestId(result, topic) {
+  const candidates = [
+    result?.mocktest,
+    result?.mock_test,
+    result?.mocktest_id,
+    result?.mockTest,
+    result?.details?.mocktest,
+    result?.details?.mocktest_id,
+    topic?.mockTestId,
+  ];
+
+  for (const value of candidates) {
+    const id = Number(value);
+    if (Number.isSafeInteger(id) && id > 0) return id;
+  }
+
+  return null;
 }
 
 /* =========================================================
@@ -103,6 +129,7 @@ export default function TopicWiseTab({
   examId,
   onLoginRequired,
   onStartMockTest,
+  governmentExamsSlug,
 }) {
   const [
     categories,
@@ -528,6 +555,10 @@ export default function TopicWiseTab({
       setChapters(
         chapterList
       );
+
+      setMockTestId(
+        resolveMockTestId(result, topic)
+      );
     } catch (error) {
       console.error(
         "loadChapters:",
@@ -561,6 +592,7 @@ export default function TopicWiseTab({
         topic={selectedTopic}
         mockTestId={mockTestId}
         cid={cid}
+        governmentExamsSlug={governmentExamsSlug}
         onStartMockTest={onStartMockTest}
         chapters={
           chapters

@@ -1,4 +1,5 @@
 import {
+    getCorrectAnswer,
     getExamTotalMark,
 } from "./mockTestUtils";
 import { secondsToMilliseconds } from "@/lib/examAttemptData";
@@ -9,6 +10,7 @@ export function buildMockAttemptPayload({
     examType,
     exam,
     questions = [],
+    answers = {},
     remainingSeconds = 0,
     startTime,
     completedAt,
@@ -21,7 +23,7 @@ export function buildMockAttemptPayload({
             questions.length
         );
 
-    return {
+    const payload = {
         cid:
             String(cid),
 
@@ -68,37 +70,29 @@ export function buildMockAttemptPayload({
                 totalMark
             ),
 
-        user_score:
-            String(
-                result.userScore
-            ),
-
-        minus_mark:
-            String(
-                result.minusMark
-            ),
-
         answer_array:
-            result.answerArray,
+            result?.answerArray ?? questions.map(
+                (question) => getCorrectAnswer(question) || 0
+            ),
 
         user_answers:
-            result.userAnswers,
-
-        total_wrong:
-            String(
-                result.totalWrong
-            ),
-
-        total_correct:
-            String(
-                result.totalCorrect
-            ),
-
-        total_attempted:
-            String(
-                result.totalAttempted
+            result?.userAnswers ?? questions.map(
+                (question, index) =>
+                    answers[question?.id ?? index + 1] ?? 0
             ),
     };
+
+    if (result) {
+        Object.assign(payload, {
+            user_score: String(result.userScore),
+            minus_mark: String(result.minusMark),
+            total_wrong: String(result.totalWrong),
+            total_correct: String(result.totalCorrect),
+            total_attempted: String(result.totalAttempted),
+        });
+    }
+
+    return payload;
 }
 
 export function getMockExamTitle({

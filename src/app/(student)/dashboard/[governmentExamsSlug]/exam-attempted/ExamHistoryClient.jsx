@@ -31,6 +31,7 @@ import {
 import {
   recoverPyqHistory,
 } from "@/lib/pyqHistoryRecovery";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -164,9 +165,19 @@ function preserveSavedCounts(source, prepared) {
     "correct_count",
     "wrong_count",
     "user_score",
+    "score",
     "minus_mark",
-    "total_mark",
+    "marks_obtained",
+    "negative_mark",
   ];
+
+  if (!isFinishedExamAttempt(source)) {
+    for (const field of fields) {
+      result[field] = null;
+    }
+
+    return result;
+  }
 
   for (const field of fields) {
     const value = source?.[field];

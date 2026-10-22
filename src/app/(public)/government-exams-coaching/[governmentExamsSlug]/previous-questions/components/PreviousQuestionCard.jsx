@@ -13,6 +13,7 @@ import {
   Target,
   X,
 } from "lucide-react";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 export default function PreviousQuestionCard({
   item,
@@ -51,13 +52,7 @@ export default function PreviousQuestionCard({
 
   function handleOk() {
     setShowPremiumModal(false);
-
-    const returnPath =
-      `${pathname}/${encodeURIComponent(id)}` +
-      `?type=${encodeURIComponent(type)}` +
-      `&selectedTestTitle=${encodeURIComponent(exam_name || "Previous Question Paper")}`;
-
-    router.push(`/login?redirect=${encodeURIComponent(returnPath)}`);
+    continueToPremiumPackages(router, pathname);
   }
 
   return (

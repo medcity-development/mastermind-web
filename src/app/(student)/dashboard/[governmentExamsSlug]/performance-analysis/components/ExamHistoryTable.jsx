@@ -1,6 +1,7 @@
 import {
   formatStatus,
 } from "../utils/performanceAnalysisUtils";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 function StatusBadge({
   value,
@@ -161,7 +162,10 @@ export default function ExamHistoryTable({
             (
               attempt,
               index
-            ) => (
+            ) => {
+              const isFinished = isFinishedExamAttempt(attempt);
+
+              return (
               <tr
                 key={`${attempt.examType}-${attempt.attemptId}`}
                 className="
@@ -290,25 +294,17 @@ export default function ExamHistoryTable({
                   />
                 </td>
 
-                <MetricCell
-                  value={
-                    attempt.attempted
-                  }
-                />
+                <MetricCell value={isFinished ? attempt.attempted : "—"} />
 
                 <MetricCell
-                  value={
-                    attempt.correct
-                  }
+                  value={isFinished ? attempt.correct : "—"}
                   className="
                     text-emerald-600
                   "
                 />
 
                 <MetricCell
-                  value={
-                    attempt.wrong
-                  }
+                  value={isFinished ? attempt.wrong : "—"}
                   className="
                     text-red-500
                   "
@@ -336,27 +332,21 @@ export default function ExamHistoryTable({
                       text-white
                     "
                   >
-                    <strong>
-                      {
-                        attempt.score
-                      }
-                    </strong>
-
-                    <span
-                      className="
-                        text-[8px]
-                        text-white/50
-                      "
-                    >
-                      /
-                      {
-                        attempt.totalMark
-                      }
-                    </span>
+                    {!isFinished ? (
+                      <strong>—</strong>
+                    ) : (
+                      <>
+                        <strong>{attempt.score}</strong>
+                        <span className="text-[8px] text-white/50">
+                          / {attempt.totalMark}
+                        </span>
+                      </>
+                    )}
                   </span>
                 </td>
               </tr>
-            )
+              );
+            }
           )}
         </tbody>
       </table>

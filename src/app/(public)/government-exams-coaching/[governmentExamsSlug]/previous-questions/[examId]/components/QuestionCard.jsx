@@ -4,6 +4,7 @@ import {
     CircleX,
     Lightbulb,
   } from "lucide-react";
+  import { getOptionDisplayText } from "@/lib/examOptionUtils";
   
   export default function QuestionCard({
     question,
@@ -232,7 +233,7 @@ import {
                       text-slate-700
                     "
                   >
-                    {option.value}
+                    {getOptionDisplayText(option.value, option.key)}
                   </span>
   
                   {isCorrect && (

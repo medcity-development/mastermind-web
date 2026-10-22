@@ -1,7 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import {
+    useCallback,
     useState,
+    useSyncExternalStore,
 } from "react";
 
 import {
@@ -14,10 +17,13 @@ import {
     UserRound,
 } from "lucide-react";
 
+import maleAvatar from "@/app/(public)/profile-setup/images/avatar-male.png";
+import femaleAvatar from "@/app/(public)/profile-setup/images/avatar-female.png";
 import ProfileUpdateModal from "./ProfileUpdateModal";
 
 export default function StudentProfile({
     initialProfile,
+    uid,
     config,
 }) {
     const [
@@ -31,6 +37,30 @@ export default function StudentProfile({
         showModal,
         setShowModal,
     ] = useState(false);
+    const subscribeToSavedAvatar = useCallback((callback) => {
+        window.addEventListener("storage", callback);
+        return () => window.removeEventListener("storage", callback);
+    }, []);
+
+    const getSavedAvatarSnapshot = useCallback(() => {
+        try {
+            const saved = JSON.parse(
+                window.localStorage.getItem("student-profile-avatar") || "null"
+            );
+            return saved?.uid === String(uid)
+                ? String(saved.avatar || "")
+                : "";
+        } catch (error) {
+            console.error("Unable to read saved profile avatar:", error);
+            return "";
+        }
+    }, [uid]);
+
+    const storedAvatar = useSyncExternalStore(
+        subscribeToSavedAvatar,
+        getSavedAvatarSnapshot,
+        () => ""
+    );
 
     const name =
         profile?.name ||
@@ -59,6 +89,11 @@ export default function StudentProfile({
             .charAt(0)
             .toUpperCase() ||
         "S";
+
+    const profileAvatar = getAvatarValue(profile);
+    const avatarImage = getAvatarImage(profileAvatar)
+        ? getAvatarImage(profileAvatar)
+        : getAvatarImage(storedAvatar);
 
     return (
         <>
@@ -138,7 +173,17 @@ export default function StudentProfile({
                   backdrop-blur
                 "
                             >
-                                {initial}
+                                {avatarImage ? (
+                                    <Image
+                                        src={avatarImage}
+                                        alt={`${name} avatar`}
+                                        width={80}
+                                        height={80}
+                                        className="h-full w-full rounded-[22px] object-cover"
+                                    />
+                                ) : (
+                                    initial
+                                )}
                             </div>
 
                             <div>
@@ -335,7 +380,12 @@ export default function StudentProfile({
 
             <ProfileUpdateModal
                 open={showModal}
-                profile={profile}
+                profile={{
+                    ...profile,
+                    avatar: getAvatarImage(profileAvatar)
+                        ? profileAvatar
+                        : storedAvatar,
+                }}
                 onClose={() =>
                     setShowModal(
                         false
@@ -347,6 +397,17 @@ export default function StudentProfile({
                     setProfile(
                         updatedProfile
                     );
+                    try {
+                        window.localStorage.setItem(
+                            "student-profile-avatar",
+                            JSON.stringify({
+                                uid: String(uid),
+                                avatar: updatedProfile.avatar,
+                            })
+                        );
+                    } catch (error) {
+                        console.error("Unable to save profile avatar locally:", error);
+                    }
 
                     setShowModal(
                         false
@@ -355,6 +416,30 @@ export default function StudentProfile({
             />
         </>
     );
+}
+
+function getAvatarValue(profile) {
+    return (
+        profile?.avatar ??
+        profile?.gender ??
+        profile?.sex ??
+        profile?.avatar_type ??
+        profile?.avatarType ??
+        ""
+    );
+}
+
+function getAvatarImage(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+
+    if (/female|woman|girl/.test(normalized)) {
+        return femaleAvatar;
+    }
+    if (/male|man|boy/.test(normalized)) {
+        return maleAvatar;
+    }
+
+    return null;
 }
 
 function ProfileItem({

@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, MinusCircle, Target, Trophy, X, XCircle } from "lucide-react";
+import { calculateExamScore } from "@/lib/examResultUtils";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -38,11 +40,12 @@ export default function ExamResultModal({
   open = false,
   result = null,
   examTitle = "",
+  notice = "",
   onClose,
   onViewAnalysis,
 }) {
   useEffect(() => {
-    if (!open) return;
+    if (!open || !result || !isFinishedExamAttempt(result)) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event) => {
@@ -53,17 +56,30 @@ export default function ExamResultModal({
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previous;
     };
-  }, [open, onClose]);
+  }, [open, onClose, result]);
 
-  if (!open || !result) return null;
+  if (!open || !result || !isFinishedExamAttempt(result)) return null;
 
-  const score = numberOrNull(result.user_score ?? result.score);
-  const totalMark = numberOrNull(result.total_mark ?? result.totalMark);
-  const attempted = numberOrNull(result.total_attempted ?? result.attempted);
-  const correct = numberOrNull(result.total_correct ?? result.correct);
-  const wrong = numberOrNull(result.total_wrong ?? result.wrong);
-  const questions = numberOrNull(result.total_questions ?? result.totalQuestions);
-  const minusMark = numberOrNull(result.minus_mark ?? result.minusMark);
+  const calculated = calculateExamScore(result);
+  const score =
+    numberOrNull(result.user_score) ??
+    numberOrNull(result.score) ??
+    calculated.score;
+  const totalMark =
+    numberOrNull(result.total_mark) ??
+    numberOrNull(result.totalMark) ??
+    calculated.totalMark;
+  const attempted = calculated.attempted;
+  const correct = calculated.correct;
+  const wrong = calculated.wrong;
+  const questions =
+    numberOrNull(result.total_questions) ??
+    numberOrNull(result.totalQuestions) ??
+    calculated.totalQuestions;
+  const minusMark =
+    numberOrNull(result.minus_mark) ??
+    numberOrNull(result.minusMark) ??
+    calculated.minusMark;
   const percentage = score !== null && totalMark > 0
     ? Math.round((score / totalMark) * 100)
     : null;
@@ -94,6 +110,14 @@ export default function ExamResultModal({
           <p className="mt-2 break-words pr-4 text-sm text-blue-100">{name}</p>
         </header>
         <div className="min-h-0 overflow-y-auto overscroll-contain">
+          {notice && (
+            <p
+              role="status"
+              className="mx-5 mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 sm:mx-8"
+            >
+              {notice}
+            </p>
+          )}
           <section className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-[#f8fbff] px-5 py-6 sm:px-8">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Final Score</p>

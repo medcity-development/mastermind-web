@@ -12,6 +12,7 @@ import {
   calculateExamCounts,
   toResultNumber,
 } from "@/lib/examResultUtils";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 export default function MockResultModal({
   open = false,
@@ -21,7 +22,8 @@ export default function MockResultModal({
 }) {
   if (
     !open ||
-    !result
+    !result ||
+    !isFinishedExamAttempt(result)
   ) {
     return null;
   }

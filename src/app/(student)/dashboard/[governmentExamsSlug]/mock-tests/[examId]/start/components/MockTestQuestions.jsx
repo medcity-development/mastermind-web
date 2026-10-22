@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
 import MockQuestionPagination from "./MockQuestionPagination";
 import MockQuestionsSection from "./MockQuestionsSection";
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 import MockTestActions from "./MockTestActions";
 import MockTestEmpty from "./MockTestEmpty";
 import MockTestError from "./MockTestError";
@@ -22,10 +25,14 @@ export default function MockTestQuestions({
   examName = "",
   shortName = "",
   examTitle = "",
+  examType = "mock",
 
   governmentExamsSlug = "",
   guestAction = "",
 }) {
+  const [showPauseConfirmation, setShowPauseConfirmation] =
+    useState(false);
+
   const {
     exam,
     questions,
@@ -74,6 +81,7 @@ export default function MockTestQuestions({
     cid,
 
     examTitle,
+    examType,
 
     governmentExamsSlug,
     guestAction,
@@ -197,9 +205,13 @@ export default function MockTestQuestions({
         />
 
         <MockTestActions
-          onPause={
-            handlePause
-          }
+          onPause={() => {
+            if (isPaused) {
+              handlePause();
+            } else {
+              setShowPauseConfirmation(true);
+            }
+          }}
           onSubmit={
             handleSubmit
           }
@@ -246,6 +258,16 @@ export default function MockTestQuestions({
         onViewAnalysis={
           handleViewAnalysis
         }
+      />
+
+      <ExamPauseConfirmModal
+        open={showPauseConfirmation}
+        saving={saving}
+        onClose={() => setShowPauseConfirmation(false)}
+        onConfirm={() => {
+          handlePause();
+          setShowPauseConfirmation(false);
+        }}
       />
     </>
   );

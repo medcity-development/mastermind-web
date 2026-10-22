@@ -67,7 +67,12 @@ export default function PerformanceSummaryGrid({
             <PerformanceSummaryCard
                 icon={Activity}
                 label="Average Score"
-                value={`${summary?.averageScore ?? 0}%`}
+                value={
+                    summary?.averageScore === null ||
+                    summary?.averageScore === undefined
+                        ? "—"
+                        : `${summary.averageScore}%`
+                }
                 description="Across completed attempts"
                 tone="
           bg-amber-50

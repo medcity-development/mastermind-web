@@ -28,7 +28,6 @@ import {
 
   FileText,
 
-  GraduationCap,
 
   LockKeyhole,
 
@@ -833,11 +832,11 @@ export default function TopicVideoPlayer({
 
           {/* PLAYER + PLAYLIST */}
 
-          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid grid-cols-1 items-start gap-5 xl:items-stretch xl:grid-cols-[minmax(0,1fr)_340px]">
 
             {/* VIDEO PLAYER */}
 
-            <div className="min-w-0 overflow-hidden rounded-[24px] shadow-[0_12px_40px_rgba(8,30,75,0.10)]">
+            <div className="min-w-0 overflow-hidden rounded-[24px] shadow-[0_12px_40px_rgba(8,30,75,0.10)] xl:h-full">
 
               <TopicVideoPlayerCard
 
@@ -889,7 +888,7 @@ export default function TopicVideoPlayer({
 
           {/* STUDY RESOURCES */}
 
-          {(hasNotes || hasMockTest) && (
+          {(hasNotes || hasMockTest || activeVideo) && (
 
             <div className="mt-6 grid w-full grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
 
@@ -917,55 +916,33 @@ export default function TopicVideoPlayer({
 
               )}
 
-              {hasMockTest && (
+              <div className={hasNotes ? "" : "lg:col-span-2"}>
 
-                <section className="h-full min-w-0 overflow-hidden rounded-[24px] border border-amber-100 bg-white shadow-[0_10px_35px_rgba(15,58,110,0.05)]">
+                  <StudyPlanMockTests
 
-                  <div className="border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 p-5">
+                    topicId={topic?.id}
 
-                    <ResourceHeader
+                    mockTestId={resolvedMockTestId}
 
-                      icon={GraduationCap}
+                    cid={cid}
 
-                      title="Practice Mock Test"
+                    uid={uid}
 
-                      subtitle="Test your preparation"
+                    onLoginRequired={
 
-                      color="amber"
+                      onLoginRequired
 
-                    />
+                    }
 
-                  </div>
+                    onStartTest={
 
-                  <div className="p-4">
+                      onStartMockTest
 
-                    <StudyPlanMockTests
+                    }
 
-                      mockTestId={resolvedMockTestId}
+                  />
 
-                      cid={cid}
-
-                      uid={uid}
-
-                      onLoginRequired={
-
-                        onLoginRequired
-
-                      }
-
-                      onStartTest={
-
-                        onStartMockTest
-
-                      }
-
-                    />
-
-                  </div>
-
-                </section>
-
-              )}
+              </div>
 
             </div>
 

@@ -344,7 +344,7 @@ export default function ScertTestCard({
             )
           }
           plansPath={
-            `/dashboard/${governmentExamsSlug}/premium-packages`
+            `/dashboard/${governmentExamsSlug}?showPackages=1`
           }
         />
       ) : null}
@@ -501,7 +501,7 @@ function PremiumModal({
             hover:bg-amber-600
           "
         >
-          View Plans
+          OK
         </Link>
 
         <button

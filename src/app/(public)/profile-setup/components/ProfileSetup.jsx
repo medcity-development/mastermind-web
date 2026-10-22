@@ -226,6 +226,18 @@ export default function ProfileSetup({
         );
       }
 
+      try {
+        window.localStorage.setItem(
+          "student-profile-avatar",
+          JSON.stringify({
+            uid: String(authData.uid),
+            avatar: gender,
+          })
+        );
+      } catch (storageError) {
+        console.error("Unable to persist the selected avatar:", storageError);
+      }
+
       setSaved(true);
 
       await Swal.fire({
@@ -282,13 +294,13 @@ export default function ProfileSetup({
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-setup-title"
-        className="relative max-h-[calc(100dvh-32px)] w-full overflow-y-auto overscroll-contain rounded-[24px] border border-white/80 bg-gradient-to-br from-white via-white to-[#f7f9ff] px-5 py-5 shadow-[0_32px_100px_rgba(1,10,40,0.36)] ring-1 ring-black/5 sm:px-7 lg:px-9 lg:py-8"
+        className="relative max-h-[calc(100dvh-88px)] w-full overflow-y-auto overscroll-contain rounded-[20px] border border-white/80 bg-gradient-to-br from-white via-white to-[#f7f9ff] px-4 py-4 shadow-[0_24px_70px_rgba(1,10,40,0.3)] ring-1 ring-black/5 sm:px-6 sm:py-5 lg:px-7"
       >
         <ProfileHeader />
 
         <form
           onSubmit={handleSubmit}
-          className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:mt-5 lg:gap-x-7 lg:gap-y-4"
+          className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2 lg:mt-4 lg:gap-x-5 lg:gap-y-3"
         >
           <div className="sm:col-span-2">
             <AvatarSelector

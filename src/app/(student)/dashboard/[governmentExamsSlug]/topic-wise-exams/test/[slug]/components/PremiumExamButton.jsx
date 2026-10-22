@@ -1,13 +1,27 @@
 
 "use client";
 
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LockKeyhole,
   Crown,
 } from "lucide-react";
+import PremiumTestPurchaseModal from "@/components/mock-tests/PremiumTestPurchaseModal";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 export default function PremiumExamButton() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+
+  function handleConfirm() {
+    setShowPurchaseModal(false);
+    continueToPremiumPackages(router, pathname);
+  }
+
   return (
+    <>
     <div className="mt-auto space-y-3">
       <div
         className="
@@ -24,19 +38,24 @@ export default function PremiumExamButton() {
 
       <button
         type="button"
-        disabled
-        title="Premium access is required to attempt this exam."
+        onClick={() => setShowPurchaseModal(true)}
         className="
-          flex w-full cursor-not-allowed
+          flex w-full
           items-center justify-center gap-2
-          rounded-xl bg-slate-100
+          rounded-xl bg-amber-500
           px-5 py-3.5
-          text-sm font-black text-slate-500
+          text-sm font-black text-white transition hover:bg-amber-600
         "
       >
         <LockKeyhole size={16} />
-        Premium Access Required
+        OK
       </button>
     </div>
+    <PremiumTestPurchaseModal
+      open={showPurchaseModal}
+      onClose={() => setShowPurchaseModal(false)}
+      onConfirm={handleConfirm}
+    />
+    </>
   );
 }

@@ -24,6 +24,7 @@ import ExamQuestions from "./ExamQuestions";
 import ExamPagination from "./ExamPagination";
 import ExamControls from "./ExamControls";
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 
 import {
   QUESTIONS_PER_PAGE,
@@ -180,6 +181,7 @@ export default function ExamClient({
   const [guestRestoreError, setGuestRestoreError] = useState("");
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [submittedResult, setSubmittedResult] = useState(null);
+  const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
   const [attemptStartTime, setAttemptStartTime] = useState(() => Date.now());
   const [attemptEndTime, setAttemptEndTime] = useState(null);
 
@@ -589,17 +591,26 @@ export default function ExamClient({
       setSaving(true);
       setSaveError("");
 
-      const {
-        answerArray,
-        correctAnswerArray,
-        wrongAnswerArray,
-      } =
-        buildAnswerData();
-
-      const userScore =
-        calculateScore(
-          correctAnswerArray.length
+      const isFinished =
+        ["complete", "completed", "finish", "finished"].includes(
+          String(examStatus).toLowerCase()
         );
+
+      const resultData = isFinished
+        ? buildAnswerData()
+        : null;
+      const answerArray = resultData
+        ? resultData.answerArray
+        : questions.map((question, index) => ({
+            question_id: question?.id,
+            answer: normalizeAnswerValue(
+              answers[String(question?.id ?? index + 1)] ??
+              answers[question?.id]
+            ),
+          }));
+      const userScore = resultData
+        ? calculateScore(resultData.correctAnswerArray.length)
+        : null;
 
       const payload = {
         uid:
@@ -641,25 +652,24 @@ export default function ExamClient({
             exam?.total_mark
           ) || 0,
 
-        user_score:
-          userScore,
-
-        minus_mark:
-          0,
-
         answer_array: questions.map(getCorrectAnswer),
         user_answers: answerArray.map((item) => item.answer || 0),
-        total_correct: correctAnswerArray.length,
-        total_wrong: wrongAnswerArray.length,
-        total_attempted: correctAnswerArray.length + wrongAnswerArray.length,
         ...(pauseId ? { pauseid: pauseId } : {}),
-
-        correct_answer_array:
-          correctAnswerArray,
-
-        wrong_answer_array:
-          wrongAnswerArray,
       };
+
+      if (resultData) {
+        Object.assign(payload, {
+          user_score: userScore,
+          minus_mark: 0,
+          total_correct: resultData.correctAnswerArray.length,
+          total_wrong: resultData.wrongAnswerArray.length,
+          total_attempted:
+            resultData.correctAnswerArray.length +
+            resultData.wrongAnswerArray.length,
+          correct_answer_array: resultData.correctAnswerArray,
+          wrong_answer_array: resultData.wrongAnswerArray,
+        });
+      }
 
       console.log(
         "STATEMENT EXAM PAYLOAD:",
@@ -802,9 +812,12 @@ export default function ExamClient({
   ======================================================= */
 
   function handlePause() {
-    saveExamAttempt(
-      "pause"
-    );
+    setShowPauseConfirmation(true);
+  }
+
+  function confirmPause() {
+    setShowPauseConfirmation(false);
+    saveExamAttempt("pause");
   }
 
   function handleFinish() {
@@ -888,6 +901,12 @@ export default function ExamClient({
         examTitle={exam?.exam_name || exam?.title || ""}
         onClose={() => setResultModalOpen(false)}
         onViewAnalysis={handleViewAnalysis}
+      />
+      <ExamPauseConfirmModal
+        open={showPauseConfirmation}
+        saving={saving}
+        onClose={() => setShowPauseConfirmation(false)}
+        onConfirm={confirmPause}
       />
       <main
         className="

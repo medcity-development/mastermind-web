@@ -67,6 +67,7 @@ export default function useMockTestExam({
     uid,
     cid,
     examTitle = "",
+    examType: requestedExamType = "mock",
     governmentExamsSlug = "",
     guestAction = "",
 }) {
@@ -92,7 +93,7 @@ export default function useMockTestExam({
     const [
         examType,
         setExamType,
-    ] = useState("mock");
+    ] = useState(requestedExamType);
 
     const [
         loading,
@@ -162,6 +163,7 @@ export default function useMockTestExam({
             examId,
             uid,
             cid,
+            examType: requestedExamType,
         });
 
     /* =======================================================
@@ -226,7 +228,7 @@ export default function useMockTestExam({
                 setImagePath("");
 
                 setExamType(
-                    "mock"
+                    requestedExamType
                 );
 
                 setInitialPauseId(
@@ -258,7 +260,7 @@ export default function useMockTestExam({
                 const guestAttempt =
                     readGuestExamHandoff({
                         examId,
-                        examType: "mock",
+                        examType: requestedExamType,
                         governmentExamsSlug,
                     });
 
@@ -311,7 +313,7 @@ export default function useMockTestExam({
                         data?.examType ??
                         data?.exam?.exam_type ??
                         data?.exam?.examType ??
-                        "mock"
+                        requestedExamType
                     )
                         .trim()
                         .toLowerCase();
@@ -440,6 +442,7 @@ export default function useMockTestExam({
         startTimer,
         stopTimer,
         governmentExamsSlug,
+        requestedExamType,
     ]);
 
     /* =======================================================
@@ -516,6 +519,7 @@ export default function useMockTestExam({
 
             examTitle:
                 resolvedExamTitle,
+                requestedExamType,
 
             governmentExamsSlug,
             guestAction,
@@ -579,12 +583,12 @@ export default function useMockTestExam({
     ======================================================= */
 
     const dashboardDetailsPath =
-        `/dashboard/${governmentExamsSlug}/mock-tests/${examId}${resolvedExamTitle
-            ? `?title=${encodeURIComponent(
-                resolvedExamTitle
-            )}`
-            : ""
-        }`;
+        `/dashboard/${governmentExamsSlug}/mock-tests/${examId}?${new URLSearchParams({
+            type: examType || "mock",
+            ...(resolvedExamTitle
+                ? { title: resolvedExamTitle }
+                : {}),
+        })}`;
 
     /* =======================================================
        RETURN

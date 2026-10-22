@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useState,
 } from "react";
 
@@ -13,38 +12,21 @@ import {
 } from "lucide-react";
 
 import {
+  usePathname,
   useRouter,
 } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
-import {
-  createPortal,
-} from "react-dom";
-
-export default function PremiumExamButton({ redirectPath = "" }) {
+export default function PremiumExamButton() {
   const router =
     useRouter();
+  const pathname =
+    usePathname();
 
   const [
     open,
     setOpen,
   ] = useState(false);
-
-  const [
-    mounted,
-    setMounted,
-  ] = useState(false);
-
-  /* =========================================================
-     CLIENT MOUNT
-  ========================================================= */
-
-  useEffect(() => {
-    setMounted(true);
-
-    return () => {
-      setMounted(false);
-    };
-  }, []);
 
   /* =========================================================
      LOCK BODY SCROLL
@@ -72,11 +54,7 @@ export default function PremiumExamButton({ redirectPath = "" }) {
   ========================================================= */
 
   function handleLogin() {
-    const loginPath = redirectPath
-      ? `/login?redirect=${encodeURIComponent(redirectPath)}`
-      : "/login";
-
-    router.push(loginPath);
+    continueToPremiumPackages(router, pathname);
   }
 
   /* =========================================================
@@ -84,7 +62,7 @@ export default function PremiumExamButton({ redirectPath = "" }) {
   ========================================================= */
 
   const modal =
-    open && mounted ? (
+    open ? (
       <div
         className="
           fixed
@@ -391,16 +369,7 @@ export default function PremiumExamButton({ redirectPath = "" }) {
         </span>
       </button>
 
-      {/* ===============================================
-          PORTAL
-      =============================================== */}
-
-      {mounted &&
-        modal &&
-        createPortal(
-          modal,
-          document.body
-        )}
+      {modal}
     </>
   );
 }

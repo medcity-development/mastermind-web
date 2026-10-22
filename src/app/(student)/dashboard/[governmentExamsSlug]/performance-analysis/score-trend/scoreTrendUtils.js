@@ -1,3 +1,5 @@
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
+
 export function safeNumber(
     value,
     fallback = 0
@@ -16,6 +18,7 @@ export function prepareChartData(
     attempts = []
 ) {
     return [...attempts]
+        .filter(isFinishedExamAttempt)
         .reverse()
         .slice(-10)
         .map(

@@ -250,7 +250,7 @@ export async function GET(
         (item) =>
           normalizeChapter(
             item,
-            thumbnailPath,
+              thumbnailPath,
             notePath
           )
       );
@@ -266,7 +266,14 @@ export async function GET(
           result?.view ||
           "",
 
-        thumbnailPath,
+        mocktest:
+          result?.mocktest ??
+          result?.mock_test ??
+          result?.mocktest_id ??
+          result?.mockTest ??
+          null,
+
+      thumbnailPath,
 
         notePath,
 

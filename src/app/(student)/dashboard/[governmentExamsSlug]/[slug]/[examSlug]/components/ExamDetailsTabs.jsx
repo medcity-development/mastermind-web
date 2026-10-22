@@ -178,11 +178,11 @@ export default function ExamDetailsTabs({
             subId={
               subId
             }
-            exam={
-              exam
-            }
             governmentExamsSlug={
               governmentExamsSlug
+            }
+            exam={
+              exam
             }
           />
         )}

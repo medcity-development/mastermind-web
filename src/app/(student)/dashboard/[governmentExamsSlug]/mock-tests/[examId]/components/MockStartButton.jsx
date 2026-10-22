@@ -8,6 +8,8 @@ import {
 export default function MockStartButton({
   examId,
   governmentExamsSlug,
+  examTitle = "",
+  examType = "mock",
 }) {
   if (
     !examId ||
@@ -16,8 +18,12 @@ export default function MockStartButton({
     return null;
   }
 
+  const query = new URLSearchParams({
+    type: examType,
+    title: examTitle,
+  });
   const startPath =
-    `/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start`;
+    `/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start?${query}`;
 
   return (
     <div

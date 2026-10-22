@@ -21,6 +21,7 @@ export default function MockTestDetails({
   shortName = "",
   governmentExamsSlug,
   examTitle = "",
+  examType = "mock",
 }) {
   const [
     exam,
@@ -61,6 +62,9 @@ export default function MockTestDetails({
 
             examid:
               String(examId),
+
+            type:
+              examType,
           });
 
         const response =
@@ -179,6 +183,7 @@ export default function MockTestDetails({
     examId,
     uid,
     cid,
+    examType,
   ]);
 
   if (loading) {
@@ -291,6 +296,9 @@ export default function MockTestDetails({
         examTitle={
           completeExam?.exam_name ||
           ""
+        }
+        examType={
+          examType
         }
       />
     </>

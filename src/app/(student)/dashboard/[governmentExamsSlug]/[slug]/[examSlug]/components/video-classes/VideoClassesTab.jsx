@@ -5,6 +5,7 @@ export default function VideoClassesTab({
   uid = 0,
   examId,
   subId,
+  governmentExamsSlug,
 }) {
   if (!examId) {
     return null;
@@ -16,6 +17,7 @@ export default function VideoClassesTab({
       uid={uid}
       examId={examId}
       subId={subId}
+      governmentExamsSlug={governmentExamsSlug}
     />
   );
 }

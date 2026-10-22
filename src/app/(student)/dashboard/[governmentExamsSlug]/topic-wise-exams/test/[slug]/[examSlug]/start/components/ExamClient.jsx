@@ -37,6 +37,7 @@ import ExamPagination from "./ExamPagination";
 import ExamControls from "./ExamControls";
 
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 
 function positiveId(value) {
   const number = Number(value);
@@ -166,6 +167,7 @@ export default function ExamClient({
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
 
   const [
     resultModalOpen,
@@ -213,20 +215,13 @@ export default function ExamClient({
     [questions]
   );
 
-  const stats = useMemo(
+  const answeredCount = useMemo(
     () =>
-      calculateExamResult({
-        answerArray: answerKeys,
-
-        userAnswers:
-          questions.map(
-            (q) => answers[String(q.id)] ?? 0
-          ),
-
-        markPerCorrect: 1,
-        negativeMarkPerWrong: 0.333,
-      }),
-    [answers, questions, answerKeys]
+      questions.reduce((count, question) => {
+        const answer = answers[String(question.id)];
+        return count + (answer != null && String(answer).trim() !== "" && String(answer) !== "0" ? 1 : 0);
+      }, 0),
+    [answers, questions]
   );
 
   function storeDraft() {
@@ -579,6 +574,7 @@ export default function ExamClient({
       }
 
       const current = snapshot.current;
+      let localFinalResult = null;
 
       const payload = {
         cid,
@@ -614,6 +610,36 @@ export default function ExamClient({
           negativeMarkPerWrong: 0.333,
         },
       };
+
+      const resultStats = action === "submit"
+        ? calculateExamResult({
+            answerArray: answerKeys,
+            userAnswers: questions.map(
+              (q) => current.answers[String(q.id)] ?? 0
+            ),
+            markPerCorrect: 1,
+            negativeMarkPerWrong: 0.333,
+          })
+        : null;
+
+      if (resultStats) {
+        Object.assign(payload, {
+          total_attempted: resultStats.attempted,
+          total_correct: resultStats.correct,
+          total_wrong: resultStats.wrong,
+          user_score: resultStats.score,
+          minus_mark: resultStats.negativeMark,
+        });
+
+        localFinalResult = {
+          ...payload,
+          exam_status: "finish",
+          exam_name:
+            exam?.exam_name ??
+            exam?.title ??
+            "",
+        };
+      }
 
       const isResuming = Boolean(current.pauseId);
       const result = await post(
@@ -652,6 +678,8 @@ export default function ExamClient({
       if (action === "submit") {
         const finalResult = {
           ...result.savedResult,
+          ...localFinalResult,
+          exam_status: "finish",
           id: current.pauseId,
           pauseid: current.pauseId,
           exam_id: id,
@@ -716,6 +744,27 @@ export default function ExamClient({
           setSaveError(failure.message);
         }
       } else {
+        if (action === "submit" && localFinalResult) {
+          const finalResult = {
+            ...localFinalResult,
+            id: current.pauseId,
+            pauseid: current.pauseId,
+            exam_id: id,
+            exam_type: type,
+          };
+
+          current.submittedResult = finalResult;
+          setSubmittedResult(finalResult);
+          setSubmitted(true);
+          setResultModalOpen(true);
+
+          try {
+            checkpoint(action);
+          } catch {
+            // Keep the in-memory result available if browser storage is unavailable.
+          }
+        }
+
         setSaveError(
           error.message ||
           "Unable to save. Your answers are retained; retry Finish."
@@ -902,6 +951,11 @@ export default function ExamClient({
       return;
     }
 
+    setShowPauseConfirmation(true);
+  }
+
+  function confirmPause() {
+    setShowPauseConfirmation(false);
     void save("pause");
   }
 
@@ -967,7 +1021,7 @@ export default function ExamClient({
         />
 
         <ExamProgress
-          answeredCount={stats.attempted}
+          answeredCount={answeredCount}
           totalQuestions={totalQuestions}
           currentPage={currentPage}
           totalPages={totalPages}
@@ -996,12 +1050,9 @@ export default function ExamClient({
             role="status"
             className="mt-5 rounded-xl bg-green-50 p-4 text-green-900"
           >
-            Exam saved. Correct:{" "}
-            {submittedResult?.total_correct}
-            {" · "}Wrong:{" "}
-            {submittedResult?.total_wrong}
-            {" · "}Score:{" "}
-            {submittedResult?.user_score}
+            {saveError
+              ? "Your finished result is ready, but the attempt could not be saved."
+              : "Exam saved. Your finished result is ready."}
           </p>
         )}
 
@@ -1062,6 +1113,11 @@ export default function ExamClient({
       <ExamResultModal
         open={resultModalOpen}
         result={submittedResult}
+        notice={
+          saveError
+            ? "Your result was calculated, but the attempt could not be saved. It may not appear in your exam history."
+            : ""
+        }
         examTitle={
           exam?.exam_name ??
           exam?.title ??
@@ -1069,6 +1125,12 @@ export default function ExamClient({
         }
         onClose={() => setResultModalOpen(false)}
         onViewAnalysis={viewAttempted}
+      />
+      <ExamPauseConfirmModal
+        open={showPauseConfirmation}
+        saving={saving}
+        onClose={() => setShowPauseConfirmation(false)}
+        onConfirm={confirmPause}
       />
     </main>
   );

@@ -76,16 +76,16 @@ export const resourceLinks = [
 export const legalLinks = [
   {
     label: "Privacy Policy",
-    href: "/privacy-policy",
+    href: "http://psc.technocitysolutions.com/public/images/documents/privacypolicy.pdf",
   },
-  {
-    label: "Terms of Service",
-    href: "/terms",
-  },
-  {
-    label: "Cookie Policy",
-    href: "/cookie-policy",
-  },
+  // {
+  //   label: "Terms of Service",
+  //   href: "/terms",
+  // },
+  // {
+  //   label: "Cookie Policy",
+  //   href: "/cookie-policy",
+  // },
 ];
 
 /* =========================================================

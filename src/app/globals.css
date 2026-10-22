@@ -66,6 +66,24 @@ body {
   background: linear-gradient(180deg, #06b6d4 0%, #8b5cf6 50%, #2563eb 100%);
 }
 
+.dashboard-content-frame main {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.dashboard-content-frame main > div:first-child {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding: 0 !important;
+}
+
+.dashboard-content-frame .mt-20 {
+  margin-top: 0 !important;
+}
+
 /*
   Important:
   Don't add a global footer background here.

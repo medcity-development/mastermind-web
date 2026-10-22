@@ -3,6 +3,7 @@ import {
   calculateExamScore,
   parseSavedAnswers,
 } from "@/lib/examResultUtils";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 function finiteNumber(value) {
   if (
@@ -27,13 +28,14 @@ function firstNumber(...values) {
 }
 
 export function prepareExamHistoryResult(item = {}) {
-  const userAnswers = parseSavedAnswers(
+  const finished = isFinishedExamAttempt(item);
+  const userAnswers = finished ? parseSavedAnswers(
     item.user_answers ?? item.user_answer_array
-  );
+  ) : [];
 
-  const correctAnswers = parseSavedAnswers(
+  const correctAnswers = finished ? parseSavedAnswers(
     item.answer_array ?? item.correct_answers
-  );
+  ) : [];
 
   const totalQuestions = firstNumber(
     item.total_questions,
@@ -44,6 +46,7 @@ export function prepareExamHistoryResult(item = {}) {
   // Calculate only when answer arrays are complete.
   // Never derive correct/wrong counts from a rounded score.
   const complete =
+    finished &&
     userAnswers.length > 0 &&
     userAnswers.length === correctAnswers.length &&
     (
@@ -59,41 +62,45 @@ export function prepareExamHistoryResult(item = {}) {
     })
     : null;
 
-  const attempted =
+  const attempted = finished ? (
     firstNumber(
       item.total_attempted,
       item.attempted,
       item.attempted_questions
     ) ??
     calculated?.attempted ??
-    null;
+    null
+  ) : null;
 
-  const correct =
+  const correct = finished ? (
     firstNumber(
       item.total_correct,
       item.correct,
       item.correct_answers_count
     ) ??
     calculated?.correct ??
-    null;
+    null
+  ) : null;
 
-  const wrong =
+  const wrong = finished ? (
     firstNumber(
       item.total_wrong,
       item.wrong,
       item.wrong_answers_count
     ) ??
     calculated?.wrong ??
-    null;
+    null
+  ) : null;
 
-  const score =
+  const score = finished ? (
     firstNumber(
       item.user_score,
       item.score,
       item.marks_obtained
     ) ??
     calculated?.score ??
-    null;
+    null
+  ) : null;
 
   const totalMark =
     firstNumber(
@@ -118,13 +125,14 @@ export function prepareExamHistoryResult(item = {}) {
     total_mark: totalMark,
     user_score: score,
 
-    minus_mark:
+    minus_mark: finished ? (
       firstNumber(
         item.minus_mark,
         item.negative_mark
       ) ??
       calculated?.minusMark ??
-      null,
+      null
+    ) : null,
 
     percentage:
       score !== null && totalMark > 0

@@ -24,6 +24,7 @@ import ExamEmpty from "./ExamEmpty";
 import useExamController from "./hooks/useExamController";
 
 import PyqResultModal from "@/components/PyqResultModal";
+import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 
 import {
   clearGuestExamHandoff,
@@ -65,6 +66,7 @@ export default function ExamClient({
   const appliedOnce = useRef(false);
   const autoSubmitted = useRef(false);
   const resumedQuestionScrolled = useRef(false);
+  const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
 
   const controller = useExamController({
     exam,
@@ -79,7 +81,11 @@ export default function ExamClient({
     guestAction,
   });
 
-  async function handlePauseAndReturn() {
+  function handlePauseAndReturn() {
+    setShowPauseConfirmation(true);
+  }
+
+  async function savePauseAndReturn() {
     const saved = await controller.handlePause();
 
     if (saved) {
@@ -87,6 +93,11 @@ export default function ExamClient({
         `/dashboard/${governmentExamsSlug}/previous-questions`
       );
     }
+  }
+
+  async function confirmPauseAndReturn() {
+    await savePauseAndReturn();
+    setShowPauseConfirmation(false);
   }
 
   useEffect(() => {
@@ -203,7 +214,7 @@ export default function ExamClient({
     if (guestAction === "submit") {
       controller.handleSubmit();
     } else {
-      handlePauseAndReturn();
+      void savePauseAndReturn();
     }
   }, [
     handoff,
@@ -213,8 +224,7 @@ export default function ExamClient({
     controller.restoreReady,
     controller.submitted,
     controller.handleSubmit,
-    controller.handlePause,
-    handlePauseAndReturn,
+    savePauseAndReturn,
   ]);
 
   /* AUTOMATIC FINISH */
@@ -453,6 +463,12 @@ export default function ExamClient({
         }
         onClose={c.closeResultModal}
         onViewAnalysis={viewAttempted}
+      />
+      <ExamPauseConfirmModal
+        open={showPauseConfirmation}
+        saving={controller.saving}
+        onClose={() => setShowPauseConfirmation(false)}
+        onConfirm={confirmPauseAndReturn}
       />
     </>
   );

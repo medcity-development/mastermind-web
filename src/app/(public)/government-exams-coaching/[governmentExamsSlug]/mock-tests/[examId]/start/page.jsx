@@ -12,6 +12,8 @@ import {
 import {
   getGovernmentExamConfig,
 } from "@/lib/governmentExamConfig";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { checkPremiumExamAccess } from "@/lib/premiumExamAccess";
 
 import MockTestQuestions from "../components/MockTestQuestions";
 
@@ -99,11 +101,8 @@ export default async function MockExamStartPage({
     shortName,
   } = config;
 
-  const uid =
-    getNumberParam(
-      query?.uid,
-      0
-    );
+  const session = await getStudentSession();
+  const uid = getNumberParam(session?.uid, 0);
 
   const title =
     String(
@@ -118,6 +117,30 @@ export default async function MockExamStartPage({
 
   if (!selectedExamId) {
     redirect(detailsPath);
+  }
+
+  const examType =
+    String(query?.type || "mock").toLowerCase() === "studyplan"
+      ? "studyplan"
+      : "mock";
+  const access = await checkPremiumExamAccess({
+    uid,
+    cid,
+    examId: selectedExamId,
+    type: examType,
+  });
+
+  if (access.isPremium && !access.hasAccess) {
+    const packagesPath =
+      `/dashboard/${governmentExamsSlug}?showPackages=1`;
+
+    if (uid <= 0) {
+      redirect(
+        `/login?redirect=${encodeURIComponent(packagesPath)}`
+      );
+    }
+
+    redirect(packagesPath);
   }
 
   return (

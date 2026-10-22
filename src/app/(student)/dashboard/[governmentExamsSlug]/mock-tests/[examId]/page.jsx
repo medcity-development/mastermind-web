@@ -62,6 +62,12 @@ export default async function MockTestDetailsPage({
 
   const query =
     await searchParams;
+  const examTitle =
+    String(query?.title ?? "").trim();
+  const examType =
+    String(query?.type || "mock").toLowerCase() === "studyplan"
+      ? "studyplan"
+      : "mock";
 
   /* =======================================================
      CONFIG
@@ -104,8 +110,12 @@ export default async function MockTestDetailsPage({
     !Number.isFinite(uid) ||
     uid <= 0
   ) {
+    const redirectParams = new URLSearchParams({
+      type: examType,
+      ...(examTitle ? { title: examTitle } : {}),
+    });
     const redirectUrl =
-      `/dashboard/${governmentExamsSlug}/mock-tests/${examId}`;
+      `/dashboard/${governmentExamsSlug}/mock-tests/${examId}?${redirectParams}`;
 
     redirect(
       `/login?redirect=${encodeURIComponent(
@@ -117,12 +127,6 @@ export default async function MockTestDetailsPage({
   /* =======================================================
      TITLE FROM SELECTED MOCK CARD
   ======================================================= */
-
-  const examTitle =
-    String(
-      query?.title ??
-      ""
-    ).trim();
 
   /* =======================================================
      RENDER
@@ -172,6 +176,9 @@ export default async function MockTestDetailsPage({
           }
           governmentExamsSlug={
             governmentExamsSlug
+          }
+          examType={
+            examType
           }
         />
       </div>

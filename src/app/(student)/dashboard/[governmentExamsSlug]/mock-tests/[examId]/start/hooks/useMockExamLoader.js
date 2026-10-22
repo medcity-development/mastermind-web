@@ -17,6 +17,7 @@ export default function useMockExamLoader({
   examId,
   uid,
   cid,
+  examType = "mock",
 }) {
   const loadMockExam =
     useCallback(
@@ -37,6 +38,9 @@ export default function useMockExamLoader({
               String(
                 examId
               ),
+
+            type:
+              examType,
 
             offset:
               "0",
@@ -81,13 +85,16 @@ export default function useMockExamLoader({
           );
         }
 
-        const examType =
-          getExamType(
-            exam,
-            detailsResult
-          );
+        const resolvedExamType =
+          String(
+            detailsResult?.examType ||
+              getExamType(exam, detailsResult) ||
+              "mock"
+          )
+            .trim()
+            .toLowerCase();
 
-        if (!examType) {
+        if (!resolvedExamType) {
           throw new Error(
             "Exam type is missing."
           );
@@ -111,7 +118,7 @@ export default function useMockExamLoader({
               ),
 
             examtype:
-              examType,
+              resolvedExamType,
           });
 
         const questionsResponse =
@@ -283,7 +290,7 @@ export default function useMockExamLoader({
 
         return {
           exam,
-          examType,
+          examType: resolvedExamType,
           questions,
 
           imagePath:
@@ -331,6 +338,7 @@ export default function useMockExamLoader({
         examId,
         uid,
         cid,
+        examType,
       ]
     );
 

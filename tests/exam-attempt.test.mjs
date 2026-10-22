@@ -28,6 +28,7 @@ const {
   getResultArray,
   isFailedResponse,
   parseAnswers,
+  withPausedAttemptPlaceholders,
   millisecondsToSeconds,
   savedPausedTimeToSeconds,
   secondsToMilliseconds,
@@ -88,6 +89,30 @@ test(
   }
 );
 
+test("paused result placeholders are blank and never calculate metrics", () => {
+  const paused = withPausedAttemptPlaceholders({
+    exam_status: "pause",
+    answer_array: ["A", "B"],
+    user_answers: ["A", "C"],
+  });
+
+  assert.equal(paused.user_score, "");
+  assert.equal(paused.minus_mark, "");
+  assert.equal(paused.total_attempted, "");
+  assert.equal(paused.total_correct, "");
+  assert.equal(paused.total_wrong, "");
+
+  const finished = {
+    exam_status: "finish",
+    total_correct: 1,
+  };
+
+  assert.equal(
+    withPausedAttemptPlaceholders(finished),
+    finished
+  );
+});
+
 test(
   "attempt payload persists start and end timestamps as epoch milliseconds",
   () => {
@@ -100,6 +125,34 @@ test(
         end_time: new Date(endTime).toISOString(),
       },
       "session-user"
+    );
+
+    test(
+      "paused attempts persist answers without calculating result fields",
+      () => {
+        const payload = buildAttemptPayload(
+          {
+            exam_status: "pause",
+            total_questions: 3,
+            total_mark: 3,
+            answer_array: ["A", "B", "C"],
+            user_answers: ["A", "D", 0],
+            total_attempted: 2,
+            total_correct: 1,
+            total_wrong: 1,
+            user_score: 0.667,
+          },
+          "session-user"
+        );
+
+        assert.equal(payload.exam_status, "pause");
+        assert.deepEqual(payload.user_answers, ["A", "D", 0]);
+        assert.equal("user_score" in payload, false);
+        assert.equal("total_attempted" in payload, false);
+        assert.equal("total_correct" in payload, false);
+        assert.equal("total_wrong" in payload, false);
+        assert.equal("minus_mark" in payload, false);
+      }
     );
 
     assert.equal(payload.start_time, startTime);
@@ -320,7 +373,7 @@ test(
 ========================================================= */
 
 test(
-  "paused updates retain their id and unanswered questions are ignored",
+  "paused updates retain their id without calculating result fields",
   () => {
     const payload =
       buildAttemptPayload(
@@ -360,25 +413,10 @@ test(
       "pause"
     );
 
-    assert.equal(
-      payload.total_correct,
-      1
-    );
-
-    assert.equal(
-      payload.total_attempted,
-      1
-    );
-
-    assert.equal(
-      payload.total_wrong,
-      0
-    );
-
-    assert.equal(
-      payload.user_score,
-      1
-    );
+    assert.equal("total_correct" in payload, false);
+    assert.equal("total_attempted" in payload, false);
+    assert.equal("total_wrong" in payload, false);
+    assert.equal("user_score" in payload, false);
   }
 );
 
@@ -888,6 +926,34 @@ test(
         requests[2].fields.exam_type,
         "pqp"
       );
+
+      const pausedPayload = buildAttemptPayload(
+        {
+          cid: 1,
+          exam_id: 20,
+          exam_type: "mock",
+          exam_status: "pause",
+          total_questions: 2,
+          answer_array: ["A", "B"],
+          user_answers: ["A", "C"],
+        },
+        "1"
+      );
+
+      await helper.createUserExamAttempt(pausedPayload);
+      await helper.updateUserExamAttempt({
+        ...pausedPayload,
+        pauseid: "99",
+      });
+
+      for (const request of requests.slice(3, 5)) {
+        assert.equal(request.fields.exam_status, "pause");
+        assert.equal(request.fields.user_score, "");
+        assert.equal(request.fields.minus_mark, "");
+        assert.equal(request.fields.total_attempted, "");
+        assert.equal(request.fields.total_correct, "");
+        assert.equal(request.fields.total_wrong, "");
+      }
 
       globalThis.fetch = async () =>
         Response.json({

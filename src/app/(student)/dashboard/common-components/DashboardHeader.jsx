@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -7,9 +12,11 @@ import {
   ArrowLeftRight,
   Bell,
   ChevronDown,
+  Loader2,
   Menu,
   Search,
 } from "lucide-react";
+import { createSlug } from "@/lib/pscSlug";
 
 /* =========================================================
    DASHBOARD HEADER
@@ -43,6 +50,122 @@ export default function DashboardHeader({
     config?.slug
       ? `/dashboard/${config.slug}/profile`
       : "#";
+
+  const [
+    searchTerm,
+    setSearchTerm,
+  ] = useState("");
+
+  const [
+    searchResults,
+    setSearchResults,
+  ] = useState([]);
+
+  const [
+    searchLoading,
+    setSearchLoading,
+  ] = useState(false);
+
+  const [
+    searchError,
+    setSearchError,
+  ] = useState("");
+
+  const [
+    searchOpen,
+    setSearchOpen,
+  ] = useState(false);
+
+  useEffect(() => {
+    const keyword = searchTerm.trim();
+
+    if (keyword.length < 2) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      setSearchLoading(true);
+      setSearchError("");
+
+      try {
+        const response = await fetch("/api/search-suggestions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ keyword }),
+          signal: controller.signal,
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || (result?.status === false && result?.message)) {
+          throw new Error(
+            result?.message || "Unable to search right now."
+          );
+        }
+
+        setSearchResults(
+          Array.isArray(result?.details)
+            ? result.details.filter(
+                (item) =>
+                  item &&
+                  item.id != null &&
+                  typeof item.name === "string" &&
+                  item.name.trim()
+              )
+            : []
+        );
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.error("Dashboard search suggestions:", error);
+          setSearchResults([]);
+          setSearchError(
+            error?.message || "Unable to search right now."
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setSearchLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [searchTerm]);
+
+  function getSuggestionHref(item) {
+    if (!config?.slug || item?.id == null) {
+      return null;
+    }
+
+    const root = `/dashboard/${encodeURIComponent(config.slug)}`;
+    const id = encodeURIComponent(String(item.id));
+    const title = encodeURIComponent(String(item.name || ""));
+    const type = String(item.type || "").trim().toLowerCase();
+
+    if (["pqp", "pyq"].includes(type)) {
+      return `${root}/previous-questions/${id}`;
+    }
+
+    if (["mock", "mocktest", "mock-test"].includes(type)) {
+      return `${root}/mock-tests/${id}?title=${title}`;
+    }
+
+    if (["twe", "topicwise", "topic-wise"].includes(type)) {
+      return `${root}/topic-wise-exams/test/${createSlug(item.name)}`;
+    }
+
+    if (["scert", "scert-test"].includes(type)) {
+      return `${root}/scert-tests`;
+    }
+
+    return null;
+  }
 
   /* =======================================================
      RENDER
@@ -189,7 +312,26 @@ export default function DashboardHeader({
 
           <input
             type="search"
+            value={searchTerm}
+            onChange={(event) => {
+              setSearchTerm(event.target.value);
+              setSearchResults([]);
+              setSearchError("");
+              setSearchLoading(false);
+              setSearchOpen(true);
+            }}
+            onFocus={() => setSearchOpen(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setSearchOpen(false);
+              }
+            }}
             placeholder="Search courses, tests, topics..."
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={searchOpen && searchTerm.trim().length >= 2}
+            aria-controls="dashboard-search-results"
+            aria-label="Search courses, tests, and topics"
             className="
               h-[44px]
               w-full
@@ -220,6 +362,71 @@ export default function DashboardHeader({
               focus:shadow-[0_0_0_4px_rgba(139,92,246,0.07)]
             "
           />
+          {searchOpen && searchTerm.trim().length >= 2 ? (
+            <div
+              id="dashboard-search-results"
+              role="listbox"
+              className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[360px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)]"
+            >
+              {searchLoading ? (
+                <p className="flex items-center gap-2 px-3 py-3 text-xs font-semibold text-slate-500">
+                  <Loader2 size={15} className="animate-spin" />
+                  Searching...
+                </p>
+              ) : searchError ? (
+                <p role="alert" className="px-3 py-3 text-xs font-semibold text-rose-600">
+                  {searchError}
+                </p>
+              ) : searchResults.length ? (
+                searchResults.map((item, index) => {
+                  const href = getSuggestionHref(item);
+                  const label = String(item.name).trim();
+                  const typeLabel = String(item.type || "exam")
+                    .replace(/[-_]/g, " ")
+                    .toUpperCase();
+
+                  return href ? (
+                    <Link
+                      key={`${item.type || "result"}-${item.id}-${index}`}
+                      href={href}
+                      role="option"
+                      aria-selected="false"
+                      onClick={() => {
+                        setSearchOpen(false);
+                        setSearchTerm("");
+                      }}
+                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-violet-50 focus:bg-violet-50 focus:outline-none"
+                    >
+                      <span className="min-w-0 truncate text-xs font-bold text-slate-700">
+                        {label}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-500">
+                        {typeLabel}
+                      </span>
+                    </Link>
+                  ) : (
+                    <div
+                      key={`${item.type || "result"}-${item.id}-${index}`}
+                      role="option"
+                      aria-selected="false"
+                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left"
+                    >
+                      <span className="min-w-0 truncate text-xs font-bold text-slate-500">
+                        {label}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-400">
+                        {typeLabel}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="px-3 py-3 text-xs font-semibold text-slate-500">
+                  No results found.
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {/* =================================================

@@ -7,6 +7,7 @@ import {
 import {
     buildAttemptPayload,
     getAttemptId,
+    withPausedAttemptPlaceholders,
 } from "@/lib/examAttemptData";
 
 export const dynamic = "force-dynamic";
@@ -123,10 +124,7 @@ export async function POST(request) {
             );
         }
 
-        const examStatus =
-            body.action === "create"
-                ? "pause"
-                : body.exam_status;
+        const examStatus = body.exam_status;
 
         if (!["pause", "finish"].includes(examStatus)) {
             return reply(
@@ -187,11 +185,13 @@ export async function POST(request) {
         payload.paused_time = seconds * 1000;
 
         const formData = new FormData();
+        const upstreamPayload =
+            withPausedAttemptPlaceholders(payload);
 
         formData.append("api", apiKey);
 
         for (
-            const [key, value] of Object.entries(payload)
+            const [key, value] of Object.entries(upstreamPayload)
         ) {
             if (key.startsWith("__") || value == null) {
                 continue;

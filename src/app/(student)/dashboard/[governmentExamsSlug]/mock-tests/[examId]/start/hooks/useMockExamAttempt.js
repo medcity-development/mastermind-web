@@ -138,6 +138,7 @@ export default function useMockExamAttempt({
                 examType,
                 exam,
                 questions,
+                answers: answersRef?.current || {},
                 remainingSeconds,
                 startTime,
                 completedAt,
@@ -150,6 +151,7 @@ export default function useMockExamAttempt({
             examType,
             exam,
             questions,
+            answersRef,
             remainingSeconds,
             startTime,
         ]
@@ -210,11 +212,8 @@ export default function useMockExamAttempt({
         setSaveMessage("");
 
         try {
-            const calculated = getCurrentResult();
-
             const payload = buildPayload({
                 examStatus: "pause",
-                result: calculated,
             });
 
             let savedPauseId = pauseId;
@@ -416,6 +415,12 @@ export default function useMockExamAttempt({
                         questions.length
                     ),
 
+                    answer_array:
+                        calculated.answerArray,
+
+                    user_answers:
+                        calculated.userAnswers,
+
                     total_attempted:
                         calculated.totalAttempted,
 
@@ -446,8 +451,10 @@ export default function useMockExamAttempt({
                         );
 
                     resultForModal = {
-                        ...localResult,
                         ...databaseResult,
+                        // Keep counts and score calculated from this submission;
+                        // older analytics rows may contain empty result fields.
+                        ...localResult,
 
                         // Preserve the actual saved
                         // attempt ID for navigation.

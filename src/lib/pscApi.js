@@ -290,6 +290,61 @@ async function postRequest({
   return result;
 }
 
+export async function getMockTestDetails({
+  uid = 0,
+  cid,
+  examId,
+  type = "mock",
+} = {}) {
+  try {
+    const safeCid = requireCid(cid);
+
+    if (
+      examId === undefined ||
+      examId === null ||
+      examId === ""
+    ) {
+      return {
+        status: false,
+        exam: [],
+        data: [],
+        message: "examId is required.",
+        raw: null,
+      };
+    }
+
+    const result = await postRequest({
+      endpoint: "getMockTestDetails",
+      fields: {
+        cid: safeCid,
+        uid: String(uid ?? 0),
+        examid: String(examId),
+        type: String(type || "mock"),
+      },
+      cache: "no-store",
+    });
+
+    return {
+      ...result,
+      status: result?.status !== false,
+      exam: result?.exam ?? [],
+      data: result?.data ?? [],
+      raw: result,
+    };
+  } catch (error) {
+    console.error("getMockTestDetails:", error);
+
+    return {
+      status: false,
+      exam: [],
+      data: [],
+      message:
+        error?.message ||
+        "Unable to load mock test details.",
+      raw: null,
+    };
+  }
+}
 
 export async function getMainCourses() {
   try {

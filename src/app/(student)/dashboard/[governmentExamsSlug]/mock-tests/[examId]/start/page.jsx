@@ -16,6 +16,7 @@ import {
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
+import { checkPremiumExamAccess } from "@/lib/premiumExamAccess";
 
 import MockTestQuestions from "./components/MockTestQuestions";
 
@@ -68,6 +69,12 @@ export default async function MockExamStartPage({
 
   const query =
     await searchParams;
+  const examTitle =
+    String(query?.title ?? "").trim();
+  const examType =
+    String(query?.type || "mock").toLowerCase() === "studyplan"
+      ? "studyplan"
+      : "mock";
 
   /* =======================================================
      CONFIG
@@ -110,8 +117,12 @@ export default async function MockExamStartPage({
     !Number.isFinite(uid) ||
     uid <= 0
   ) {
+    const redirectParams = new URLSearchParams({
+      type: examType,
+      ...(examTitle ? { title: examTitle } : {}),
+    });
     const redirectUrl =
-      `/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start`;
+      `/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start?${redirectParams}`;
 
     redirect(
       `/login?redirect=${encodeURIComponent(
@@ -120,17 +131,24 @@ export default async function MockExamStartPage({
     );
   }
 
+  const access = await checkPremiumExamAccess({
+    uid,
+    cid,
+    examId,
+    type: examType,
+  });
+
+  if (access.isPremium && !access.hasAccess) {
+    redirect(
+      `/dashboard/${governmentExamsSlug}?showPackages=1`
+    );
+  }
+
   /* =======================================================
      EXAM TITLE
 
      Comes from the real selected mock exam.
   ======================================================= */
-
-  const examTitle =
-    String(
-      query?.title ??
-      ""
-    ).trim();
 
   /* =======================================================
      DETAILS PATH
@@ -183,12 +201,12 @@ export default async function MockExamStartPage({
                   detailsPath,
 
                 query:
-                  examTitle
-                    ? {
-                        title:
-                          examTitle,
-                      }
-                    : {},
+                  {
+                    type: examType,
+                    ...(examTitle
+                      ? { title: examTitle }
+                      : {}),
+                  },
               }}
               className="
                 inline-flex
@@ -256,6 +274,9 @@ export default async function MockExamStartPage({
           }
           examTitle={
             examTitle
+          }
+          examType={
+            examType
           }
           governmentExamsSlug={
             governmentExamsSlug

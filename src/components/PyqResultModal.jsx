@@ -4,6 +4,7 @@ import {
     useEffect,
     useRef,
 } from "react";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 export default function PyqResultModal({
     open,
@@ -13,17 +14,18 @@ export default function PyqResultModal({
     onViewAnalysis,
 }) {
     const dialog = useRef(null);
+    const canShowResult = isFinishedExamAttempt(result);
 
     useEffect(() => {
         const element = dialog.current;
 
         if (!element) return;
 
-        if (open && !element.open) {
+        if (open && canShowResult && !element.open) {
             element.showModal();
         }
 
-        if (!open && element.open) {
+        if ((!open || !canShowResult) && element.open) {
             element.close();
         }
 
@@ -32,7 +34,9 @@ export default function PyqResultModal({
                 element.close();
             }
         };
-    }, [open]);
+    }, [open, canShowResult]);
+
+    if (!canShowResult) return null;
 
     const counts = [
         ["Attempted", result?.total_attempted],

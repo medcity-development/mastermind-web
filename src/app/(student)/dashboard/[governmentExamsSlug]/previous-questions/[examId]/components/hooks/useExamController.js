@@ -586,9 +586,15 @@ export default function useExamController({
     ]
   );
 
-  const stats = useMemo(
-    () => statsFor(answers),
-    [answers, statsFor]
+  const answeredCount = useMemo(
+    () =>
+      Object.values(answers).filter(
+        (answer) =>
+          answer != null &&
+          String(answer).trim() !== "" &&
+          String(answer) !== "0"
+      ).length,
+    [answers]
   );
 
   /* RESTORE GUEST ATTEMPT */
@@ -775,9 +781,9 @@ export default function useExamController({
 
       const current = attempt.current;
 
-      const resultStats = statsFor(
-        current.answers
-      );
+      const resultStats = action === "submit"
+        ? statsFor(current.answers)
+        : null;
       const lastAnsweredIndex = getQuestionIndex(
         normalizedQuestions,
         current.lastAnsweredQuestionId
@@ -814,26 +820,21 @@ export default function useExamController({
               current.answers[question.id] ?? 0
           ),
 
-        total_attempted:
-          resultStats.attempted,
-
-        total_correct:
-          resultStats.correct,
-
-        total_wrong:
-          resultStats.wrong,
-
-        user_score:
-          resultStats.score,
-
-        minus_mark:
-          resultStats.negativeMark,
-
         __scoring: {
           markPerCorrect,
           negativeMarkPerWrong,
         },
       };
+
+      if (resultStats) {
+        Object.assign(payload, {
+          total_attempted: resultStats.attempted,
+          total_correct: resultStats.correct,
+          total_wrong: resultStats.wrong,
+          user_score: resultStats.score,
+          minus_mark: resultStats.negativeMark,
+        });
+      }
 
       const isResuming = Boolean(current.pauseId);
       const result = await postAttempt(
@@ -1050,15 +1051,15 @@ export default function useExamController({
     answers,
 
     answeredCount:
-      stats.attempted,
+      answeredCount,
 
     unansweredCount:
-      totalQuestions - stats.attempted,
+      totalQuestions - answeredCount,
 
     progress:
       totalQuestions > 0
         ? Math.round(
-          (stats.attempted / totalQuestions) * 100
+          (answeredCount / totalQuestions) * 100
         )
         : 0,
 
@@ -1071,13 +1072,13 @@ export default function useExamController({
     correctCount:
       submitted
         ? submittedResult?.total_correct ??
-        stats.correct
+        0
         : 0,
 
     wrongCount:
       submitted
         ? submittedResult?.total_wrong ??
-        stats.wrong
+        0
         : 0,
 
     durationMinutes,

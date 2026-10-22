@@ -62,7 +62,7 @@ export default function ScertExamActions({
       >
         <Pause size={17} />
 
-        Pause & Exit
+        Pause Exam
       </button>
 
       {/* FINISH */}

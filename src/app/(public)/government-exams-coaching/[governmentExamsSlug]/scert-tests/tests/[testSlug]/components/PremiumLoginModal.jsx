@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  usePathname,
   useRouter,
 } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 import {
   Crown,
@@ -13,24 +15,18 @@ import {
 export default function PremiumLoginModal({
   open,
   onClose,
-  redirectPath = "",
 }) {
   const router =
     useRouter();
+  const pathname =
+    usePathname();
 
   if (!open) {
     return null;
   }
 
   function handleLogin() {
-    const redirect =
-      encodeURIComponent(
-        redirectPath
-      );
-
-    router.push(
-      `/login?redirect=${redirect}`
-    );
+    continueToPremiumPackages(router, pathname);
   }
 
   return (
@@ -169,7 +165,7 @@ export default function PremiumLoginModal({
             text-white
           "
         >
-          Login & View Plans
+          OK
         </button>
       </div>
     </div>

@@ -20,7 +20,7 @@ export default function PremiumMockTestModal({
   }
 
   const premiumPath =
-    `/dashboard/${governmentExamsSlug}/premium-packages`;
+    `/dashboard/${governmentExamsSlug}?showPackages=1`;
 
   return (
     <div
@@ -353,7 +353,7 @@ export default function PremiumMockTestModal({
                 hover:-translate-y-0.5
               "
             >
-              View Premium Plans
+              OK
             </Link>
           </div>
         </div>

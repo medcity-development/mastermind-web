@@ -6,16 +6,20 @@ import {
     getPackageDetails,
     getPackagesList,
   } from "@/lib/packagesHelper";
+  import {
+    getGovernmentExamConfig,
+  } from "@/lib/governmentExamConfig";
   
   import PackageDetails from "./components/PackageDetails";
   
   async function resolvePackage(
-    slug
+    slug,
+    cid
   ) {
     const packages =
       await getPackagesList({
         uid: 0,
-        cid: 1,
+        cid,
       });
   
     return (
@@ -29,12 +33,20 @@ import {
   export async function generateMetadata({
     params,
   }) {
-    const { slug } =
+    const {
+      governmentExamsSlug,
+      slug,
+    } =
       await params;
-  
+    const config =
+      getGovernmentExamConfig(
+        governmentExamsSlug
+      );
+
     const selectedPackage =
       await resolvePackage(
-        slug
+        slug,
+        config?.cid
       );
   
     if (!selectedPackage) {
@@ -62,12 +74,20 @@ import {
   export default async function PackageDetailsPage({
     params,
   }) {
-    const { slug } =
+    const {
+      governmentExamsSlug,
+      slug,
+    } =
       await params;
-  
+    const config =
+      getGovernmentExamConfig(
+        governmentExamsSlug
+      );
+
     const selectedPackage =
       await resolvePackage(
-        slug
+        slug,
+        config?.cid
       );
   
     if (!selectedPackage) {
@@ -80,7 +100,7 @@ import {
           selectedPackage.id,
   
         uid: 0,
-        cid: 1,
+        cid: config.cid,
       });
   
     if (!details) {

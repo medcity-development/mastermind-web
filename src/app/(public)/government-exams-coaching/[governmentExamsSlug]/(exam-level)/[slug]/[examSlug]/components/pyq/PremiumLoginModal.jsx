@@ -9,16 +9,19 @@ import {
 
 import {
   useRouter,
+  usePathname,
 } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 export default function PremiumLoginModal({
   open,
   exam,
   onClose,
-  redirectPath = "",
 }) {
   const router =
     useRouter();
+  const pathname =
+    usePathname();
 
   if (!open) {
     return null;
@@ -31,11 +34,7 @@ export default function PremiumLoginModal({
     "Premium Mock Test";
 
   function handleLogin() {
-    const loginPath = redirectPath
-      ? `/login?redirect=${encodeURIComponent(redirectPath)}`
-      : "/login";
-
-    router.push(loginPath);
+    continueToPremiumPackages(router, pathname);
   }
 
   return (
@@ -335,7 +334,7 @@ export default function PremiumLoginModal({
                 size={16}
               />
 
-              Login
+              OK
             </button>
           </div>
         </div>

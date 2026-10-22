@@ -26,6 +26,9 @@ export default function TopicVideoPlayerCard({
         border-[#dce8f7]
         bg-white
         shadow-[0_18px_50px_rgba(22,79,165,0.08)]
+        xl:flex
+        xl:h-full
+        xl:flex-col
       "
     >
       {/* PLAYER */}
@@ -36,6 +39,9 @@ export default function TopicVideoPlayerCard({
           aspect-video
           overflow-hidden
           bg-[#071f55]
+          xl:aspect-auto
+          xl:min-h-0
+          xl:flex-1
         "
       >
         {activeUrl ? (
@@ -55,6 +61,8 @@ export default function TopicVideoPlayerCard({
             className="
               h-full
               w-full
+              xl:absolute
+              xl:inset-0
               bg-black
               object-contain
             "
@@ -72,6 +80,7 @@ export default function TopicVideoPlayerCard({
               via-[#0b3a83]
               to-[#075fc8]
               text-white
+              xl:inset-0
             "
           >
             <div className="text-center">

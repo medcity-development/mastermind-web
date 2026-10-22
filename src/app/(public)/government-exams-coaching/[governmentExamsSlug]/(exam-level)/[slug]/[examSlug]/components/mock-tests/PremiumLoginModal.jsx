@@ -2,23 +2,25 @@
 
 import {
   Crown,
-  LogIn,
   ShieldCheck,
   X,
 } from "lucide-react";
 
 import {
   useRouter,
+  usePathname,
 } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 export default function PremiumLoginModal({
   open,
   exam,
   onClose,
-  redirectPath = "",
 }) {
   const router =
     useRouter();
+  const pathname =
+    usePathname();
 
   if (!open) {
     return null;
@@ -31,11 +33,7 @@ export default function PremiumLoginModal({
     "Premium Mock Test";
 
   function handleLogin() {
-    const loginPath = redirectPath
-      ? `/login?redirect=${encodeURIComponent(redirectPath)}`
-      : "/login";
-
-    router.push(loginPath);
+    continueToPremiumPackages(router, pathname);
   }
 
   return (
@@ -188,8 +186,7 @@ export default function PremiumLoginModal({
                 text-[#071f55]
               "
             >
-              Login to access this
-              exam
+              Purchase a plan to continue
             </h2>
 
             <p
@@ -254,7 +251,7 @@ export default function PremiumLoginModal({
                   text-[#071f55]
                 "
               >
-                Login required
+                Premium plan required
               </p>
 
               <p
@@ -265,10 +262,7 @@ export default function PremiumLoginModal({
                   text-slate-500
                 "
               >
-                Sign in to your
-                MasterMind account
-                to continue to this
-                premium mock test.
+                View available plans to unlock this premium mock test.
               </p>
             </div>
           </div>
@@ -331,11 +325,7 @@ export default function PremiumLoginModal({
                 hover:shadow-[0_16px_34px_rgba(22,79,165,0.28)]
               "
             >
-              <LogIn
-                size={16}
-              />
-
-              Login
+              OK
             </button>
           </div>
         </div>

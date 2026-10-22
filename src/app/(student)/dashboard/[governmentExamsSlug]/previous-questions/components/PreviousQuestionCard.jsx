@@ -461,7 +461,7 @@ export default function PreviousQuestionCard({
             </p>
 
             <Link
-              href={`/dashboard/${governmentExamsSlug}/premium-packages`}
+              href={`/dashboard/${governmentExamsSlug}?showPackages=1`}
               className="
                 block
                 mt-6
@@ -476,7 +476,7 @@ export default function PreviousQuestionCard({
                 text-white
               "
             >
-              View Plans
+              OK
             </Link>
           </div>
         </div>

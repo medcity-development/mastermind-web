@@ -6,6 +6,10 @@ import {
   Trophy,
   XCircle,
 } from "lucide-react";
+import {
+  isFinishedExamAttempt,
+  isPausedExamAttempt,
+} from "@/lib/examAttemptStatus";
 
 /* =========================================================
    FORMAT
@@ -107,6 +111,8 @@ export default function SavedResultCard({
     )
       .trim()
       .toLowerCase();
+  const isPaused = isPausedExamAttempt(result);
+  const isFinished = isFinishedExamAttempt(result);
 
   const statusText =
     status === "finish" ||
@@ -120,7 +126,7 @@ export default function SavedResultCard({
         "paused"
         ? "Paused"
         : status ||
-        "Finished";
+       "Not finished";
 
   const detailCards = [
     {
@@ -213,6 +219,18 @@ export default function SavedResultCard({
         CircleMinus,
     },
   ];
+  const visibleDetailCards = isFinished
+    ? detailCards
+    : detailCards.filter(
+        ({ label }) =>
+          ![
+            "Total Mark",
+            "Attempted",
+            "Correct",
+            "Wrong",
+            "Minus Mark",
+          ].includes(label)
+      );
 
   return (
     <section
@@ -260,55 +278,35 @@ export default function SavedResultCard({
                 text-white/75
               "
             >
-              Calculated Result
+              {isFinished ? "Calculated Result" : "Exam Attempt"}
             </p>
 
-            <p
-              className="
-                mt-3
-                text-sm
-                font-medium
-                text-white/90
-              "
-            >
-              Score
-            </p>
+            {!isFinished ? (
+              <div className="mt-3">
+                <p className="text-lg font-black text-white">
+                  {isPaused ? "Exam Paused" : "Exam Not Finished"}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-white/80">
+                  Finish the exam to see your score.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="mt-3 text-sm font-medium text-white/90">
+                  Score
+                </p>
 
-            <div
-              className="
-                mt-1
-                flex
-                items-end
-                gap-1
-              "
-            >
-              <span
-                className="
-                  text-[34px]
-                  font-black
-                  leading-none
-                  text-white
-                "
-              >
-                {formatNumber(
-                  score
-                )}
-              </span>
+                <div className="mt-1 flex items-end gap-1">
+                  <span className="text-[34px] font-black leading-none text-white">
+                    {formatNumber(score)}
+                  </span>
 
-              <span
-                className="
-                  pb-1
-                  text-sm
-                  font-extrabold
-                  text-white
-                "
-              >
-                /
-                {formatNumber(
-                  totalMark
-                )}
-              </span>
-            </div>
+                  <span className="pb-1 text-sm font-extrabold text-white">
+                    / {formatNumber(totalMark)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           <div
@@ -361,7 +359,7 @@ export default function SavedResultCard({
           lg:grid-cols-4
         "
       >
-        {detailCards.map(
+        {visibleDetailCards.map(
           ({
             label,
             value,

@@ -8,6 +8,7 @@ import {
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
 import DashboardSelectedTestNotice from "./DashboardSelectedTestNotice";
+import DashboardPremiumPackagesPrompt from "./DashboardPremiumPackagesPrompt";
 
 export default function DashboardShell({
   config,
@@ -110,6 +111,7 @@ export default function DashboardShell({
         >
           <div
             className="
+              dashboard-content-frame
               mx-auto
               w-full
               max-w-[1500px]
@@ -117,6 +119,10 @@ export default function DashboardShell({
           >
             <Suspense fallback={null}>
               <DashboardSelectedTestNotice />
+              <DashboardPremiumPackagesPrompt
+                governmentExamsSlug={config.slug}
+                cid={config.cid}
+              />
             </Suspense>
             {children}
           </div>

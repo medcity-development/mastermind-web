@@ -179,6 +179,8 @@ async function parseJsonResponse(
 export async function getPackagesList({
   uid = 0,
   cid,
+  throwOnError = false,
+  includeActivePacks = false,
 } = {}) {
   try {
     if (!hasValidCid(cid)) {
@@ -186,7 +188,9 @@ export async function getPackagesList({
         "getPackagesList: cid is required."
       );
 
-      return [];
+      return includeActivePacks
+        ? { packages: [], activePacks: [] }
+        : [];
     }
 
     const {
@@ -213,22 +217,16 @@ export async function getPackagesList({
       String(cid)
     );
 
-    const response =
-      await fetch(
-        `${apiBaseUrl}/getPackagesList`,
-        {
-          method:
-            "POST",
-
-          body:
-            formData,
-
-          next: {
-            revalidate:
-              3600,
-          },
-        }
-      );
+    const response = await fetch(
+      `${apiBaseUrl}/getPackagesList`,
+      {
+        method: "POST",
+        body: formData,
+        ...(Number(uid) > 0
+          ? { cache: "no-store" }
+          : { next: { revalidate: 3600 } }),
+      }
+    );
 
     const result =
       await parseJsonResponse(
@@ -249,7 +247,7 @@ export async function getPackagesList({
         ? result.data
         : [];
 
-    return rawPackages
+    const packages = rawPackages
       .filter(
         (item) =>
           item?.id &&
@@ -327,6 +325,12 @@ export async function getPackagesList({
             item?.course ??
             "",
 
+          courseId:
+            item?.courseid ??
+            item?.course_id ??
+            item?.courseId ??
+            "",
+
           type:
             item?.type ??
             "",
@@ -347,13 +351,30 @@ export async function getPackagesList({
             item,
         })
       );
+
+    return includeActivePacks
+      ? {
+          packages,
+          activePacks: Array.isArray(
+            result?.activepacks ?? result?.activePacks
+          )
+            ? result.activepacks ?? result.activePacks
+            : [],
+        }
+      : packages;
   } catch (error) {
     console.error(
       "getPackagesList error:",
       error
     );
 
-    return [];
+    if (throwOnError) {
+      throw error;
+    }
+
+    return includeActivePacks
+      ? { packages: [], activePacks: [] }
+      : [];
   }
 }
 
@@ -429,10 +450,13 @@ export async function getPackageDetails({
           body:
             formData,
 
-          next: {
-            revalidate:
-              3600,
-          },
+            ...(Number(uid) > 0
+              ? { cache: "no-store" }
+              : {
+                  next: {
+                    revalidate: 3600,
+                  },
+                }),
         }
       );
 
@@ -541,6 +565,23 @@ export async function getPackageDetails({
       ) ??
       rawPrices[0] ??
       null;
+
+    const priceOptions =
+      rawPrices
+        .filter(
+          (item) =>
+            String(item?.status ?? "1") === "1"
+        )
+        .map((item) => ({
+          id: item?.id ?? null,
+          current: item?.price ?? "",
+          original: item?.striked_price ?? "",
+          subtotal: item?.subtotal ?? "",
+          final: item?.roundvalue ?? item?.price ?? "",
+          gst: item?.gst ?? "0",
+          validity: item?.validity ?? "",
+          days: item?.days ?? "",
+        }));
 
     const price =
       priceItem
@@ -728,7 +769,21 @@ export async function getPackageDetails({
           result?.premium
         ),
 
+      packStatus:
+        result?.packStatus ??
+        "",
+
+      packPurchased:
+        result?.packPurchased ??
+        "",
+
+      packValid:
+        result?.packValid ??
+        "",
+
       price,
+
+      priceOptions,
 
       features,
 

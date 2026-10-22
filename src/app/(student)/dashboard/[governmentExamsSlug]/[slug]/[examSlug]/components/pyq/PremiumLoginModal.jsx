@@ -9,7 +9,9 @@ import {
 
 import {
   useRouter,
+  usePathname,
 } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 export default function PremiumLoginModal({
   open,
@@ -18,6 +20,8 @@ export default function PremiumLoginModal({
 }) {
   const router =
     useRouter();
+  const pathname =
+    usePathname();
 
   if (!open) {
     return null;
@@ -30,9 +34,7 @@ export default function PremiumLoginModal({
     "Premium Mock Test";
 
   function handleLogin() {
-    router.push(
-      "/dashboard"
-    );
+    continueToPremiumPackages(router, pathname);
   }
 
   return (
@@ -185,8 +187,7 @@ export default function PremiumLoginModal({
                 text-[#071f55]
               "
             >
-              Login to access this
-              exam
+              Purchase a plan to continue
             </h2>
 
             <p
@@ -332,7 +333,7 @@ export default function PremiumLoginModal({
                 size={16}
               />
 
-              Login
+              OK
             </button>
           </div>
         </div>

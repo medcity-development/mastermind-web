@@ -1,6 +1,8 @@
 import {
   NextResponse,
 } from "next/server";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { checkPremiumExamAccess } from "@/lib/premiumExamAccess";
 
 export async function GET(
   request
@@ -17,10 +19,8 @@ export async function GET(
         "cid"
       );
 
-    const uid =
-      searchParams.get(
-        "uid"
-      ) || "0";
+    const session = await getStudentSession();
+    const uid = Number(session?.uid) || 0;
 
     const examId =
       searchParams.get(
@@ -61,6 +61,24 @@ export async function GET(
         {
           status: 400,
         }
+      );
+    }
+
+    const access = await checkPremiumExamAccess({
+      uid,
+      cid,
+      examId,
+      type: examType,
+    });
+
+    if (access.isPremium && !access.hasAccess) {
+      return NextResponse.json(
+        {
+          status: false,
+          message: "Purchase a plan to access this premium exam.",
+          data: [],
+        },
+        { status: 403 }
       );
     }
 

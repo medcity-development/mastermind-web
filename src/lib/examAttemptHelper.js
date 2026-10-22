@@ -4,6 +4,7 @@
 import {
   getAttemptId,
   isFailedResponse,
+  withPausedAttemptPlaceholders,
 } from "./examAttemptData";
 
 /* =========================================================
@@ -278,7 +279,7 @@ export async function createUserExamAttempt(
   try {
     const result = await sendExamRequest(
       "setNewUserExams",
-      payload
+      withPausedAttemptPlaceholders(payload)
     );
 
     const failed = normalizeFailure(
@@ -333,7 +334,7 @@ export async function updateUserExamAttempt(
 
     const result = await sendExamRequest(
       "setUpdateUserExams",
-      payload
+      withPausedAttemptPlaceholders(payload)
     );
 
     const failed = normalizeFailure(

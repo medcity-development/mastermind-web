@@ -114,6 +114,7 @@ export default async function ProfilePage({
             initialProfile={
                 profile
             }
+            uid={session.uid}
             config={
                 config
             }

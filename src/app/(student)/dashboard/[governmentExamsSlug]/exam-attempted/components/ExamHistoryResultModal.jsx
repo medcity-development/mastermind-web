@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, MinusCircle, Target, Trophy, X, XCircle } from "lucide-react";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -42,7 +43,7 @@ export default function ExamHistoryResultModal({
   onViewAnalysis,
 }) {
   useEffect(() => {
-    if (!open) return;
+    if (!open || !result || !isFinishedExamAttempt(result)) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event) => {
@@ -53,9 +54,9 @@ export default function ExamHistoryResultModal({
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previous;
     };
-  }, [open, onClose]);
+  }, [open, onClose, result]);
 
-  if (!open || !result) return null;
+  if (!open || !result || !isFinishedExamAttempt(result)) return null;
 
   // All values have already been prepared by prepareExamHistoryResult.
   const score = numberOrNull(result.user_score ?? result.score);

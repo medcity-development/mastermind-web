@@ -756,18 +756,6 @@ export function buildAttemptPayload(
     );
 
   /* =======================================================
-     CALCULATED RESULT
-  ======================================================= */
-
-  const calculated =
-    calculateExamResult({
-      answerArray,
-      userAnswers,
-      markPerCorrect,
-      negativeMarkPerWrong,
-    });
-
-  /* =======================================================
      STATUS
   ======================================================= */
 
@@ -775,6 +763,22 @@ export function buildAttemptPayload(
     normalizeExamStatus(
       body?.exam_status
     );
+
+  const isFinished = [
+    "complete",
+    "completed",
+    "finish",
+    "finished",
+  ].includes(examStatus);
+
+  const calculated = isFinished
+    ? calculateExamResult({
+        answerArray,
+        userAnswers,
+        markPerCorrect,
+        negativeMarkPerWrong,
+      })
+    : null;
 
   /* =======================================================
      EXAM TYPE
@@ -791,11 +795,8 @@ export function buildAttemptPayload(
   /* =======================================================
      PAYLOAD
 
-     IMPORTANT:
-     Never trust client-calculated
-     score/count values.
-
-     Calculate everything here.
+     Never trust client-calculated scores. Evaluate answers
+     only after the attempt has been finished.
   ======================================================= */
 
   const payload = {
@@ -829,42 +830,27 @@ export function buildAttemptPayload(
     total_mark:
       totalMark,
 
-    /*
-     * Android score
-     */
-    user_score:
-      calculated.score,
-
-    /*
-     * Total deducted mark
-     *
-     * 13 wrong:
-     * 13 × .333 = 4.329
-     * rounded = 4.33
-     */
-    minus_mark:
-      calculated.negativeMark,
-
     answer_array:
       answerArray,
 
     user_answers:
       userAnswers,
 
-    total_attempted:
-      calculated.attempted,
-
-    total_correct:
-      calculated.correct,
-
-    total_wrong:
-      calculated.wrong,
-
     __scoring: {
       markPerCorrect,
       negativeMarkPerWrong,
     },
   };
+
+  if (calculated) {
+    Object.assign(payload, {
+      user_score: calculated.score,
+      minus_mark: calculated.negativeMark,
+      total_attempted: calculated.attempted,
+      total_correct: calculated.correct,
+      total_wrong: calculated.wrong,
+    });
+  }
 
   const startTime = timestampToMilliseconds(
     body?.start_time ?? body?.startTime ?? body?.started_at
@@ -902,4 +888,27 @@ export function buildAttemptPayload(
   }
 
   return payload;
+}
+
+export function withPausedAttemptPlaceholders(payload = {}) {
+  const status = String(
+    payload.exam_status ??
+    payload.examStatus ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!["pause", "paused"].includes(status)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    user_score: "",
+    minus_mark: "",
+    total_attempted: "",
+    total_correct: "",
+    total_wrong: "",
+  };
 }

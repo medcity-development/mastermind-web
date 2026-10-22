@@ -2,6 +2,7 @@ import {
     getAttemptId,
     getResultArray,
 } from "@/lib/examAttemptData";
+import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
 
 /* =========================================================
    EXAM TYPES
@@ -207,31 +208,23 @@ export function normalizeAttempt({
             source?.total_questions
         );
 
-    const attempted =
-        toNumber(
-            source?.total_attempted
-        );
-
-    const correct =
-        toNumber(
-            source?.total_correct
-        );
-
-    const wrong =
-        toNumber(
+    const finished = isFinishedExamAttempt(source);
+    const attempted = finished
+        ? toNumber(source?.total_attempted)
+        : null;
+    const correct = finished
+        ? toNumber(source?.total_correct)
+        : null;
+    const wrong = finished
+        ? toNumber(
             source?.total_wrong,
-            Math.max(
-                0,
-                attempted -
-                correct
-            )
-        );
+            Math.max(0, attempted - correct)
+        )
+        : null;
 
-    const score =
-        toNumber(
-            source?.user_score,
-            correct
-        );
+    const score = finished
+        ? toNumber(source?.user_score, correct)
+        : null;
 
     const totalMark =
         toNumber(
@@ -240,7 +233,7 @@ export function normalizeAttempt({
         );
 
     const percentage =
-        totalMark > 0
+        finished && totalMark > 0
             ? Math.max(
                 0,
                 Math.min(
@@ -455,8 +448,11 @@ export function formatStatus(
 export function buildPerformanceSummary(
     attempts = []
 ) {
+    const finishedAttempts =
+        attempts.filter(isFinishedExamAttempt);
+
     const totalAttempted =
-        attempts.reduce(
+        finishedAttempts.reduce(
             (
                 sum,
                 attempt
@@ -469,7 +465,7 @@ export function buildPerformanceSummary(
         );
 
     const totalCorrect =
-        attempts.reduce(
+        finishedAttempts.reduce(
             (
                 sum,
                 attempt
@@ -482,7 +478,7 @@ export function buildPerformanceSummary(
         );
 
     const totalWrong =
-        attempts.reduce(
+        finishedAttempts.reduce(
             (
                 sum,
                 attempt
@@ -495,9 +491,9 @@ export function buildPerformanceSummary(
         );
 
     const averageScore =
-        attempts.length
+        finishedAttempts.length
             ? Math.round(
-                attempts.reduce(
+                finishedAttempts.reduce(
                     (
                         sum,
                         attempt
@@ -508,9 +504,9 @@ export function buildPerformanceSummary(
                         ),
                     0
                 ) /
-                attempts.length
+                finishedAttempts.length
             )
-            : 0;
+            : null;
 
     return {
         tests:
@@ -520,5 +516,6 @@ export function buildPerformanceSummary(
         totalCorrect,
         totalWrong,
         averageScore,
+        finishedAttempts: finishedAttempts.length,
     };
 }

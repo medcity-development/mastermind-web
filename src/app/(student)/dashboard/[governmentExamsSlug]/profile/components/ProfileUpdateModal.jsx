@@ -1,9 +1,7 @@
 "use client";
 
-import {
-    useEffect,
-    useState,
-} from "react";
+import Image from "next/image";
+import { useState } from "react";
 
 import {
     Loader2,
@@ -12,9 +10,21 @@ import {
 } from "lucide-react";
 
 import Swal from "sweetalert2";
+import maleAvatar from "@/app/(public)/profile-setup/images/avatar-male.png";
+import femaleAvatar from "@/app/(public)/profile-setup/images/avatar-female.png";
 
 export default function ProfileUpdateModal({
     open,
+    ...props
+}) {
+    if (!open) {
+        return null;
+    }
+
+    return <ProfileUpdateForm {...props} />;
+}
+
+function ProfileUpdateForm({
     profile,
     onClose,
     onUpdated,
@@ -24,28 +34,7 @@ export default function ProfileUpdateModal({
         setLoading,
     ] = useState(false);
 
-    const [
-        form,
-        setForm,
-    ] = useState({
-        name: "",
-        email: "",
-        mobile: "",
-        dob: "",
-        place: "",
-        promocode: "",
-        code:
-            "+91",
-        avatar: "",
-    });
-
-    useEffect(
-        () => {
-            if (!open) {
-                return;
-            }
-
-            setForm({
+    const [form, setForm] = useState(() => ({
                 name:
                     profile?.name ||
                     "",
@@ -78,17 +67,7 @@ export default function ProfileUpdateModal({
                 avatar:
                     profile?.avatar ||
                     "",
-            });
-        },
-        [
-            open,
-            profile,
-        ]
-    );
-
-    if (!open) {
-        return null;
-    }
+            }));
 
     function handleChange(
         event
@@ -334,7 +313,47 @@ export default function ProfileUpdateModal({
             sm:grid-cols-2
           "
                 >
-                    <ProfileInput
+          <div className="sm:col-span-2">
+              <p className="mb-2 text-[11px] font-semibold text-slate-700">
+                  Choose your avatar
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                  {[
+                      { value: "male", label: "Male", image: maleAvatar },
+                      { value: "female", label: "Female", image: femaleAvatar },
+                  ].map((avatar) => (
+                      <button
+                          key={avatar.value}
+                          type="button"
+                          aria-pressed={form.avatar === avatar.value}
+                          onClick={() =>
+                              setForm((previous) => ({
+                                  ...previous,
+                                  avatar: avatar.value,
+                              }))
+                          }
+                          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                              form.avatar === avatar.value
+                                  ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+                                  : "border-slate-200 hover:border-blue-300"
+                          }`}
+                      >
+                          <Image
+                              src={avatar.image}
+                              alt={`${avatar.label} avatar`}
+                              width={42}
+                              height={42}
+                              className="h-[42px] w-[42px] rounded-full object-cover"
+                          />
+                          <span className="text-xs font-bold text-slate-700">
+                              {avatar.label}
+                          </span>
+                      </button>
+                  ))}
+              </div>
+          </div>
+
+          <ProfileInput
                         label="Full Name"
                         name="name"
                         value={

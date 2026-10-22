@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
 
 import {
   Crown,
@@ -14,8 +15,16 @@ export default function PremiumMockTestModal({
   test,
   onClose,
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   if (!open) {
     return null;
+  }
+
+  function handleConfirm() {
+    onClose();
+    continueToPremiumPackages(router, pathname);
   }
 
   return (
@@ -284,9 +293,9 @@ export default function PremiumMockTestModal({
               Maybe Later
             </button>
 
-            <Link
-              href="/government-exams-coaching/kerala-psc/premium-packages"
-              onClick={onClose}
+            <button
+              type="button"
+              onClick={handleConfirm}
               className="
                 flex
                 min-h-[46px]
@@ -307,8 +316,8 @@ export default function PremiumMockTestModal({
                 hover:-translate-y-0.5
               "
             >
-              View Premium Plans
-            </Link>
+              OK
+            </button>
           </div>
         </div>
       </div>

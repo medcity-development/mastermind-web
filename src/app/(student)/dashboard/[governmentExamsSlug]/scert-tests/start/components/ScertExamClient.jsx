@@ -10,7 +10,6 @@ import {
 import { useRouter } from "next/navigation";
 
 import {
-  calculateExamResult,
   getAttemptId,
   getResultArray,
   parseAnswers,
@@ -29,10 +28,10 @@ import ScertExamHeader from "./ScertExamHeader";
 import ScertQuestionList from "./ScertQuestionList";
 import ScertPagination from "./ScertPagination";
 import ScertExamActions from "./ScertExamActions";
-import ScertPauseModal from "./ScertPauseModal";
 import ScertFinishModal from "./ScertFinishModal";
 
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 
 function positiveId(value) {
   const number = Number(value);
@@ -209,21 +208,13 @@ export default function ScertExamClient({
     [questions]
   );
 
-  const stats = useMemo(
+  const answeredCount = useMemo(
     () =>
-      calculateExamResult({
-        answerArray: answerKeys,
-
-        userAnswers:
-          questions.map(
-            (question) =>
-              answers[String(question.id)] ?? 0
-          ),
-
-        markPerCorrect: 1,
-        negativeMarkPerWrong: 0.333,
-      }),
-    [answers, questions, answerKeys]
+      questions.reduce((count, question) => {
+        const answer = answers[String(question.id)];
+        return count + (answer != null && String(answer).trim() !== "" && String(answer) !== "0" ? 1 : 0);
+      }, 0),
+    [answers, questions]
   );
 
   /* LOCAL DRAFT */
@@ -666,6 +657,7 @@ export default function ScertExamClient({
       if (action === "submit") {
         const finalResult = {
           ...result.savedResult,
+          exam_status: "finish",
           id: current.pauseId,
           pauseid: current.pauseId,
           exam_id: id,
@@ -935,7 +927,7 @@ export default function ScertExamClient({
           exam={exam}
           remainingSeconds={remainingSeconds}
           totalQuestions={totalQuestions}
-          answeredCount={stats.attempted}
+          answeredCount={answeredCount}
           currentPage={currentPage}
           totalPages={totalPages}
         />
@@ -1030,7 +1022,7 @@ export default function ScertExamClient({
         </section>
       </div>
 
-      <ScertPauseModal
+      <ExamPauseConfirmModal
         open={showPauseModal}
         saving={saving}
         onClose={() => {
@@ -1044,7 +1036,7 @@ export default function ScertExamClient({
       <ScertFinishModal
         open={showFinishModal}
         saving={saving}
-        attempted={stats.attempted}
+        attempted={answeredCount}
         totalQuestions={totalQuestions}
         onClose={() => {
           if (!saving) {

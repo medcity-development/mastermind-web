@@ -28,6 +28,11 @@ import {
 import {
   calculateExamScore,
 } from "@/lib/examResultUtils";
+import {
+  getExamAttemptStatus,
+  isFinishedExamAttempt,
+  isPausedExamAttempt,
+} from "@/lib/examAttemptStatus";
 
 import {
   buildQuestionRows,
@@ -398,6 +403,9 @@ export default function ExamAnalysisClient(props) {
   }, [loadAnalysis, refreshKey]);
 
   const record = review?.attempt ?? null;
+  const isPaused = isPausedExamAttempt(record);
+  const isFinished = isFinishedExamAttempt(record);
+  const attemptStatus = getExamAttemptStatus(record);
 
   const questions = useMemo(
     () =>
@@ -414,21 +422,21 @@ export default function ExamAnalysisClient(props) {
   const imagePath = review?.imagePath ?? "";
 
   const rows = useMemo(() => {
-    if (!record) return [];
+    if (!record || !isFinished) return [];
 
     return buildQuestionRows({
       result: record,
       questions,
       imagePath,
     });
-  }, [record, questions, imagePath]);
+  }, [record, questions, imagePath, isFinished]);
 
   /* =======================================================
      EXAM STATISTICS
   ======================================================= */
 
   const stats = useMemo(() => {
-    if (!record) return null;
+    if (!record || !isFinished) return null;
 
     const calculated = calculateExamScore({
       ...record,
@@ -450,7 +458,7 @@ export default function ExamAnalysisClient(props) {
       wrong: calculated.wrong,
       minusMark: calculated.minusMark,
     };
-  }, [record]);
+  }, [record, isFinished]);
 
   const percentage = useMemo(() => {
     const score = numberOrNull(stats?.score);
@@ -523,47 +531,70 @@ export default function ExamAnalysisClient(props) {
 
         {/* ANALYSIS */}
 
-        {!loading && !error && record && stats && (
+        {!loading && !error && record && (
           <>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-              <SummaryCard
-                label="Score"
-                value={stats.score}
-                icon={Trophy}
-              />
+            {!isFinished && (
+              <div
+                role="status"
+                className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"
+              >
+                <h2 className="font-black">
+                  {isPaused ? "Exam Paused" : "Exam Not Finished"}
+                </h2>
+                <p className="mt-1 text-sm">
+                  This exam is not finished yet. Resume and finish it to see
+                  your score.
+                </p>
+                {attemptStatus && !isPaused && (
+                  <p className="mt-1 text-xs capitalize">
+                    Current status: {attemptStatus}
+                  </p>
+                )}
+              </div>
+            )}
 
-              <SummaryCard
-                label="Attempted"
-                value={stats.attempted}
-                icon={ListChecks}
-                theme="purple"
-              />
+            {isFinished && stats && (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+                <SummaryCard
+                  label="Score"
+                  value={stats.score}
+                  icon={Trophy}
+                />
 
-              <SummaryCard
-                label="Correct"
-                value={stats.correct}
-                icon={CheckCircle2}
-                theme="green"
-              />
+                <SummaryCard
+                  label="Attempted"
+                  value={stats.attempted}
+                  icon={ListChecks}
+                  theme="purple"
+                />
 
-              <SummaryCard
-                label="Wrong"
-                value={stats.wrong}
-                icon={XCircle}
-                theme="red"
-              />
+                <SummaryCard
+                  label="Correct"
+                  value={stats.correct}
+                  icon={CheckCircle2}
+                  theme="green"
+                />
 
-              <SummaryCard
-                label="Negative Mark"
-                value={stats.minusMark}
-                icon={CircleMinus}
-                theme="orange"
-              />
-            </div>
+                <SummaryCard
+                  label="Wrong"
+                  value={stats.wrong}
+                  icon={XCircle}
+                  theme="red"
+                />
+
+                <SummaryCard
+                  label="Negative Mark"
+                  value={stats.minusMark}
+                  icon={CircleMinus}
+                  theme="orange"
+                />
+              </div>
+            )}
 
             {/* PERFORMANCE OVERVIEW */}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            {isFinished && stats && (
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <BarChart3 className="text-[#017dc0]" />
 
@@ -615,10 +646,12 @@ export default function ExamAnalysisClient(props) {
                   />
                 </div>
               )}
-            </section>
+              </section>
+            )}
 
             {/* QUESTION ANALYSIS */}
 
+            {isFinished && (
             <section>
               <div className="mb-5 flex items-center gap-3">
                 <Target className="text-[#017dc0]" />
@@ -640,6 +673,7 @@ export default function ExamAnalysisClient(props) {
 
               <QuestionReview rows={rows} />
             </section>
+            )}
           </>
         )}
       </div>

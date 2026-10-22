@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 
 import TopicChapterList from "./TopicChapterList";
-import StudyPlanMockTests from "./StudyPlanMockTests";
 
 function extractArray(result) {
   if (Array.isArray(result?.items)) {
@@ -330,18 +329,12 @@ export default function TopicWiseTab({
           loading={loadingChapters}
           error={error}
           onBack={backToTopics}
+          mockTestId={mockTestId}
+          cid={cid}
+          uid={uid}
+          onLoginRequired={onLoginRequired}
+          onStartMockTest={onStartMockTest}
         />
-
-        {!loadingChapters && selectedTopic?.id && (
-  <StudyPlanMockTests
-    key={selectedTopic.id}
-    topicId={selectedTopic.id}
-    cid={cid}
-    uid={uid}
-    onLoginRequired={onLoginRequired}
-    onStartTest={onStartMockTest}
-  />
-)}
       </div>
     );
   }

@@ -111,8 +111,11 @@ export async function GET(request) {
 
   const cid = validId(params.get("cid"));
   const topicId = validId(params.get("topicId"));
+  const requestedMockTestId = validId(
+    params.get("mockTestId")
+  );
 
-  if (!cid || !topicId) {
+  if (!cid || (!topicId && !requestedMockTestId)) {
     return json(
       {
         status: false,
@@ -124,20 +127,23 @@ export async function GET(request) {
 
   try {
     // STEP 1: Retrieve the linked test ID.
-    const chapters = await backendRequest(
-      "getChaptersList",
-      {
-        cid,
-        uid: 0,
-        topicid: topicId,
-      }
-    );
+    let mockTestId = requestedMockTestId;
+    if (!mockTestId) {
+      const chapters = await backendRequest(
+        "getChaptersList",
+        {
+          cid,
+          uid: 0,
+          topicid: topicId,
+        }
+      );
 
-    const mockTestId = validId(
-      chapters?.mocktest ??
-      chapters?.mock_test ??
-      chapters?.mocktest_id
-    );
+      mockTestId = validId(
+        chapters?.mocktest ??
+        chapters?.mock_test ??
+        chapters?.mocktest_id
+      );
+    }
 
     if (!mockTestId) {
       return json({
@@ -167,11 +173,17 @@ export async function GET(request) {
     const selected = exams.find((item) => {
       const id = validId(item?.id);
 
+      const type = String(item.type || "").toLowerCase();
+      const itemTopicId =
+        item.topicid ?? item.topic_id;
+
       return (
         id === mockTestId &&
-        String(item.type).toLowerCase() ===
-          "studyplan" &&
-        String(item.topicid) === String(topicId)
+        (!type || type === "studyplan") &&
+        (requestedMockTestId ||
+          !topicId ||
+          itemTopicId == null ||
+          String(itemTopicId) === String(topicId))
       );
     });
 
