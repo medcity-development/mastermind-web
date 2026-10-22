@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import {
   ArrowRight,
 } from "lucide-react";
@@ -173,8 +171,8 @@ export default function DashboardHero({
           {description}
         </p>
 
-        <Link
-          href={`${config.basePath}/recommended-courses`}
+        <a
+          href="#dashboard-learning-tools"
           className="
             mt-6
             inline-flex
@@ -199,7 +197,7 @@ export default function DashboardHero({
           Continue Learning
 
           <ArrowRight size={14} />
-        </Link>
+        </a>
       </div>
     </section>
   );

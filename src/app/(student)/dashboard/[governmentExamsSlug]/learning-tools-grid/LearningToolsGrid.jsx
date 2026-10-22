@@ -76,6 +76,7 @@ export default async function LearningToolsGrid({
 
   return (
     <section
+      id="dashboard-learning-tools"
       className="
         relative
         w-full
