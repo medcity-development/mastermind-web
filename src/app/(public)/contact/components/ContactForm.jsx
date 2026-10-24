@@ -1,21 +1,62 @@
 "use client";
 
+import { useState } from "react";
 import {
   ArrowRight,
+  BookOpen,
   Mail,
   MessageSquare,
   Phone,
   User,
 } from "lucide-react";
+import EnquirySuccessModal from "@/components/enquiry-form/EnquirySuccessModal";
 
 export default function ContactForm() {
-  const handleSubmit = (event) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsSubmitting(true);
+    setSubmissionError("");
+
+    const form = event.currentTarget;
+    const enquiry = Object.fromEntries(new FormData(form).entries());
+
+    try {
+      const response = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(enquiry),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result?.status !== true) {
+        throw new Error(
+          result?.message || "Unable to submit your enquiry. Please try again."
+        );
+      }
+
+      form.reset();
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      setSubmissionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your enquiry. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <section
-      className="
+    <>
+      <section
+        className="
         rounded-[20px]
         border
         border-[#dfeaf5]
@@ -23,109 +64,90 @@ export default function ContactForm() {
         p-5
         shadow-[0_10px_30px_rgba(15,58,110,0.06)]
         sm:p-6
-      " data-aos="fade-up"
-    >
-      <div>
-        <h2
-          className="
+      "
+        data-aos="fade-up"
+      >
+        <div>
+          <h2
+            className="
             text-xl
             font-black
             text-[#082b7a]
           "
-        >
-          Send Us a Message
-        </h2>
+          >
+            Send Us a Message
+          </h2>
 
-        <p
-          className="
+          <p
+            className="
             mt-1
             text-xs
             text-[#7183a3]
           "
-        >
-          Fill in the details below and
-          we&apos;ll get back to you shortly.
-        </p>
-      </div>
+          >
+            Fill in the details below and we&apos;ll get back to you shortly.
+          </p>
+        </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-5 space-y-3"
-      >
-        <div
-          className="
+        <form className="mt-5 space-y-3" onSubmit={handleSubmit}>
+          <div
+            className="
             grid
             gap-3
             sm:grid-cols-2
           "
-        >
-          <Field
-            icon={User}
-            placeholder="Your Name *"
-          />
+          >
+            <Field
+              icon={User}
+              name="firstname"
+              placeholder="Full Name"
+            />
 
-          <Field
-            icon={Mail}
-            type="email"
-            placeholder="Your Email *"
-          />
+            <Field
+              icon={Mail}
+              name="email"
+              type="email"
+              placeholder="Email ID"
+            />
 
-          <Field
-            icon={Phone}
-            type="tel"
-            placeholder="Phone Number *"
-          />
+            <Field
+              icon={Phone}
+              name="mobile"
+              type="tel"
+              placeholder="Mobile Number"
+            />
 
-          <Field
-            icon={MessageSquare}
-            placeholder="Subject *"
-          />
-        </div>
+            <Field
+              icon={BookOpen}
+              name="course"
+              placeholder="Enter a Course Name"
+            />
 
-        <div
-          className="
-            flex
-            min-h-[120px]
-            items-start
-            gap-2
-            rounded-xl
-            border
-            border-[#dbe7f4]
-            bg-white
-            px-3
-            py-3
-            focus-within:border-[#087ee9]
-          "
-        >
-          <MessageSquare
+            <TextareaField
+              icon={MessageSquare}
+              name="address"
+              placeholder="Address"
+            />
+
+            <TextareaField
+              icon={MessageSquare}
+              name="message"
+              placeholder="Message"
+            />
+          </div>
+
+          {submissionError && (
+            <p
+              className="text-sm text-red-600"
+              role="alert"
+              aria-live="polite"
+            >
+              {submissionError}
+            </p>
+          )}
+
+          <button
             className="
-              mt-0.5
-              h-4
-              w-4
-              shrink-0
-              text-[#7189ae]
-            "
-          />
-
-          <textarea
-            required
-            placeholder="Your Message *"
-            className="
-              min-h-[95px]
-              w-full
-              resize-none
-              bg-transparent
-              text-xs
-              text-slate-700
-              outline-none
-              placeholder:text-[#8ea0bb]
-            "
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="
             flex
             w-full
             items-center
@@ -143,23 +165,42 @@ export default function ContactForm() {
             shadow-[0_10px_24px_rgba(8,126,233,0.22)]
             transition
             hover:-translate-y-0.5
+            disabled:cursor-not-allowed
+            disabled:opacity-60
           "
-        >
-          Send Message
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      </form>
-    </section>
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? "Submitting..." : "Send Message"}
+            {!isSubmitting && <ArrowRight className="h-4 w-4" />}
+          </button>
+        </form>
+      </section>
+
+      {isSuccessModalOpen && (
+        <EnquirySuccessModal
+          onClose={() => setIsSuccessModalOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
 function Field({
   icon: Icon,
+  name,
   type = "text",
   placeholder,
 }) {
+  const maxLength = {
+    firstname: 150,
+    email: 254,
+    mobile: 30,
+    course: 150,
+  }[name];
+
   return (
-    <div
+    <label
       className="
         flex
         items-center
@@ -174,6 +215,7 @@ function Field({
       "
     >
       <Icon
+        aria-hidden="true"
         className="
           h-4
           w-4
@@ -183,9 +225,7 @@ function Field({
       />
 
       <input
-        type={type}
-        required
-        placeholder={placeholder}
+        autoComplete={name === "firstname" ? "name" : name}
         className="
           min-w-0
           flex-1
@@ -195,7 +235,53 @@ function Field({
           outline-none
           placeholder:text-[#8ea0bb]
         "
+        maxLength={maxLength}
+        name={name}
+        placeholder={placeholder}
+        required
+        type={type}
       />
-    </div>
+    </label>
+  );
+}
+
+function TextareaField({ icon: Icon, name, placeholder }) {
+  return (
+    <label
+      className="
+        flex
+        min-h-[112px]
+        items-start
+        gap-2
+        rounded-xl
+        border
+        border-[#dbe7f4]
+        bg-white
+        px-3
+        py-3
+        focus-within:border-[#087ee9]
+      "
+    >
+      <Icon
+        aria-hidden="true"
+        className="mt-0.5 h-4 w-4 shrink-0 text-[#7189ae]"
+      />
+      <textarea
+        className="
+          min-h-[88px]
+          w-full
+          resize-none
+          bg-transparent
+          text-xs
+          text-slate-700
+          outline-none
+          placeholder:text-[#8ea0bb]
+        "
+        maxLength={name === "address" ? 500 : 2000}
+        name={name}
+        placeholder={placeholder}
+        required
+      />
+    </label>
   );
 }

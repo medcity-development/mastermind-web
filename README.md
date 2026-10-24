@@ -20,6 +20,14 @@ You can start editing the page by modifying `app/page.js`. The page auto-updates
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Enquiry inbox configuration
+
+The admin enquiry inbox at `/forAdmin-enquiries@masterMind` requires these server-side environment variables:
+
+- `PSC_API_BASE_URL` and `PSC_API_KEY` for the enquiry API.
+- `ENQUIRY_ADMIN_PASSWORD` for admin sign-in.
+- `ENQUIRY_ADMIN_SESSION_SECRET` for signing admin sessions. Use a secret with at least 32 characters.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

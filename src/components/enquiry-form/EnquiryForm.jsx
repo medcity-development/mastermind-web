@@ -1,7 +1,54 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
+import EnquirySuccessModal from "./EnquirySuccessModal";
 
 const EnquiryForm = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setSubmissionError("");
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const enquiry = Object.fromEntries(formData.entries());
+
+    try {
+      const response = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(enquiry),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result?.status !== true) {
+        throw new Error(
+          result?.message || "Unable to submit your enquiry. Please try again."
+        );
+      }
+
+      form.reset();
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      setSubmissionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your enquiry. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
+    <>
     <section className="relative w-full overflow-hidden py-16" data-aos="fade-up">
       {/* Background image */}
       <Image
@@ -19,46 +66,63 @@ const EnquiryForm = () => {
         <FormHeader />
 
         <div className="mx-auto mt-8 max-w-5xl">
-          <form>
+          <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <FormInput
                 type="text"
-                name="fullname"
+                name="firstname"
                 placeholder="Full Name"
+                required
               />
 
               <FormInput
                 type="email"
                 name="email"
                 placeholder="Email ID"
+                required
               />
 
               <FormInput
                 type="tel"
                 name="mobile"
                 placeholder="Mobile Number"
+                required
               />
 
               <FormInput
                 type="text"
                 name="course"
-                placeholder="Select Course"
+                placeholder="Enter a Course Name"
+                required
               />
 
               <FormTextarea
                 name="address"
                 placeholder="Address"
+                required
               />
 
               <FormTextarea
                 name="message"
                 placeholder="Message"
+                required
               />
             </div>
+
+            {submissionError && (
+              <p
+                className="mt-4 text-center text-sm text-red-200"
+                role="alert"
+                aria-live="polite"
+              >
+                {submissionError}
+              </p>
+            )}
 
             <div className="mt-8 flex justify-center">
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="
                   w-40
                   rounded-lg
@@ -77,15 +141,21 @@ const EnquiryForm = () => {
                   focus:outline-none
                   focus:ring-2
                   focus:ring-white/60
+                  disabled:cursor-not-allowed
+                  disabled:opacity-70 cursor-pointer
                 "
               >
-                Submit
+                {isSubmitting ? "Submitting..." : "Submit"}
               </button>
             </div>
           </form>
         </div>
       </div>
     </section>
+    {isSuccessModalOpen && (
+      <EnquirySuccessModal onClose={() => setIsSuccessModalOpen(false)} />
+    )}
+    </>
   );
 };
 
@@ -103,13 +173,14 @@ const FormHeader = () => {
   );
 };
 
-const FormInput = ({ type, name, placeholder }) => {
+const FormInput = ({ type, name, placeholder, required }) => {
   return (
     <div>
       <input
         type={type}
         name={name}
         placeholder={placeholder}
+        required={required}
         className="
           w-full
           rounded-lg
@@ -134,13 +205,14 @@ const FormInput = ({ type, name, placeholder }) => {
   );
 };
 
-const FormTextarea = ({ name, placeholder }) => {
+const FormTextarea = ({ name, placeholder, required }) => {
   return (
     <div>
       <textarea
         name={name}
         placeholder={placeholder}
         rows={4}
+        required={required}
         className="
           w-full
           resize-none
