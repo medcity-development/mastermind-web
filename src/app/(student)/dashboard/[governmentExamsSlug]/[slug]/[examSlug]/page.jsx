@@ -1,41 +1,18 @@
-import {
-  notFound,
-} from "next/navigation";
 
-import {
-  createSlug,
-} from "@/lib/pscSlug";
+import { cache } from "react";
+import { notFound } from "next/navigation";
 
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  resolveSubCategory,
-} from "@/lib/subCategoriesHelper";
-
-import {
-  getSubExams,
-} from "@/lib/pscApi";
-
-import {
-  getSubExamDetails,
-} from "@/lib/subExamDetailsHelper";
-
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
+import { createSlug } from "@/lib/pscSlug";
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { resolveSubCategory } from "@/lib/subCategoriesHelper";
+import { getSubExams } from "@/lib/pscApi";
+import { getSubExamDetails } from "@/lib/subExamDetailsHelper";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
 
 import ExamDetailsHero from "./components/ExamDetailsHero";
 import ExamDetailsTabs from "./components/ExamDetailsTabs";
 
-/* =========================================================
-   GET EXAM NAME
-========================================================= */
-
-function getExamName(
-  exam
-) {
+function getExamName(exam) {
   return (
     exam?.exam_name ||
     exam?.exam ||
@@ -45,155 +22,151 @@ function getExamName(
   );
 }
 
-/* =========================================================
-   RESOLVE EXAM FROM SEO SLUG
-========================================================= */
+function normalizeSlug(value) {
+  return createSlug(String(value || "").trim());
+}
 
-async function resolveExam({
-  governmentExamsSlug,
-  levelSlug,
-  examSlug,
-  uid = 0,
-}) {
-  /* =======================================================
-     GOVERNMENT EXAM CONFIG
+function removeAbbreviation(value) {
+  return String(value || "")
+    .replace(/\([^)]*\)/g, "")
+    .trim();
+}
 
-     kerala-psc → cid 1
-     rrb-ssc    → cid 2
-  ======================================================= */
+function matchesExam(exam, requestedSlug) {
+  const name = getExamName(exam);
 
-  const governmentConfig =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const candidates = [
+    name,
+    removeAbbreviation(name),
+    exam?.slug,
+    exam?.exam_slug,
+    exam?.seo_slug,
+  ];
 
-  if (!governmentConfig) {
-    return null;
-  }
+  return candidates.some(
+    (candidate) =>
+      candidate &&
+      normalizeSlug(candidate) === requestedSlug
+  );
+}
 
-  const cid =
-    String(
-      governmentConfig.cid
-    );
+const resolveExam = cache(
+  async (
+    governmentExamsSlug,
+    levelSlug,
+    examSlug,
+    uid = 0
+  ) => {
+    const governmentConfig =
+      getGovernmentExamConfig(governmentExamsSlug);
 
-  /* =======================================================
-     LEVEL SLUG → SUB CATEGORY ID
-  ======================================================= */
+    if (!governmentConfig) {
+      console.error(
+        "Invalid government exam:",
+        governmentExamsSlug
+      );
+      return null;
+    }
 
-  const level =
-    await resolveSubCategory({
+    const cid = String(governmentConfig.cid);
+
+    const level = await resolveSubCategory({
       cid,
-      uid:
-        uid || 0,
+      uid: uid || 0,
       levelSlug,
     });
 
-  if (!level) {
-    return null;
-  }
+    if (!level) {
+      console.error("Unable to resolve level:", {
+        cid,
+        levelSlug,
+      });
+      return null;
+    }
 
-  const subId =
-    String(
-      level.subId
-    );
+    const subId = String(level.subId);
 
-  /* =======================================================
-     LOAD SUB EXAMS
-  ======================================================= */
-
-  const result =
-    await getSubExams({
+    const result = await getSubExams({
       cid,
-      uid:
-        uid || 0,
+      uid: uid || 0,
       subId,
     });
 
-  const exams =
-    Array.isArray(
-      result?.exams
-    )
+    if (!result?.status) {
+      throw new Error(
+        result?.message || "Unable to load exams."
+      );
+    }
+
+    const exams = Array.isArray(result?.exams)
       ? result.exams
       : [];
 
-  /* =======================================================
-     FIND EXAM BY SEO SLUG
-  ======================================================= */
+    const requestedSlug = normalizeSlug(examSlug);
 
-  const selectedExam =
-    exams.find(
-      (exam) => {
-        const name =
-          getExamName(
-            exam
-          );
+    console.log("EXAM RESOLUTION:", {
+      uid,
+      cid,
+      subId,
+      requestedSlug,
+      availableExams: exams.map((exam) => ({
+        id: exam.id,
+        name: getExamName(exam),
+        slug: normalizeSlug(getExamName(exam)),
+      })),
+    });
 
-        if (!name) {
-          return false;
-        }
+    const selectedExam =
+      exams.find((exam) =>
+        matchesExam(exam, requestedSlug)
+      ) || null;
 
-        return (
-          createSlug(name) ===
-          String(
-            examSlug
-          ).toLowerCase()
-        );
-      }
-    ) || null;
+    if (!selectedExam) {
+      console.error("Exam slug not found:", {
+        requestedSlug,
+        cid,
+        subId,
+      });
 
-  if (!selectedExam) {
-    return null;
+      return null;
+    }
+
+    const examId = String(
+      selectedExam?.id ?? ""
+    );
+
+    if (!examId) return null;
+
+    return {
+      governmentConfig,
+      level,
+      selectedExam,
+      cid,
+      subId,
+      examId,
+    };
   }
+);
 
-  const examId =
-    selectedExam?.id
-      ? String(
-          selectedExam.id
-        )
-      : "";
-
-  if (!examId) {
-    return null;
-  }
-
-  return {
-    governmentConfig,
-    level,
-    selectedExam,
-    cid,
-    subId,
-    examId,
-  };
-}
-
-/* =========================================================
-   METADATA
-========================================================= */
-
-export async function generateMetadata({
-  params,
-}) {
+export async function generateMetadata({ params }) {
   const {
     governmentExamsSlug,
     slug,
     examSlug,
   } = await params;
 
-  const resolved =
-    await resolveExam({
-      governmentExamsSlug,
+  const session = await getStudentSession();
 
-      levelSlug:
-        slug,
-
-      examSlug,
-    });
+  const resolved = await resolveExam(
+    governmentExamsSlug,
+    slug,
+    examSlug,
+    session?.uid || 0
+  );
 
   if (!resolved) {
     return {
-      title:
-        "Exam | MasterMind Academy",
-
+      title: "Exam | MasterMind Academy",
       robots: {
         index: false,
         follow: false,
@@ -207,33 +180,16 @@ export async function generateMetadata({
     selectedExam,
   } = resolved;
 
-  const examName =
-    getExamName(
-      selectedExam
-    );
-
-  const canonical =
-    `/dashboard/` +
-    `${governmentExamsSlug}/` +
-    `${slug}/` +
-    `${examSlug}`;
+  const examName = getExamName(selectedExam);
 
   return {
-    title:
-      `${examName} | ${governmentConfig.name} | MasterMind Academy`,
-
-    description:
-      `Prepare for ${examName} under ${level.name}. Access mock tests, video classes, previous questions and exam preparation resources.`,
-
+    title: `${examName} | ${governmentConfig.name} | MasterMind Academy`,
+    description: `Prepare for ${examName} under ${level.name}. Access mock tests, video classes, previous questions and preparation resources.`,
     alternates: {
-      canonical,
+      canonical: `/dashboard/${governmentExamsSlug}/${slug}/${examSlug}`,
     },
   };
 }
-
-/* =========================================================
-   PAGE
-========================================================= */
 
 export default async function SubExamDetailsPage({
   params,
@@ -244,33 +200,19 @@ export default async function SubExamDetailsPage({
     examSlug,
   } = await params;
 
-  if (
-    !governmentExamsSlug ||
-    !slug ||
-    !examSlug
-  ) {
+  if (!governmentExamsSlug || !slug || !examSlug) {
     notFound();
   }
 
-  /* =======================================================
-     SEO SLUG → API IDS
-  ======================================================= */
+  const session = await getStudentSession();
+  const uid = session?.uid || 0;
 
-  const session =
-    await getStudentSession();
-
-  const uid =
-    session?.uid || "";
-
-  const resolved =
-    await resolveExam({
-      governmentExamsSlug,
-
-      levelSlug:
-        slug,
-
-      examSlug,
-    });
+  const resolved = await resolveExam(
+    governmentExamsSlug,
+    slug,
+    examSlug,
+    uid
+  );
 
   if (!resolved) {
     notFound();
@@ -283,100 +225,41 @@ export default async function SubExamDetailsPage({
     examId,
   } = resolved;
 
-  /* =======================================================
-     EXAM TYPE
+  const type = selectedExam?.type || "mock";
 
-     Keep API value when available.
-  ======================================================= */
+  const result = await getSubExamDetails({
+    uid,
+    cid,
+    subExamId: examId,
+    type,
+    offset: 0,
+  });
 
-  const type =
-    selectedExam?.type ||
-    "mock";
-
-  /* =======================================================
-     GET DETAILS
-  ======================================================= */
-
-  const result =
-    await getSubExamDetails({
-      uid,
-
-      cid,
-
-      subExamId:
-        examId,
-
-      type,
-
-      offset: 0,
-    });
-
-  /*
-   Prefer the detailed API object.
-
-   If data is unavailable but the exam was
-   already resolved from getSubExams(),
-   keep the resolved exam available.
-  */
+  const details = result?.data;
 
   const exam =
-    result?.data ||
-    selectedExam;
-
-  if (!exam) {
-    notFound();
-  }
+    details &&
+    !Array.isArray(details) &&
+    typeof details === "object"
+      ? { ...selectedExam, ...details }
+      : selectedExam;
 
   return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f4f9ff]
-        pb-5
-        pt-5
-      "
-    >
-      <div
-        className="
-          mx-auto
-          w-full
-          max-w-[1450px]
-          px-4
-          sm:px-6
-          lg:px-8
-        "
-      >
+    <main className="min-h-screen bg-[#f4f9ff] pb-5 pt-5">
+      <div className="mx-auto w-full max-w-[1450px] px-4 sm:px-6 lg:px-8">
         <ExamDetailsHero
-          exam={
-            exam
-          }
-          levelSlug={
-            slug
-          }
-          governmentExamsSlug={
-            governmentExamsSlug
-          }
+          exam={exam}
+          levelSlug={slug}
+          governmentExamsSlug={governmentExamsSlug}
         />
 
         <ExamDetailsTabs
-          cid={
-            cid
-          }
-          uid={
-            uid
-          }
-          examId={
-            examId
-          }
-          subId={
-            subId
-          }
-          exam={
-            exam
-          }
-          governmentExamsSlug={
-            governmentExamsSlug
-          }
+          cid={cid}
+          uid={uid}
+          examId={examId}
+          subId={subId}
+          exam={exam}
+          governmentExamsSlug={governmentExamsSlug}
         />
       </div>
     </main>

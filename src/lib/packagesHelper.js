@@ -378,6 +378,58 @@ export async function getPackagesList({
   }
 }
 
+export async function getActivePlans({
+  uid,
+  cid,
+} = {}) {
+  if (!hasValidCid(cid)) {
+    throw new Error("getActivePlans: cid is required.");
+  }
+
+  if (!Number.isSafeInteger(Number(uid)) || Number(uid) <= 0) {
+    throw new Error("getActivePlans: a valid uid is required.");
+  }
+
+  const { apiBaseUrl, apiKey } = getApiConfig();
+  const formData = new FormData();
+
+  formData.append("api", apiKey);
+  formData.append("uid", String(uid));
+  formData.append("cid", String(cid));
+
+  const response = await fetch(
+    `${apiBaseUrl}/getActivePlans`,
+    {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    }
+  );
+
+  const result = await parseJsonResponse(
+    response,
+    "getActivePlans"
+  );
+
+  if (result?.status === false) {
+    throw new Error(
+      result?.message || "getActivePlans returned an unsuccessful status."
+    );
+  }
+
+  const plans =
+    result?.data ??
+    result?.activeplans ??
+    result?.activePlans ??
+    result?.plans;
+
+  if (!Array.isArray(plans)) {
+    throw new Error("getActivePlans returned an invalid plan list.");
+  }
+
+  return plans;
+}
+
 /* =========================================================
    PACKAGE DETAILS
 
@@ -494,6 +546,22 @@ export async function getPackageDetails({
       return null;
     }
 
+    if (
+      packageItem?.id !== undefined &&
+      packageItem?.id !== null &&
+      String(packageItem.id) !== String(pid)
+    ) {
+      console.error(
+        "Package ID mismatch:",
+        {
+          requestedPid: pid,
+          returnedPid: packageItem.id,
+        }
+      );
+
+      return null;
+    }
+
     /*
      * Extra protection:
      * if backend returns cid,
@@ -559,18 +627,14 @@ export async function getPackageDetails({
     const priceItem =
       rawPrices.find(
         (item) =>
-          String(
-            item?.status
-          ) === "1"
-      ) ??
-      rawPrices[0] ??
-      null;
+          String(item?.status) === "1"
+      ) ?? null;
 
     const priceOptions =
       rawPrices
         .filter(
           (item) =>
-            String(item?.status ?? "1") === "1"
+            String(item?.status) === "1"
         )
         .map((item) => ({
           id: item?.id ?? null,
@@ -617,6 +681,24 @@ export async function getPackageDetails({
               "",
           }
         : null;
+
+    const promocodes = Array.isArray(result?.promocodes)
+      ? result.promocodes
+          .filter((item) => item && typeof item === "object")
+          .map((item) => ({
+            ...item,
+            code: String(
+              item?.code ??
+                item?.promocode ??
+                item?.promo_code ??
+                item?.coupon_code ??
+                ""
+            ).trim(),
+            mode: String(item?.mode ?? "").trim().toLowerCase(),
+            value: item?.value ?? item?.amount ?? null,
+            status: item?.status ?? item?.active ?? null,
+          }))
+      : [];
 
     /* =====================================================
        FEATURES
@@ -784,6 +866,8 @@ export async function getPackageDetails({
       price,
 
       priceOptions,
+
+      promocodes,
 
       features,
 

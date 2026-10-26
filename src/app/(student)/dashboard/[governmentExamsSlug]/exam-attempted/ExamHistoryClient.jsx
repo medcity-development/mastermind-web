@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -31,22 +30,32 @@ import {
 import {
   recoverPyqHistory,
 } from "@/lib/pyqHistoryRecovery";
-import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
+
+import {
+  isFinishedExamAttempt,
+} from "@/lib/examAttemptStatus";
 
 const ITEMS_PER_PAGE = 10;
 
-// Study Plan intentionally disabled.
 const HISTORY_TYPES = [
   "mock",
   "pqp",
   "scert",
   "topicwise",
+  "studyplan",
 ];
 
 const TYPE_ALIASES = {
   pyq: "pqp",
   twe: "topicwise",
   "topic-wise": "topicwise",
+  "topic wise": "topicwise",
+  "topic_wise": "topicwise",
+  "mock test": "mock",
+  mocktest: "mock",
+  "study-plan": "studyplan",
+  "study_plan": "studyplan",
+  "study plan": "studyplan",
 };
 
 const nameCache = new Map();
@@ -92,7 +101,10 @@ function resolveName(record) {
     record?.exam_title,
     record?.examTitle,
     record?.test_name,
+    record?.testName,
     record?.test_title,
+    record?.mock_name,
+    record?.mockName,
     record?.title,
     record?.name,
     record?.exam?.exam_name,
@@ -133,22 +145,29 @@ function positiveId(value) {
 function examIdOf(record) {
   return positiveId(
     record?.exam_id ??
-    record?.examId ??
-    record?.examid ??
-    record?.test_id ??
-    record?.testId
+      record?.examId ??
+      record?.examid ??
+      record?.test_id ??
+      record?.testId
   );
 }
 
 function attemptIdOf(record) {
-  return positiveId(
-    record?._historyId ??
-    record?.attempt_id ??
-    record?.attemptId ??
-    record?.pauseid ??
-    record?.pause_id ??
-    record?.id
-  );
+  const candidates = [
+    record?._historyId,
+    record?.attempt_id,
+    record?.attemptId,
+    record?.pauseid,
+    record?.pause_id,
+    record?.id,
+  ];
+
+  for (const candidate of candidates) {
+    const id = positiveId(candidate);
+    if (id) return id;
+  }
+
+  return null;
 }
 
 function preserveSavedCounts(source, prepared) {
@@ -180,14 +199,14 @@ function preserveSavedCounts(source, prepared) {
   }
 
   for (const field of fields) {
-    const value = source?.[field];
+    const savedValue = source?.[field];
 
     if (
-      value !== null &&
-      value !== undefined &&
-      value !== ""
+      savedValue !== null &&
+      savedValue !== undefined &&
+      savedValue !== ""
     ) {
-      result[field] = value;
+      result[field] = savedValue;
     } else if (
       prepared?.[field] === undefined ||
       prepared?.[field] === null
@@ -199,20 +218,15 @@ function preserveSavedCounts(source, prepared) {
   return result;
 }
 
-function normalizeRecord(record, examType) {
-  const type = normalizeType(
-    record?.exam_type ??
-    record?._examType ??
-    examType
-  );
+function normalizeRecord(record, requestedType) {
+  const type = normalizeType(requestedType);
 
   const source =
     type === "pqp"
       ? recoverPyqHistory(record)
       : record;
 
-  const prepared =
-    prepareExamHistoryResult(source);
+  const prepared = prepareExamHistoryResult(source);
 
   const normalized = preserveSavedCounts(
     source,
@@ -223,13 +237,23 @@ function normalizeRecord(record, examType) {
     resolveName(normalized) ||
     resolveName(record);
 
+  const attemptId = attemptIdOf(record);
+
   return {
     ...normalized,
+
     exam_type: type,
     _examType: type,
-    _historyId: attemptIdOf(record),
+
+    ...(attemptId
+      ? { _historyId: attemptId }
+      : {}),
+
     _resolvedExamName: name,
-    exam_name: name,
+
+    ...(name
+      ? { exam_name: name }
+      : {}),
   };
 }
 
@@ -238,17 +262,26 @@ async function loadExamType({
   examType,
   signal,
 }) {
+  const type = normalizeType(examType);
+  const endpoint =
+    type === "studyplan"
+      ? "/api/exam-attempt/studyplan-history"
+      : "/api/exam-attempt/history";
+
   const response = await fetch(
-    "/api/exam-attempt/history",
+    endpoint,
     {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
         cid,
         exam_type: examType,
       }),
+
       cache: "no-store",
       signal,
     }
@@ -270,7 +303,7 @@ async function loadExamType({
   ) {
     throw new Error(
       result?.message ||
-      `${examType}: History unavailable.`
+        `${examType}: History unavailable.`
     );
   }
 
@@ -295,7 +328,9 @@ async function loadExamType({
     records: records.map((record) =>
       normalizeRecord(record, examType)
     ),
+
     partialVerification: partial,
+
     unresolvedCount:
       Number(result?.unresolvedCount) || 0,
   };
@@ -365,9 +400,7 @@ async function fetchExamName({
         nameCooldownUntil =
           Date.now() +
           retryMilliseconds(
-            response.headers.get(
-              "Retry-After"
-            )
+            response.headers.get("Retry-After")
           );
 
         return "";
@@ -443,42 +476,49 @@ export default function ExamHistoryClient({
   const router = useRouter();
 
   const [attempts, setAttempts] = useState([]);
-  const [activeTab, setActiveTab] =
-    useState("all");
+
+  const [activeTab, setActiveTab] = useState("all");
 
   const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] =
-    useState(1);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const [historyIncomplete, setHistoryIncomplete] =
-    useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const [refreshKey, setRefreshKey] =
-    useState(0);
+  const [
+    historyIncomplete,
+    setHistoryIncomplete,
+  ] = useState(false);
 
-  const attemptedNames = useRef(
-    new Set()
-  );
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const normalizedTypes = HISTORY_TYPES;
+  const attemptedNames = useRef(new Set());
+
+  const normalizedTypes = useMemo(() => {
+    const requestedTypes =
+      Array.isArray(examTypes) && examTypes.length
+        ? examTypes
+        : HISTORY_TYPES;
+
+    return [
+      ...new Set(
+        requestedTypes
+          .map(normalizeType)
+          .filter((type) =>
+            HISTORY_TYPES.includes(type)
+          )
+      ),
+    ];
+  }, [examTypes]);
 
   const refresh = useCallback(() => {
     attemptedNames.current.clear();
     nameCache.clear();
-
     setRefreshKey((value) => value + 1);
   }, []);
 
-  /* ==========================================
-     LOAD EXAM HISTORY
-  ========================================== */
-
   useEffect(() => {
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
 
     let mounted = true;
 
@@ -486,16 +526,15 @@ export default function ExamHistoryClient({
       setLoading(true);
       setHistoryIncomplete(false);
 
-      const results =
-        await Promise.allSettled(
-          normalizedTypes.map((examType) =>
-            loadExamType({
-              cid,
-              examType,
-              signal: controller.signal,
-            })
-          )
-        );
+      const results = await Promise.allSettled(
+        normalizedTypes.map((examType) =>
+          loadExamType({
+            cid,
+            examType,
+            signal: controller.signal,
+          })
+        )
+      );
 
       if (
         !mounted ||
@@ -569,30 +608,26 @@ export default function ExamHistoryClient({
       mounted = false;
       controller.abort();
     };
-  }, [cid, refreshKey]);
+  }, [
+    cid,
+    normalizedTypes,
+    refreshKey,
+  ]);
 
-  /* ==========================================
-     EXAM TABS
-  ========================================== */
+ const tabs = useMemo(() => {
+  return buildExamHistoryTabs(attempts)
+    .map((tab) => ({
+      ...tab,
+      key: tab.key ?? tab.value ?? tab.id,
+    }))
+    .filter((tab) => {
+      if (tab.key === "all") return true;
 
-  const tabs = useMemo(() => {
-    return buildExamHistoryTabs(
-      attempts
-    ).filter((tab) => {
-      const type = normalizeType(
-        tab?.value ??
-        tab?.id ??
-        tab?.type ??
-        tab?.key
+      return normalizedTypes.includes(
+        normalizeType(tab.key)
       );
-
-      return type !== "studyplan";
     });
-  }, [attempts]);
-
-  /* ==========================================
-     SEARCH AND FILTER
-  ========================================== */
+}, [attempts, normalizedTypes]);
 
   const filteredAttempts = useMemo(() => {
     const query = search
@@ -615,10 +650,11 @@ export default function ExamHistoryClient({
         return true;
       }
 
+      const name = resolveName(attempt)
+        .toLowerCase();
+
       return (
-        resolveName(attempt)
-          .toLowerCase()
-          .includes(query) ||
+        name.includes(query) ||
         type.includes(query) ||
         String(
           examIdOf(attempt) ?? ""
@@ -635,7 +671,7 @@ export default function ExamHistoryClient({
     1,
     Math.ceil(
       filteredAttempts.length /
-      ITEMS_PER_PAGE
+        ITEMS_PER_PAGE
     )
   );
 
@@ -659,10 +695,6 @@ export default function ExamHistoryClient({
     ]
   );
 
-  /* ==========================================
-     RESOLVE MISSING EXAM NAMES
-  ========================================== */
-
   useEffect(() => {
     if (
       loading ||
@@ -681,13 +713,11 @@ export default function ExamHistoryClient({
           continue;
         }
 
-        const examId =
-          examIdOf(attempt);
+        const examId = examIdOf(attempt);
 
-        const examType =
-          normalizeType(
-            getAttemptExamType(attempt)
-          );
+        const examType = normalizeType(
+          getAttemptExamType(attempt)
+        );
 
         if (!examId || !examType) {
           continue;
@@ -719,14 +749,12 @@ export default function ExamHistoryClient({
         }
 
         if (
-          Date.now() <
-          nameCooldownUntil
+          Date.now() < nameCooldownUntil
         ) {
           break;
         }
 
-        const name =
-          await fetchExamName(item);
+        const name = await fetchExamName(item);
 
         if (cancelled) {
           return;
@@ -778,13 +806,8 @@ export default function ExamHistoryClient({
     refreshKey,
   ]);
 
-  /* ==========================================
-     VIEW EXAM ANALYSIS
-  ========================================== */
-
   function handleViewAnalysis(attempt) {
-    const attemptId =
-      attemptIdOf(attempt);
+    const attemptId = attemptIdOf(attempt);
 
     const examType = normalizeType(
       getAttemptExamType(attempt)
@@ -819,20 +842,12 @@ export default function ExamHistoryClient({
     );
   }
 
-  /* ==========================================
-     EMPTY STATE
-  ========================================== */
-
   const emptyMessage =
     attempts.length === 0
       ? historyIncomplete
         ? "Exam history is temporarily unavailable. Please refresh to try again."
         : "No exams attempted so far."
       : "No exams match your search or filter.";
-
-  /* ==========================================
-     UI
-  ========================================== */
 
   return (
     <div className="w-full min-w-0 space-y-5">
@@ -847,18 +862,16 @@ export default function ExamHistoryClient({
         onRefresh={refresh}
       />
 
-      {/* No student-facing API warning banners */}
-
       <div className="min-w-0 max-w-full overflow-x-auto">
         <ExamHistoryTabs
           tabs={tabs}
           activeTab={activeTab}
           onChange={(value) => {
-            const nextType =
-              normalizeType(value);
+            const nextType = normalizeType(value);
 
             if (
-              nextType === "studyplan"
+              nextType !== "all" &&
+              !normalizedTypes.includes(nextType)
             ) {
               return;
             }
@@ -885,9 +898,7 @@ export default function ExamHistoryClient({
           attempts={visibleAttempts}
           loading={loading}
           startIndex={startIndex}
-          onViewAnalysis={
-            handleViewAnalysis
-          }
+          onViewAnalysis={handleViewAnalysis}
           emptyMessage={emptyMessage}
         />
 
@@ -896,13 +907,9 @@ export default function ExamHistoryClient({
             <ExamHistoryPagination
               currentPage={safePage}
               totalPages={totalPages}
-              totalItems={
-                filteredAttempts.length
-              }
+              totalItems={filteredAttempts.length}
               startIndex={startIndex}
-              itemsPerPage={
-                ITEMS_PER_PAGE
-              }
+              itemsPerPage={ITEMS_PER_PAGE}
               onPageChange={(page) => {
                 if (
                   page >= 1 &&

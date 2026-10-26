@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 
 import LevelMockTestCard from "./LevelMockTestCard";
-import PremiumLoginModal from "./PremiumLoginModal";
 
 const PAGE_SIZE = 10;
 
@@ -58,12 +57,6 @@ export default function MockTestsTab({
     setHistory,
   ] =
     useState([]);
-
-  const [
-    selectedPremiumExam,
-    setSelectedPremiumExam,
-  ] =
-    useState(null);
 
   useEffect(() => {
     console.log(
@@ -275,9 +268,6 @@ export default function MockTestsTab({
         []
       );
 
-      setSelectedPremiumExam(
-        null
-      );
     });
   }, [
     subId,
@@ -558,18 +548,6 @@ export default function MockTestsTab({
                     governmentExamsSlug={
                       governmentExamsSlug
                     }
-                    onPremiumClick={(
-                      selectedExam
-                    ) => {
-                      console.log(
-                        "OPEN PREMIUM MODAL:",
-                        selectedExam
-                      );
-
-                      setSelectedPremiumExam(
-                        selectedExam
-                      );
-                    }}
                   />
                 )
               )}
@@ -686,22 +664,6 @@ export default function MockTestsTab({
         )}
       </section>
 
-      {/* PREMIUM MODAL */}
-      <PremiumLoginModal
-        open={
-          Boolean(
-            selectedPremiumExam
-          )
-        }
-        exam={
-          selectedPremiumExam
-        }
-        onClose={() =>
-          setSelectedPremiumExam(
-            null
-          )
-        }
-      />
     </>
   );
 }

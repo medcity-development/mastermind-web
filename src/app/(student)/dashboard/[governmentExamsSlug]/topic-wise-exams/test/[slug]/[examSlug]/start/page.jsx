@@ -15,6 +15,7 @@ import {
 import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
 import { getStudentSession } from "@/lib/auth/getStudentSession";
 import { createSlug } from "@/lib/pscSlug";
+import { checkPremiumExamAccess } from "@/lib/premiumExamAccess";
 
 import ExamClient from "./components/ExamClient";
 
@@ -199,12 +200,26 @@ export default async function TopicWiseExamStartPage({
     mode,
   });
 
-  if (access !== "free") {
+  const premiumAccess =
+    access === "paid"
+      ? await checkPremiumExamAccess({
+          uid,
+          cid,
+          examId,
+          type: "twe",
+          exam: selected,
+        })
+      : null;
+
+  if (
+    access !== "free" &&
+    !premiumAccess?.hasAccess
+  ) {
     return (
       <ErrorPage
         message={
           access === "paid"
-            ? "This exam requires premium access."
+            ? "This premium exam is not included in your active purchased plans."
             : "Unable to verify access to this exam."
         }
         href={listHref}

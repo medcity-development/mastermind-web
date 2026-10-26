@@ -14,341 +14,136 @@ import {
 
 import TopicVideoPlaylistItem from "./TopicVideoPlaylistItem";
 
-const PLAYLIST_PAGE_SIZE = 8;
+const PAGE_SIZE = 8;
 
 export default function TopicVideoPlaylist({
   videos = [],
   activeVideo,
   onSelect,
 }) {
-  const [
-    currentPage,
-    setCurrentPage,
-  ] = useState(1);
+  const [currentPage, setCurrentPage] =
+    useState(1);
 
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        videos.length /
-          PLAYLIST_PAGE_SIZE
-      )
-    );
+  const safeVideos = useMemo(
+    () => (Array.isArray(videos) ? videos : []),
+    [videos]
+  );
 
-  /* =========================================================
-     MOVE PAGE TO ACTIVE VIDEO
-  ========================================================= */
+  const totalPages = Math.max(
+    1,
+    Math.ceil(safeVideos.length / PAGE_SIZE)
+  );
 
   useEffect(() => {
-    if (
-      !activeVideo ||
-      !videos.length
-    ) {
-      return;
-    }
+    if (!activeVideo?.id) return;
 
-    const activeIndex =
-      videos.findIndex(
-        (video) =>
-          String(
-            video?.id
-          ) ===
-          String(
-            activeVideo?.id
-          )
-      );
+    const activeIndex = safeVideos.findIndex(
+      (video) =>
+        String(video?.id) ===
+        String(activeVideo.id)
+    );
 
-    if (
-      activeIndex < 0
-    ) {
-      return;
-    }
+    if (activeIndex < 0) return;
 
-    const page =
-      Math.floor(
-        activeIndex /
-          PLAYLIST_PAGE_SIZE
-      ) + 1;
+    setCurrentPage(
+      Math.floor(activeIndex / PAGE_SIZE) + 1
+    );
+  }, [activeVideo?.id, safeVideos]);
 
-    setCurrentPage(page);
-  }, [
-    activeVideo?.id,
-    videos,
-  ]);
-
-  /* =========================================================
-     VISIBLE ITEMS
-  ========================================================= */
-
-  const visibleVideos =
-    useMemo(() => {
-      const start =
-        (currentPage - 1) *
-        PLAYLIST_PAGE_SIZE;
-
-      return videos.slice(
-        start,
-        start +
-          PLAYLIST_PAGE_SIZE
-      );
-    }, [
-      videos,
-      currentPage,
-    ]);
+  useEffect(() => {
+    setCurrentPage((page) =>
+      Math.min(Math.max(page, 1), totalPages)
+    );
+  }, [totalPages]);
 
   const startIndex =
-    (currentPage - 1) *
-    PLAYLIST_PAGE_SIZE;
+    (currentPage - 1) * PAGE_SIZE;
+
+  const visibleVideos = safeVideos.slice(
+    startIndex,
+    startIndex + PAGE_SIZE
+  );
 
   return (
-    <aside
-      className="
-        min-w-0
-        overflow-hidden
-        rounded-[26px]
-        border
-        border-[#dce8f7]
-        bg-white
-        shadow-[0_18px_50px_rgba(22,79,165,0.07)]
-      "
-    >
-      {/* HEADER */}
-
-      <div
-        className="
-          flex
-          items-center
-          justify-between
-          gap-3
-          border-b
-          border-[#e8eef7]
-          bg-gradient-to-r
-          from-[#f8fbff]
-          to-white
-          p-4
-          sm:p-5
-        "
-      >
-        <div
-          className="
-            flex
-            items-center
-            gap-3
-          "
-        >
-          <span
-            className="
-              flex
-              h-10
-              w-10
-              items-center
-              justify-center
-              rounded-[12px]
-              bg-gradient-to-br
-              from-[#075fc8]
-              to-[#164fa5]
-              text-white
-            "
-          >
-            <ListVideo
-              size={18}
-            />
+    <aside className="min-w-0 overflow-hidden rounded-[24px] border border-[#dce8f7] bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-[#f8fbff] p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white">
+            <ListVideo size={19} />
           </span>
 
           <div>
-            <h3
-              className="
-                text-[14px]
-                font-black
-                text-[#071f55]
-              "
-            >
+            <h3 className="text-sm font-black text-[#071f55]">
               Playlist
             </h3>
 
-            <p
-              className="
-                mt-0.5
-                text-[9px]
-                text-slate-400
-              "
-            >
-              All available
-              lessons
+            <p className="mt-0.5 text-[10px] text-slate-500">
+              Select a lesson to watch
             </p>
           </div>
         </div>
 
-        <span
-          className="
-            rounded-full
-            bg-[#edf7ff]
-            px-3
-            py-1.5
-            text-[9px]
-            font-black
-            text-[#075fc8]
-          "
-        >
-          {videos.length}
+        <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold text-blue-700">
+          {safeVideos.length} Lessons
         </span>
       </div>
 
-      {/* ITEMS */}
-
-      <div
-        className="
-          p-3
-          sm:p-4
-        "
-      >
-        <div
-          className="
-            space-y-3
-          "
-        >
-          {visibleVideos.map(
-            (
-              video,
-              index
-            ) => (
-              <TopicVideoPlaylistItem
-                key={
-                  `${
-                    video?.id
-                  }-${
-                    startIndex +
-                    index
-                  }`
-                }
-                video={
-                  video
-                }
-                index={
-                  startIndex +
-                  index
-                }
-                active={
-                  String(
-                    activeVideo
-                      ?.id
-                  ) ===
-                  String(
-                    video?.id
-                  )
-                }
-                onClick={() =>
-                  onSelect(
-                    video
-                  )
-                }
-              />
-            )
-          )}
-        </div>
+      <div className="space-y-2 p-3 sm:p-4">
+        {visibleVideos.length ? (
+          visibleVideos.map((video, index) => (
+            <TopicVideoPlaylistItem
+              key={`${video?.id ?? "video"}-${startIndex + index}`}
+              video={video}
+              index={startIndex + index}
+              active={
+                String(activeVideo?.id) ===
+                String(video?.id)
+              }
+              onClick={() => onSelect?.(video)}
+            />
+          ))
+        ) : (
+          <div className="rounded-xl bg-slate-50 p-8 text-center text-xs text-slate-500">
+            No videos available.
+          </div>
+        )}
       </div>
 
-      {/* PAGINATION */}
-
-      {totalPages > 1 ? (
-        <div
-          className="
-            flex
-            items-center
-            justify-between
-            gap-3
-            border-t
-            border-[#e8eef7]
-            bg-[#fbfdff]
-            px-4
-            py-3
-          "
-        >
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-3">
           <button
             type="button"
-            disabled={
-              currentPage <= 1
-            }
+            aria-label="Previous playlist page"
+            disabled={currentPage <= 1}
             onClick={() =>
-              setCurrentPage(
-                (page) =>
-                  Math.max(
-                    1,
-                    page - 1
-                  )
+              setCurrentPage((page) =>
+                Math.max(1, page - 1)
               )
             }
-            className="
-              flex
-              h-9
-              w-9
-              items-center
-              justify-center
-              rounded-xl
-              border
-              border-slate-200
-              bg-white
-              text-slate-600
-              disabled:opacity-30
-            "
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
           >
-            <ChevronLeft
-              size={15}
-            />
+            <ChevronLeft size={17} />
           </button>
 
-          <p
-            className="
-              text-[10px]
-              font-bold
-              text-slate-500
-            "
-          >
-            Page{" "}
-            <span
-              className="
-                text-[#075fc8]
-              "
-            >
-              {currentPage}
-            </span>
-            {" "}of{" "}
-            {totalPages}
-          </p>
+          <span className="text-xs font-bold text-slate-500">
+            Page {currentPage} of {totalPages}
+          </span>
 
           <button
             type="button"
-            disabled={
-              currentPage >=
-              totalPages
-            }
+            aria-label="Next playlist page"
+            disabled={currentPage >= totalPages}
             onClick={() =>
-              setCurrentPage(
-                (page) =>
-                  Math.min(
-                    totalPages,
-                    page + 1
-                  )
+              setCurrentPage((page) =>
+                Math.min(totalPages, page + 1)
               )
             }
-            className="
-              flex
-              h-9
-              w-9
-              items-center
-              justify-center
-              rounded-xl
-              bg-[#075fc8]
-              text-white
-              disabled:opacity-30
-            "
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white disabled:opacity-40"
           >
-            <ChevronRight
-              size={15}
-            />
+            <ChevronRight size={17} />
           </button>
         </div>
-      ) : null}
+      )}
     </aside>
   );
 }

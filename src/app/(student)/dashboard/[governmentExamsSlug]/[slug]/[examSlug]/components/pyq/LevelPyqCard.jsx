@@ -15,7 +15,6 @@ export default function LevelPyqCard({
   uid = 0,
   cid = 1,
   governmentExamsSlug = "kerala-psc",
-  onPremiumClick,
 }) {
   if (!exam?.id) {
     return null;
@@ -272,19 +271,8 @@ export default function LevelPyqCard({
         "
       >
         {isPaid ? (
-          // =================================================
-          // PREMIUM
-          // NO NAVIGATION
-          // OPEN MODAL
-          // =================================================
-
-          <button
-            type="button"
-            onClick={() =>
-              onPremiumClick?.(
-                exam
-              )
-            }
+          <Link
+            href={href}
             className="
               flex
               w-full
@@ -310,7 +298,7 @@ export default function LevelPyqCard({
               size={14}
             />
 
-            Unlock Premium
+            View Premium Test
 
             <ArrowRight
               size={14}
@@ -319,7 +307,7 @@ export default function LevelPyqCard({
                 group-hover:translate-x-1
               "
             />
-          </button>
+          </Link>
         ) : (
           // =================================================
           // FREE

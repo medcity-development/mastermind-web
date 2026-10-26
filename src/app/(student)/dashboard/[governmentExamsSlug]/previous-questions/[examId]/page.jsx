@@ -1,4 +1,7 @@
-import { notFound } from "next/navigation";
+import {
+  notFound,
+  redirect,
+} from "next/navigation";
 
 import {
   getPyqExamDetails,
@@ -11,6 +14,9 @@ import {
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
+import {
+  checkPremiumExamAccess,
+} from "@/lib/premiumExamAccess";
 
 import ExamHero from "./components/ExamHero";
 import ExamInstructions from "./components/ExamInstructions";
@@ -184,6 +190,25 @@ export default async function PyqDetailsPage({
 
   if (!result?.exam) {
     notFound();
+  }
+
+  if (
+    String(result.exam.access ?? "").trim().toLowerCase() ===
+    "paid"
+  ) {
+    const access = await checkPremiumExamAccess({
+      uid,
+      cid,
+      examId,
+      type,
+      exam: result.exam,
+    });
+
+    if (!access.hasAccess) {
+      redirect(
+        `/dashboard/${governmentExamsSlug}?showPackages=1`
+      );
+    }
   }
 
   return (

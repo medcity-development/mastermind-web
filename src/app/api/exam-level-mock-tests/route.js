@@ -1,3 +1,4 @@
+import { applyPackageAccess } from "@/lib/packageAccess";
 import {
     NextResponse,
   } from "next/server";
@@ -98,7 +99,7 @@ import {
         );
   
       const result =
-        await response.json();
+        await applyPackageAccess(await response.json(), { cid, contentType: type || "mock" });
   
       return NextResponse.json(
         result,

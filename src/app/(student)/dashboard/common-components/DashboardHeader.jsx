@@ -15,6 +15,7 @@ import {
   Loader2,
   Menu,
   Search,
+  ShoppingCart,
 } from "lucide-react";
 import { createSlug } from "@/lib/pscSlug";
 
@@ -27,6 +28,11 @@ export default function DashboardHeader({
   config,
   dashboardOptions = [],
   onMenuClick,
+  onPurchasesClick,
+  purchasesCount,
+  onSearchResultSelect,
+  onNotificationsClick,
+  unreadNotificationsCount,
 }) {
   /* =======================================================
      USER
@@ -76,6 +82,11 @@ export default function DashboardHeader({
     setSearchOpen,
   ] = useState(false);
 
+  const [
+    activeSuggestionIndex,
+    setActiveSuggestionIndex,
+  ] = useState(-1);
+
   useEffect(() => {
     const keyword = searchTerm.trim();
 
@@ -106,17 +117,23 @@ export default function DashboardHeader({
           );
         }
 
-        setSearchResults(
-          Array.isArray(result?.details)
-            ? result.details.filter(
+        const suggestions = Array.isArray(result?.details)
+          ? result.details.filter(
                 (item) =>
                   item &&
-                  item.id != null &&
-                  typeof item.name === "string" &&
-                  item.name.trim()
+                  (item.id != null ||
+                    item.exam_id != null ||
+                    item.test_id != null ||
+                    item.examId != null ||
+                    item.examid != null ||
+                    item.testid != null) &&
+                  typeof (item.name || item.exam_name || item.title) === "string" &&
+                  (item.name || item.exam_name || item.title).trim()
               )
-            : []
-        );
+          : [];
+
+        setSearchResults(suggestions);
+        setActiveSuggestionIndex(-1);
       } catch (error) {
         if (error?.name !== "AbortError") {
           console.error("Dashboard search suggestions:", error);
@@ -139,32 +156,131 @@ export default function DashboardHeader({
   }, [searchTerm]);
 
   function getSuggestionHref(item) {
-    if (!config?.slug || item?.id == null) {
+    if (!config?.slug) {
       return null;
     }
 
     const root = `/dashboard/${encodeURIComponent(config.slug)}`;
-    const id = encodeURIComponent(String(item.id));
-    const title = encodeURIComponent(String(item.name || ""));
-    const type = String(item.type || "").trim().toLowerCase();
+    const rawId =
+      item?.exam_id ??
+      item?.test_id ??
+      item?.examId ??
+      item?.examid ??
+      item?.testid ??
+      item?.id;
+    const id =
+      rawId == null
+        ? ""
+        : encodeURIComponent(String(rawId));
+    const name = String(item?.name || item?.exam_name || item?.title || "");
+    const title = encodeURIComponent(name);
+    const type = String(
+      item?.type ||
+      item?.exam_type ||
+      item?.test_type ||
+      item?.category_type ||
+      ""
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    const topic = String(
+      item?.subject ||
+      item?.topic ||
+      item?.topic_name ||
+      item?.category ||
+      item?.category_name ||
+      ""
+    ).trim();
+    const topicSlug = createSlug(topic);
 
-    if (["pqp", "pyq"].includes(type)) {
-      return `${root}/previous-questions/${id}`;
+    const apiPath = item?.href || item?.url || item?.link || item?.path;
+    if (typeof apiPath === "string" && apiPath.startsWith("/") && !apiPath.startsWith("//")) {
+      if (apiPath.startsWith(`${root}/`)) {
+        return apiPath;
+      }
+
+      const dashboardPrefix = `/dashboard/${encodeURIComponent(config.slug)}/`;
+      const publicPrefix = `/government-exams-coaching/${encodeURIComponent(config.slug)}/`;
+      if (apiPath.startsWith(publicPrefix)) {
+        return `${dashboardPrefix}${apiPath.slice(publicPrefix.length)}`;
+      }
     }
 
-    if (["mock", "mocktest", "mock-test"].includes(type)) {
-      return `${root}/mock-tests/${id}?title=${title}`;
+    if (
+      type.includes("pqp") ||
+      type.includes("pyq") ||
+      type.includes("previousquestion")
+    ) {
+      return id ? `${root}/previous-questions/${id}?type=pqp` : `${root}/previous-questions`;
     }
 
-    if (["twe", "topicwise", "topic-wise"].includes(type)) {
-      return `${root}/topic-wise-exams/test/${createSlug(item.name)}`;
+    if (type.includes("mock") || type.includes("studyplan")) {
+      if (!id) return `${root}/mock-tests`;
+      const examType = type.includes("studyplan") ? "&type=studyplan" : "";
+      return `${root}/mock-tests/${id}?title=${title}${examType}`;
     }
 
-    if (["scert", "scert-test"].includes(type)) {
+    if (type.includes("twe") || type.includes("topicwise")) {
+      if (topicSlug && id) {
+        return `${root}/topic-wise-exams/test/${topicSlug}/${id}`;
+      }
+      if (topicSlug) {
+        return `${root}/topic-wise-exams/test/${topicSlug}`;
+      }
+      return `${root}/topic-wise-exams`;
+    }
+
+    if (type.includes("scert")) {
+      const classId =
+        item?.class_id ??
+        item?.classId ??
+        item?.classid;
+      if (id && classId != null) {
+        const testSlug = createSlug(name) || id;
+        return `${root}/scert-tests/tests/${testSlug}?examId=${id}&classId=${encodeURIComponent(String(classId))}`;
+      }
       return `${root}/scert-tests`;
     }
 
+    if (type.includes("statement")) {
+      if (topicSlug && name) {
+        return `${root}/statement-type-exams/${topicSlug}/${createSlug(name)}`;
+      }
+      return `${root}/statement-type-exams`;
+    }
+
+    if (type.includes("exam") || type.includes("subject")) {
+      const level = String(
+        item?.level ||
+        item?.level_name ||
+        item?.sub_category ||
+        item?.subcategory ||
+        item?.sub_category_name ||
+        ""
+      ).trim();
+      if (level && name) {
+        return `${root}/${createSlug(level)}/${createSlug(name)}`;
+      }
+      return null;
+    }
+
+    if (type.includes("currentaffair") || type === "ca") {
+      return `${root}/current-affairs`;
+    }
+
     return null;
+  }
+
+  function selectSuggestion(item) {
+    const href = getSuggestionHref(item);
+    if (!href) return;
+
+    setSearchOpen(false);
+    setSearchTerm("");
+    setSearchResults([]);
+    setActiveSuggestionIndex(-1);
+    onSearchResultSelect?.(item, href);
   }
 
   /* =======================================================
@@ -318,12 +434,31 @@ export default function DashboardHeader({
               setSearchResults([]);
               setSearchError("");
               setSearchLoading(false);
+              setActiveSuggestionIndex(-1);
               setSearchOpen(true);
             }}
             onFocus={() => setSearchOpen(true)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 setSearchOpen(false);
+                setActiveSuggestionIndex(-1);
+              } else if (event.key === "ArrowDown" && searchResults.length) {
+                event.preventDefault();
+                setActiveSuggestionIndex((index) =>
+                  Math.min(index + 1, searchResults.length - 1)
+                );
+              } else if (event.key === "ArrowUp" && searchResults.length) {
+                event.preventDefault();
+                setActiveSuggestionIndex((index) => Math.max(index - 1, 0));
+              } else if (
+                event.key === "Enter" &&
+                searchResults.length
+              ) {
+                event.preventDefault();
+                const selectedIndex = activeSuggestionIndex >= 0
+                  ? activeSuggestionIndex
+                  : 0;
+                selectSuggestion(searchResults[selectedIndex]);
               }
             }}
             placeholder="Search courses, tests, topics..."
@@ -380,22 +515,25 @@ export default function DashboardHeader({
               ) : searchResults.length ? (
                 searchResults.map((item, index) => {
                   const href = getSuggestionHref(item);
-                  const label = String(item.name).trim();
-                  const typeLabel = String(item.type || "exam")
+                  const label = String(item.name || item.exam_name || item.title).trim();
+                  const typeLabel = String(item.type || item.exam_type || item.test_type || "exam")
                     .replace(/[-_]/g, " ")
                     .toUpperCase();
 
-                  return href ? (
-                    <Link
+                  return (
+                    <button
                       key={`${item.type || "result"}-${item.id}-${index}`}
-                      href={href}
+                      type="button"
                       role="option"
-                      aria-selected="false"
-                      onClick={() => {
-                        setSearchOpen(false);
-                        setSearchTerm("");
-                      }}
-                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-violet-50 focus:bg-violet-50 focus:outline-none"
+                      aria-selected={index === activeSuggestionIndex}
+                      disabled={!href}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      onClick={() => selectSuggestion(item)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition focus:outline-none ${
+                        index === activeSuggestionIndex
+                          ? "bg-violet-50"
+                          : "hover:bg-violet-50"
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       <span className="min-w-0 truncate text-xs font-bold text-slate-700">
                         {label}
@@ -403,21 +541,7 @@ export default function DashboardHeader({
                       <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-500">
                         {typeLabel}
                       </span>
-                    </Link>
-                  ) : (
-                    <div
-                      key={`${item.type || "result"}-${item.id}-${index}`}
-                      role="option"
-                      aria-selected="false"
-                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left"
-                    >
-                      <span className="min-w-0 truncate text-xs font-bold text-slate-500">
-                        {label}
-                      </span>
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-extrabold tracking-wide text-slate-400">
-                        {typeLabel}
-                      </span>
-                    </div>
+                    </button>
                   );
                 })
               ) : (
@@ -473,11 +597,50 @@ export default function DashboardHeader({
             </div>
           </details>
 
-          {/* NOTIFICATION */}
+          {/* NOTIFICATIONS */}
 
           <button
             type="button"
-            aria-label="Notifications"
+            aria-label={
+              unreadNotificationsCount > 0
+                ? `Notifications, ${unreadNotificationsCount} unread`
+                : "Notifications"
+            }
+            aria-haspopup="dialog"
+            onClick={onNotificationsClick}
+            className="
+              relative
+              flex
+              h-10
+              w-10
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-slate-200
+              bg-white
+              text-[#111827]
+              shadow-sm
+              transition-all
+              hover:border-violet-200
+              hover:bg-violet-50
+            "
+          >
+            <Bell size={18} strokeWidth={1.9} />
+            {unreadNotificationsCount > 0 ? (
+              <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[9px] font-extrabold leading-none text-white">
+                {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+              </span>
+            ) : null}
+          </button>
+
+          {/* PURCHASED PACKAGES */}
+
+          <button
+            type="button"
+            aria-label="View purchased packages"
+            aria-haspopup="dialog"
+            onClick={onPurchasesClick}
             className="
               relative
 
@@ -504,28 +667,15 @@ export default function DashboardHeader({
               hover:bg-violet-50
             "
           >
-            <Bell
+            <ShoppingCart
               size={18}
               strokeWidth={1.9}
             />
-
-            <span
-              className="
-                absolute
-                right-[8px]
-                top-[7px]
-
-                h-[7px]
-                w-[7px]
-
-                rounded-full
-
-                border-2
-                border-white
-
-                bg-[#ff3f74]
-              "
-            />
+            {purchasesCount !== null ? (
+              <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[9px] font-extrabold leading-none text-white">
+                {purchasesCount > 99 ? "99+" : purchasesCount}
+              </span>
+            ) : null}
           </button>
 
           {/* =================================================

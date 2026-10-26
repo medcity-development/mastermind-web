@@ -1,3 +1,4 @@
+import { applyPackageAccess } from "@/lib/packageAccess";
 // src/lib/subExamDetailsHelper.js
 
 import "server-only";
@@ -100,7 +101,7 @@ async function postRequest(
     );
   }
 
-  return result;
+  return applyPackageAccess(result, fields);
 }
 
 /* =========================================================

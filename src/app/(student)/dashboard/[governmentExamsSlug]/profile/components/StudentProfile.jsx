@@ -14,6 +14,7 @@ import {
     Mail,
     MapPin,
     Phone,
+    ShoppingBag,
     ShieldCheck,
     Trash2,
     UserRound,
@@ -24,6 +25,7 @@ import Swal from "sweetalert2";
 import maleAvatar from "@/app/(public)/profile-setup/images/avatar-male.png";
 import femaleAvatar from "@/app/(public)/profile-setup/images/avatar-female.png";
 import ProfileUpdateModal from "./ProfileUpdateModal";
+import PurchasedPackagesModal from "@/app/(student)/dashboard/common-components/PurchasedPackagesModal";
 
 export default function StudentProfile({
     initialProfile,
@@ -41,6 +43,10 @@ export default function StudentProfile({
     const [
         showModal,
         setShowModal,
+    ] = useState(false);
+    const [
+        showPurchases,
+        setShowPurchases,
     ] = useState(false);
     const [
         deletingAccount,
@@ -297,14 +303,42 @@ export default function StudentProfile({
                             </div>
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setShowModal(
-                                    true
-                                )
-                            }
-                            className="
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowPurchases(true)}
+                                className="
+                inline-flex
+                cursor-pointer
+                items-center
+                justify-center
+                gap-2
+                rounded-[14px]
+                border
+                border-white/30
+                bg-white/10
+                px-5
+                py-3
+                text-[13px]
+                font-bold
+                text-white
+                backdrop-blur
+                transition
+                hover:bg-white/20
+              "
+                            >
+                                <ShoppingBag size={16} />
+                                My Purchases
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setShowModal(
+                                        true
+                                    )
+                                }
+                                className="
                 inline-flex
                 cursor-pointer
                 items-center
@@ -327,7 +361,8 @@ export default function StudentProfile({
                             />
 
                             Update Profile
-                        </button>
+                            </button>
+                        </div>
                     </div>
                 </section>
 
@@ -511,6 +546,11 @@ export default function StudentProfile({
                     );
                 }}
             />
+            {showPurchases ? (
+                <PurchasedPackagesModal
+                    onClose={() => setShowPurchases(false)}
+                />
+            ) : null}
         </>
     );
 }

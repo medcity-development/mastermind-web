@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 
 import {
@@ -7,58 +6,18 @@ import {
 
 import {
   getCourseExamHistory,
-  filterExamHistoryByCourse,
+  getHistoryCourseId,
   normalizeHistoryType,
+  isHistoryTypeEnabled,
 } from "@/lib/examHistoryApi";
 
 import {
+  verifyExamHistoryCourse,
   resolveExamHistoryName,
 } from "@/lib/examHistoryHelper";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-/* =========================================================
-   SUPPORTED EXAM TYPES
-   Study Plan disabled
-========================================================= */
-
-const TYPES = new Set([
-  "mock",
-  "pqp",
-  "scert",
-  "topicwise",
-]);
-
-/* =========================================================
-   RESPONSE HELPERS
-========================================================= */
-
-function response(body, status = 200) {
-  return NextResponse.json(body, {
-    status,
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
-function fail(message, status = 500) {
-  return response(
-    {
-      status: false,
-      message,
-      details: [],
-      data: [],
-      courseFilterVerified: false,
-    },
-    status
-  );
-}
-
-/* =========================================================
-   VALIDATE ID
-========================================================= */
 
 function positiveId(value) {
   if (
@@ -68,29 +27,21 @@ function positiveId(value) {
     return null;
   }
 
-  const number = Number(value);
+  const n = Number(value);
 
-  return Number.isSafeInteger(number) &&
-    number > 0
-    ? number
+  return Number.isSafeInteger(n) && n > 0
+    ? n
     : null;
 }
 
 function firstId(...values) {
   for (const value of values) {
-    const number = positiveId(value);
-
-    if (number) {
-      return number;
-    }
+    const id = positiveId(value);
+    if (id) return id;
   }
 
   return null;
 }
-
-/* =========================================================
-   EXAM / ATTEMPT IDS
-========================================================= */
 
 function examIdOf(row) {
   return firstId(
@@ -112,60 +63,83 @@ function attemptIdOf(row) {
   );
 }
 
-/* =========================================================
-   EXAM NAME
-========================================================= */
+function reply(
+  body,
+  status = 200,
+  retryAfter = null
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      ...(retryAfter
+        ? {
+            "Retry-After": String(retryAfter),
+          }
+        : {}),
+    },
+  });
+}
 
-function existingName(row) {
-  const values = [
+function fail(
+  message,
+  status = 500,
+  retryAfter = null
+) {
+  return reply(
+    {
+      status: false,
+      message,
+      details: [],
+      data: [],
+      courseFilterVerified: false,
+    },
+    status,
+    retryAfter
+  );
+}
+
+function nameOf(row) {
+  const candidates = [
     row._resolvedExamName,
     row.exam_name,
     row.examName,
     row.exam_title,
     row.examTitle,
     row.test_name,
+    row.testName,
     row.test_title,
     row.title,
     row.name,
     row.exam?.exam_name,
     row.exam?.title,
-    row.exam_details?.exam_name,
-    row.exam_details?.title,
   ];
 
+  const invalid = new Set([
+    "",
+    "-",
+    "—",
+    "null",
+    "undefined",
+    "exam name unavailable",
+  ]);
+
   return (
-    values.find(
+    candidates.find(
       (value) =>
         typeof value === "string" &&
         value.trim() &&
-        ![
-          "-",
-          "—",
-          "null",
-          "undefined",
-          "exam name unavailable",
-        ].includes(
+        !invalid.has(
           value.trim().toLowerCase()
         )
     )?.trim() || ""
   );
 }
 
-/* =========================================================
-   POST - EXAM HISTORY
-========================================================= */
-
 export async function POST(request) {
   try {
-    /* -------------------------------
-       STUDENT SESSION
-    -------------------------------- */
-
-    const session =
-      await getStudentSession();
-
-    const uid =
-      positiveId(session?.uid);
+    const session = await getStudentSession();
+    const uid = positiveId(session?.uid);
 
     if (!uid) {
       return fail(
@@ -173,10 +147,6 @@ export async function POST(request) {
         401
       );
     }
-
-    /* -------------------------------
-       REQUEST BODY
-    -------------------------------- */
 
     let body;
 
@@ -189,43 +159,33 @@ export async function POST(request) {
       );
     }
 
-    const cid =
-      positiveId(body?.cid);
+    const cid = positiveId(body?.cid);
 
-    const examType =
-      normalizeHistoryType(
-        body?.exam_type ??
-          body?.examType
-      );
+    const examType = normalizeHistoryType(
+      body?.exam_type ?? body?.examType
+    );
 
     if (!cid) {
-      return fail(
-        "Invalid course ID.",
-        400
-      );
+      return fail("Invalid course ID.", 400);
     }
 
-    if (!TYPES.has(examType)) {
+    if (!isHistoryTypeEnabled(examType)) {
       return fail(
         "Unsupported exam history type.",
         400
       );
     }
 
-    /* -------------------------------
-       FETCH HISTORY
-    -------------------------------- */
-
-    const result =
-      await getCourseExamHistory({
-        uid,
-        cid,
-        examType,
-      });
+    const result = await getCourseExamHistory({
+      uid,
+      cid,
+      examType,
+    });
 
     if (!result?.status) {
-      const upstream =
-        Number(result?.httpStatus);
+      const upstream = Number(
+        result?.httpStatus
+      );
 
       const status = [
         400,
@@ -238,51 +198,32 @@ export async function POST(request) {
         ? upstream
         : 502;
 
-      console.error(
-        "Exam history upstream error",
-        {
-          uid,
-          cid,
-          examType,
-          upstream,
-          message: result?.message,
-        }
-      );
-
       return fail(
-        "Exam history is temporarily unavailable.",
-        status
+        result?.message ||
+          "Exam history is temporarily unavailable.",
+        status,
+        result?.retryAfter
       );
     }
 
-    /* -------------------------------
-       NORMALIZE BACKEND DATA
-    -------------------------------- */
-
-    const rows =
-      Array.isArray(result.details)
-        ? result.details
-        : Array.isArray(result.data)
-          ? result.data
-          : [];
-    const courseRows =
-      filterExamHistoryByCourse(rows, cid);
+    const rows = Array.isArray(result.details)
+      ? result.details
+      : Array.isArray(result.data)
+        ? result.data
+        : [];
 
     const accepted = [];
-
     const seen = new Set();
 
     const nameCache = new Map();
+    const verificationCache = new Map();
 
-    const excludedCourseCount =
-      rows.length - courseRows.length;
+    let excludedCourseCount = 0;
     let excludedTypeCount = 0;
+    let excludedUserCount = 0;
+    let unresolvedCount = 0;
 
-    /* -------------------------------
-       FILTER ATTEMPTS
-    -------------------------------- */
-
-    for (const row of courseRows) {
+    for (const row of rows) {
       if (
         !row ||
         typeof row !== "object" ||
@@ -291,54 +232,124 @@ export async function POST(request) {
         continue;
       }
 
-      const rowType =
-        normalizeHistoryType(
-          row.exam_type ??
-            row.examType ??
-            row._examType ??
-            examType
-        );
+      const rowType = normalizeHistoryType(
+        row.exam_type ??
+          row.examType ??
+          row._examType ??
+          examType
+      );
 
       if (rowType !== examType) {
         excludedTypeCount++;
         continue;
       }
 
-      const examId =
-        examIdOf(row);
-
-      const attemptId =
-        attemptIdOf(row);
-
-      const key = attemptId
-        ? `${examType}:${attemptId}`
-        : null;
+      const explicitCid = positiveId(
+        getHistoryCourseId(row)
+      );
 
       if (
-        key &&
-        seen.has(key)
+        explicitCid !== null &&
+        explicitCid !== cid
       ) {
+        excludedCourseCount++;
         continue;
       }
 
-      if (key) {
-        seen.add(key);
+      const rowUid = positiveId(
+        row.uid ??
+          row.user_id ??
+          row.userId
+      );
+
+      if (
+        rowUid !== null &&
+        rowUid !== uid
+      ) {
+        excludedUserCount++;
+        continue;
       }
 
-      /* -----------------------------
-         RESOLVE EXAM NAME
-      ----------------------------- */
+      const examId = examIdOf(row);
+      const attemptId = attemptIdOf(row);
 
-      let name =
-        existingName(row);
+      if (!attemptId) {
+        unresolvedCount++;
+        continue;
+      }
+
+      const key = `${examType}:${attemptId}`;
+
+      if (seen.has(key)) continue;
+
+      let verified = null;
+
+      if (explicitCid === cid) {
+        verified = true;
+      } else if (examId) {
+        const verificationKey =
+          `${examType}:${examId}:${attemptId}`;
+
+        if (
+          !verificationCache.has(
+            verificationKey
+          )
+        ) {
+          verificationCache.set(
+            verificationKey,
+            Promise.resolve()
+              .then(() =>
+                verifyExamHistoryCourse({
+                  cid,
+                  uid,
+                  examId,
+                  examType,
+                  attemptId,
+                })
+              )
+              .catch((error) => {
+                console.error(
+                  "EXAM HISTORY VERIFICATION:",
+                  {
+                    examType,
+                    examId,
+                    attemptId,
+                    message: error?.message,
+                  }
+                );
+
+                return null;
+              })
+          );
+        }
+
+        verified =
+          await verificationCache.get(
+            verificationKey
+          );
+      }
+
+      if (verified !== true) {
+        if (verified === false) {
+          excludedCourseCount++;
+        } else {
+          unresolvedCount++;
+        }
+
+        continue;
+      }
+
+      seen.add(key);
+
+      let name = nameOf(row);
 
       if (!name && examId) {
-        const cacheKey =
+        const nameKey =
           `${examType}:${examId}`;
 
-        if (!nameCache.has(cacheKey)) {
+        if (!nameCache.has(nameKey)) {
           nameCache.set(
-            cacheKey,
+            nameKey,
             Promise.resolve()
               .then(() =>
                 resolveExamHistoryName({
@@ -349,31 +360,18 @@ export async function POST(request) {
                   item: row,
                 })
               )
-              .catch((error) => {
-                console.error(
-                  "Exam history name lookup failed",
-                  error
-                );
-
-                return "";
-              })
+              .catch(() => "")
           );
         }
 
         const resolved =
-          await nameCache.get(
-            cacheKey
-          );
+          await nameCache.get(nameKey);
 
         name =
           typeof resolved === "string"
             ? resolved.trim()
             : "";
       }
-
-      /* -----------------------------
-         ACCEPT VALID ATTEMPT
-      ----------------------------- */
 
       accepted.push({
         ...row,
@@ -385,37 +383,44 @@ export async function POST(request) {
         _examId: examId,
 
         _resolvedExamName: name,
-
-        exam_name:
-          name || existingName(row),
+        exam_name: name || nameOf(row),
 
         _courseVerified: true,
       });
     }
 
-    /* -------------------------------
-       SUCCESS RESPONSE
-    -------------------------------- */
+    if (unresolvedCount > 0) {
+      console.warn(
+        "[Exam History] Partial verification:",
+        {
+          type: examType,
+          cid,
+          unresolvedCount,
+        }
+      );
+    }
 
-    return response({
+    return reply({
       status: true,
-
       exam_type: examType,
 
       details: accepted,
       data: accepted,
-
       total: accepted.length,
 
       courseFilterVerified: true,
-      partialVerification: false,
-      unresolvedCount: 0,
+
+      partialVerification:
+        unresolvedCount > 0,
+
+      unresolvedCount,
       excludedCourseCount,
       excludedTypeCount,
+      excludedUserCount,
     });
   } catch (error) {
     console.error(
-      "Exam history route failed",
+      "EXAM HISTORY ROUTE:",
       error
     );
 

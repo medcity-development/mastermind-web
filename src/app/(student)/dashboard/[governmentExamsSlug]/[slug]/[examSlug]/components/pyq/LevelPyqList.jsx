@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 
 import LevelPyqCard from "./LevelPyqCard";
-import PremiumLoginModal from "./PremiumLoginModal";
 
 export default function LevelPyqList({
   initialExams = [],
@@ -47,20 +46,6 @@ export default function LevelPyqList({
   ] = useState("");
 
   // =========================================================
-  // PREMIUM MODAL
-  // =========================================================
-
-  const [
-    premiumExam,
-    setPremiumExam,
-  ] = useState(null);
-
-  const [
-    premiumModalOpen,
-    setPremiumModalOpen,
-  ] = useState(false);
-
-  // =========================================================
   // SYNC INITIAL DATA
   // =========================================================
 
@@ -80,30 +65,6 @@ export default function LevelPyqList({
     initialExams,
     initialNextOffset,
   ]);
-
-  // =========================================================
-  // OPEN PREMIUM MODAL
-  // =========================================================
-
-  function handlePremiumClick(
-    exam
-  ) {
-    setPremiumExam(exam);
-    setPremiumModalOpen(true);
-  }
-
-  // =========================================================
-  // CLOSE PREMIUM MODAL
-  // =========================================================
-
-  function handleClosePremium() {
-    setPremiumModalOpen(false);
-
-    // optional:
-    // keep exam briefly while closing animation completes.
-    // If your modal has no animation, this can also be:
-    // setPremiumExam(null);
-  }
 
   // =========================================================
   // LOAD MORE
@@ -260,9 +221,6 @@ export default function LevelPyqList({
                 governmentExamsSlug={
                   governmentExamsSlug
                 }
-                onPremiumClick={
-                  handlePremiumClick
-                }
               />
             )
           )}
@@ -361,21 +319,6 @@ export default function LevelPyqList({
         ) : null}
       </div>
 
-      {/* =====================================================
-          PREMIUM LOGIN MODAL
-      ===================================================== */}
-
-      <PremiumLoginModal
-        open={
-          premiumModalOpen
-        }
-        exam={
-          premiumExam
-        }
-        onClose={
-          handleClosePremium
-        }
-      />
     </>
   );
 }

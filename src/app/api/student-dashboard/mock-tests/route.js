@@ -5,6 +5,9 @@ import {
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
+import {
+  checkPremiumExamAccess,
+} from "@/lib/premiumExamAccess";
 
 export const dynamic =
   "force-dynamic";
@@ -113,6 +116,27 @@ export async function GET(
         },
         {
           status: 400,
+        }
+      );
+    }
+
+    const access = await checkPremiumExamAccess({
+      uid,
+      cid,
+      examId,
+      type: examType || "mock",
+    });
+
+    if (access.isPremium && !access.hasAccess) {
+      return NextResponse.json(
+        {
+          status: false,
+          message:
+            "This premium test is not included in your active purchased plans.",
+          data: [],
+        },
+        {
+          status: 403,
         }
       );
     }

@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
+import {
+  checkPremiumExamAccess,
+} from "@/lib/premiumExamAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +104,20 @@ export async function GET(request) {
 
     if (!examType) {
       return fail("examtype is required.", 400);
+    }
+
+    const access = await checkPremiumExamAccess({
+      uid,
+      cid,
+      examId,
+      type: examType,
+    });
+
+    if (access.isPremium && !access.hasAccess) {
+      return fail(
+        "This premium test is not included in your active purchased plans.",
+        403
+      );
     }
 
     const apiBaseUrl = String(

@@ -6,10 +6,12 @@ export default function VideoClassesTab({
   examId,
   subId,
   governmentExamsSlug,
+  isAuthenticated = false,
+  onLoginRequired,
+  onStartMockTest,
+  onUpgrade,
 }) {
-  if (!examId) {
-    return null;
-  }
+  if (!examId) return null;
 
   return (
     <TopicWiseTab
@@ -18,6 +20,10 @@ export default function VideoClassesTab({
       examId={examId}
       subId={subId}
       governmentExamsSlug={governmentExamsSlug}
+      isAuthenticated={isAuthenticated}
+      onLoginRequired={onLoginRequired}
+      onStartMockTest={onStartMockTest}
+      onUpgrade={onUpgrade}
     />
   );
 }

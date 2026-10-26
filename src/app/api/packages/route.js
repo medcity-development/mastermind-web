@@ -1,3 +1,4 @@
+import { getOwnedPackages } from "@/lib/packageAccess";
 import { NextResponse } from "next/server";
 import { getPackagesList } from "@/lib/packagesHelper";
 import { getStudentSession } from "@/lib/auth/getStudentSession";
@@ -23,13 +24,17 @@ export async function GET(request) {
       throwOnError: true,
     });
 
+    const owned = await getOwnedPackages(uid, cid);
+
     return NextResponse.json(
       {
         status: true,
+        hasActivePlan: owned.length > 0,
         authenticated: uid > 0,
         profileCompleted: session?.stage === "completed",
         packages: packages.map((item) => ({
           id: item.id,
+          packageAccess: owned.some(({ pid }) => String(pid) === String(item.id)),
           cid: item.cid,
           package: item.package,
           tag: item.tag,

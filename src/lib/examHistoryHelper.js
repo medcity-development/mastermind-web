@@ -1,25 +1,17 @@
-
 import "server-only";
 
 import {
   normalizeHistoryType,
   backendHistoryType,
+  getHistoryCourseId,
+  isHistoryTypeEnabled,
 } from "@/lib/examHistoryApi";
 
-import {
-  getExamHistoryTypes,
-} from "@/lib/examHistoryTypes";
-
 const cache = new Map();
-
 const CACHE_TTL = 5 * 60 * 1000;
 const MAX_CACHE_SIZE = 300;
 
 let cooldownUntil = 0;
-
-/* =========================================================
-   EXAM NAME FIELDS
-========================================================= */
 
 const NAME_FIELDS = [
   "_resolvedExamName",
@@ -53,67 +45,26 @@ const CONTAINERS = [
   "info",
 ];
 
-/* =========================================================
-   ID HELPERS
-========================================================= */
-
 function positiveId(value) {
-  if (
-    value === null ||
-    value === undefined ||
-    String(value).trim() === ""
-  ) {
+  if (value == null || String(value).trim() === "") {
     return null;
   }
 
-  const number = Number(value);
+  const n = Number(value);
 
-  return Number.isSafeInteger(number) && number > 0
-    ? number
+  return Number.isSafeInteger(n) && n > 0
+    ? n
     : null;
 }
 
 function firstId(...values) {
   for (const value of values) {
-    const found = positiveId(value);
-
-    if (found) return found;
+    const id = positiveId(value);
+    if (id) return id;
   }
 
   return null;
 }
-
-/* =========================================================
-   EXAM TYPE HELPERS
-========================================================= */
-
-function typeOf(value) {
-  return normalizeHistoryType(value);
-}
-
-function backendType(value) {
-  return backendHistoryType(value);
-}
-
-export function isSupportedExamHistoryType(value) {
-  const expected = backendType(value);
-
-  return getExamHistoryTypes().some(
-    (type) => backendType(type) === expected
-  );
-}
-
-function validLookup({ cid, uid, examId }) {
-  return Boolean(
-    positiveId(cid) &&
-    positiveId(uid) &&
-    positiveId(examId)
-  );
-}
-
-/* =========================================================
-   EXAM NAME EXTRACTION
-========================================================= */
 
 function cleanName(value) {
   if (typeof value !== "string") return "";
@@ -137,40 +88,21 @@ function cleanName(value) {
 }
 
 function extractName(value, depth = 0) {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    depth > 5
-  ) {
-    return "";
-  }
+  if (!value || depth > 5) return "";
 
   if (Array.isArray(value)) {
     for (const item of value) {
       const name = extractName(item, depth + 1);
-
       if (name) return name;
     }
 
     return "";
   }
 
-  for (const field of [
-    "exam",
-    "exam_details",
-    "examDetails",
-  ]) {
-    const name = extractName(
-      value[field],
-      depth + 1
-    );
-
-    if (name) return name;
-  }
+  if (typeof value !== "object") return "";
 
   for (const field of NAME_FIELDS) {
     const name = cleanName(value[field]);
-
     if (name) return name;
   }
 
@@ -185,10 +117,6 @@ function extractName(value, depth = 0) {
 
   return "";
 }
-
-/* =========================================================
-   EXAM DURATION EXTRACTION
-========================================================= */
 
 function extractMinutes(value, depth = 0) {
   if (
@@ -240,314 +168,14 @@ function extractMinutes(value, depth = 0) {
   return null;
 }
 
-/* =========================================================
-   API RESPONSE HELPERS
-========================================================= */
-
-function failed(result) {
-  return (
-    !result ||
-    [
-      false,
-      "false",
-      0,
-      "0",
-      "error",
-      "failed",
-    ].includes(result.status)
-  );
-}
-
-function retryMilliseconds(value) {
-  if (value == null || value === "") {
-    return 60000;
-  }
-
-  const seconds = Number(value);
-
-  if (
-    Number.isFinite(seconds) &&
-    seconds >= 0
-  ) {
-    return Math.max(1000, seconds * 1000);
-  }
-
-  const timestamp = Date.parse(value);
-
-  return Number.isFinite(timestamp)
-    ? Math.max(1000, timestamp - Date.now())
-    : 60000;
-}
-
-/* =========================================================
-   BACKEND API REQUEST
-========================================================= */
-
-async function requestApi(endpoint, payload) {
-  const baseUrl = String(
-    process.env.PSC_API_BASE_URL || ""
-  )
-    .trim()
-    .replace(/\/+$/, "");
-
-  const apiKey = String(
-    process.env.PSC_API_KEY || ""
-  ).trim();
-
-  if (!baseUrl || !apiKey) {
-    console.error("PSC API configuration missing");
-    return null;
-  }
-
-  const key = JSON.stringify([
-    baseUrl,
-    endpoint,
-    payload,
-  ]);
-
-  const cached = cache.get(key);
-
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.promise;
-  }
-
-  cache.delete(key);
-
-  if (Date.now() < cooldownUntil) {
-    return null;
-  }
-
-  const entry = {
-    expiresAt: Date.now() + CACHE_TTL,
-    promise: null,
-  };
-
-  entry.promise = (async () => {
-    try {
-      const form = new FormData();
-
-      form.append("api", apiKey);
-
-      for (const [field, value] of Object.entries(
-        payload
-      )) {
-        if (value != null && value !== "") {
-          form.append(field, String(value));
-        }
-      }
-
-      const response = await fetch(
-        `${baseUrl}/${endpoint}`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-          },
-          body: form,
-          cache: "no-store",
-          signal: AbortSignal.timeout(15000),
-        }
-      );
-
-      if (response.status === 429) {
-        cooldownUntil = Math.max(
-          cooldownUntil,
-          Date.now() +
-            retryMilliseconds(
-              response.headers.get("retry-after")
-            )
-        );
-
-        return null;
-      }
-
-      if (!response.ok) {
-        console.warn("EXAM HISTORY API ERROR", {
-          endpoint,
-          status: response.status,
-        });
-
-        return null;
-      }
-
-      const result = await response.json();
-
-      return failed(result) ? null : result;
-    } catch (error) {
-      console.warn("EXAM HISTORY LOOKUP", {
-        endpoint,
-        message: error?.message,
-      });
-
-      return null;
-    }
-  })();
-
-  cache.set(key, entry);
-
-  if (cache.size > MAX_CACHE_SIZE) {
-    cache.delete(cache.keys().next().value);
-  }
-
-  const result = await entry.promise;
-
-  if (!result && cache.get(key) === entry) {
-    cache.delete(key);
-  }
-
-  return result;
-}
-
-/* =========================================================
-   LOAD EXAM DETAILS
-========================================================= */
-
-async function loadDetails({
-  cid,
-  uid,
-  examId,
-  examType = "mock",
-} = {}) {
-  if (!validLookup({ cid, uid, examId })) {
-    return null;
-  }
-
-  const type = typeOf(examType);
-
-  if (!isSupportedExamHistoryType(type)) {
-    return null;
-  }
-
-  return requestApi("getMockTestDetails", {
-    cid: Number(cid),
-    uid: Number(uid),
-    examid: Number(examId),
-    type: backendType(type),
-  });
-}
-
-/* =========================================================
-   MOCK EXAM NAME
-========================================================= */
-
-export async function getMockExamName(options = {}) {
-  return extractName(await loadDetails(options));
-}
-
-/* =========================================================
-   EXAM DURATION
-========================================================= */
-
-export async function getExamHistoryDurationSeconds(
-  options = {}
-) {
-  const minutes = extractMinutes(
-    await loadDetails(options)
-  );
-
-  return minutes === null
-    ? null
-    : Math.round(minutes * 60);
-}
-
-/* =========================================================
-   ANALYTICS EXAM NAME
-========================================================= */
-
-export async function getAnalyticsExamName({
-  cid,
-  uid,
-  examId,
-  examType,
-} = {}) {
-  if (!validLookup({ cid, uid, examId })) {
-    return "";
-  }
-
-  const type = typeOf(examType);
-
-  if (!isSupportedExamHistoryType(type)) {
-    return "";
-  }
-
-  const result = await requestApi(
-    "getUserExamAnalytics2",
-    {
-      cid: Number(cid),
-      uid: Number(uid),
-      exam_id: Number(examId),
-      exam_type: backendType(type),
-    }
-  );
-
-  return extractName(result);
-}
-
-/* =========================================================
-   RESOLVE EXAM HISTORY NAME
-========================================================= */
-
-export async function resolveExamHistoryName({
-  cid,
-  uid,
-  examId,
-  examType,
-  item,
-} = {}) {
-  const existingName = extractName(item);
-
-  if (existingName) return existingName;
-
-  const type = typeOf(
-    examType ??
-    item?.exam_type ??
-    item?._examType
-  );
-
-  if (!isSupportedExamHistoryType(type)) {
-    return "";
-  }
-
-  const resolvedId = firstId(
-    examId,
-    item?.exam_id,
-    item?.examId,
-    item?.examid,
-    item?.test_id,
-    item?.testId
-  );
-
-  if (!resolvedId) return "";
-
-  const analyticsName = await getAnalyticsExamName({
-    cid,
-    uid,
-    examId: resolvedId,
-    examType: type,
-  });
-
-  if (analyticsName) return analyticsName;
-
-  return extractName(
-    await loadDetails({
-      cid,
-      uid,
-      examId: resolvedId,
-      examType: type,
-    })
-  );
-}
-
-/* =========================================================
-   EXTRACT API ROWS
-========================================================= */
-
 function extractRows(response) {
   const candidates = [
     response?.details,
     response?.data,
     response?.result,
     response?.results,
+    response?.exam,
+    response?.exam_details,
     response?.data?.details,
     response?.data?.data,
     response?.result?.details,
@@ -570,35 +198,417 @@ function extractRows(response) {
   return rows;
 }
 
-/* =========================================================
-   GET COURSE ID
-========================================================= */
+function retryMs(value) {
+  const seconds = Number(value);
 
-function getCourseId(row) {
-  return firstId(
-    row?.cid,
-    row?.course_id,
-    row?.courseId,
-    row?.courseid,
-    row?.course?.cid,
-    row?.course?.id,
-    row?.course_details?.cid,
-    row?.course_details?.course_id
+  if (
+    value != null &&
+    value !== "" &&
+    Number.isFinite(seconds)
+  ) {
+    return Math.max(1000, seconds * 1000);
+  }
+
+  const date = Date.parse(value);
+
+  return Number.isFinite(date)
+    ? Math.max(1000, date - Date.now())
+    : 60000;
+}
+
+async function requestApi(endpoint, payload) {
+  const base = String(
+    process.env.PSC_API_BASE_URL || ""
+  )
+    .trim()
+    .replace(/\/+$/, "");
+
+  const api = String(
+    process.env.PSC_API_KEY || ""
+  ).trim();
+
+  if (!base || !api) {
+    console.error("PSC API configuration missing");
+    return null;
+  }
+
+  const key = JSON.stringify([
+    base,
+    endpoint,
+    payload,
+  ]);
+
+  const existing = cache.get(key);
+
+  if (
+    existing &&
+    existing.expiresAt > Date.now()
+  ) {
+    return existing.promise;
+  }
+
+  if (Date.now() < cooldownUntil) {
+    return null;
+  }
+
+  const entry = {
+    expiresAt: Date.now() + CACHE_TTL,
+    promise: null,
+  };
+
+  entry.promise = (async () => {
+    try {
+      const form = new FormData();
+      form.append("api", api);
+
+      for (const [field, value] of Object.entries(
+        payload
+      )) {
+        if (value != null && value !== "") {
+          form.append(field, String(value));
+        }
+      }
+
+      const response = await fetch(
+        `${base}/${endpoint}`,
+        {
+          method: "POST",
+          body: form,
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+
+      if (response.status === 429) {
+        cooldownUntil = Math.max(
+          cooldownUntil,
+          Date.now() +
+            retryMs(
+              response.headers.get("retry-after")
+            )
+        );
+
+        return null;
+      }
+
+      if (!response.ok) return null;
+
+      const result = await response.json();
+
+      if (
+        !result ||
+        [false, "false", 0, "0"].includes(
+          result.status
+        )
+      ) {
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.warn("EXAM HISTORY LOOKUP:", {
+        endpoint,
+        message: error?.message,
+      });
+
+      return null;
+    }
+  })();
+
+  cache.set(key, entry);
+
+  if (cache.size > MAX_CACHE_SIZE) {
+    cache.delete(
+      cache.keys().next().value
+    );
+  }
+
+  const result = await entry.promise;
+
+  if (!result && cache.get(key) === entry) {
+    cache.delete(key);
+  }
+
+  return result;
+}
+
+function validLookup({ cid, uid, examId }) {
+  return Boolean(
+    positiveId(cid) &&
+    positiveId(uid) &&
+    positiveId(examId)
   );
 }
 
-/* =========================================================
-   VERIFY EXAM HISTORY COURSE
+export function isSupportedExamHistoryType(value) {
+  return isHistoryTypeEnabled(value);
+}
 
-   Returns:
-   true  = course positively verified
-   false = explicit course mismatch
-   null  = insufficient information
+async function loadDetails({
+  cid,
+  uid,
+  examId,
+  examType = "mock",
+} = {}) {
+  if (!validLookup({ cid, uid, examId })) {
+    return null;
+  }
 
-   Missing course data must not be treated
-   as a confirmed course match.
-========================================================= */
+  const type = normalizeHistoryType(examType);
 
+  if (!isHistoryTypeEnabled(type)) {
+    return null;
+  }
+
+  return requestApi("getMockTestDetails", {
+    cid: Number(cid),
+    uid: Number(uid),
+    examid: Number(examId),
+    type: backendHistoryType(type),
+  });
+}
+
+export async function getMockExamName(
+  options = {}
+) {
+  return extractName(
+    await loadDetails(options)
+  );
+}
+
+export async function getExamHistoryDurationSeconds(
+  options = {}
+) {
+  const minutes = extractMinutes(
+    await loadDetails(options)
+  );
+
+  return minutes === null
+    ? null
+    : Math.round(minutes * 60);
+}
+
+async function loadUserAnalytics({
+  cid,
+  uid,
+  examId,
+  examType,
+}) {
+  if (!validLookup({ cid, uid, examId })) {
+    return null;
+  }
+
+  const type = normalizeHistoryType(examType);
+
+  if (!isHistoryTypeEnabled(type)) {
+    return null;
+  }
+
+  return requestApi("getUserExamAnalytics2", {
+    cid: Number(cid),
+    uid: Number(uid),
+    exam_id: Number(examId),
+    exam_type: backendHistoryType(type),
+  });
+}
+
+export async function getAnalyticsExamName({
+  cid,
+  uid,
+  examId,
+  examType,
+} = {}) {
+  const result = await loadUserAnalytics({
+    cid,
+    uid,
+    examId,
+    examType,
+  });
+
+  return extractName(result);
+}
+
+export async function resolveExamHistoryName({
+  cid,
+  uid,
+  examId,
+  examType,
+  item,
+} = {}) {
+  const existing = extractName(item);
+
+  if (existing) return existing;
+
+  const type = normalizeHistoryType(
+    examType ??
+      item?.exam_type ??
+      item?._examType
+  );
+
+  const resolvedId = firstId(
+    examId,
+    item?.exam_id,
+    item?.examId,
+    item?.examid,
+    item?.test_id,
+    item?.testId
+  );
+
+  if (
+    !resolvedId ||
+    !isHistoryTypeEnabled(type)
+  ) {
+    return "";
+  }
+
+  const analyticsName = await getAnalyticsExamName({
+    cid,
+    uid,
+    examId: resolvedId,
+    examType: type,
+  });
+
+  if (analyticsName) return analyticsName;
+
+  return extractName(
+    await loadDetails({
+      cid,
+      uid,
+      examId: resolvedId,
+      examType: type,
+    })
+  );
+}
+
+function getMatchingExam(
+  response,
+  examId,
+  examType
+) {
+  const expectedId = positiveId(examId);
+  const expectedType = backendHistoryType(
+    examType
+  );
+
+  if (!expectedId) return null;
+
+  const candidates = [
+    response?.exam,
+    response?.exam_details,
+    response?.examDetails,
+    response?.details,
+  ];
+
+  for (const candidate of candidates) {
+    const rows = Array.isArray(candidate)
+      ? candidate
+      : candidate &&
+          typeof candidate === "object"
+        ? [candidate]
+        : [];
+
+    for (const exam of rows) {
+      if (!exam || typeof exam !== "object") {
+        continue;
+      }
+
+      const returnedId = firstId(
+        exam.id,
+        exam.exam_id,
+        exam.examId,
+        exam.examid
+      );
+
+      const returnedType =
+        exam.type ??
+        exam.exam_type ??
+        exam.examType;
+
+      if (
+        returnedId === expectedId &&
+        (
+          returnedType == null ||
+          backendHistoryType(returnedType) ===
+            expectedType
+        )
+      ) {
+        return exam;
+      }
+    }
+  }
+
+  return null;
+}
+
+function identityMatches({
+  row,
+  attemptId,
+  examId,
+  uid,
+  examType,
+}) {
+  const returnedAttemptId = firstId(
+    row.attempt_id,
+    row.attemptId,
+    row.pauseid,
+    row.pause_id,
+    row.id
+  );
+
+  if (returnedAttemptId !== attemptId) {
+    return false;
+  }
+
+  const returnedExamId = firstId(
+    row.exam_id,
+    row.examId,
+    row.examid,
+    row.test_id,
+    row.testId
+  );
+
+  if (
+    returnedExamId !== null &&
+    returnedExamId !== examId
+  ) {
+    return false;
+  }
+
+  const returnedUid = firstId(
+    row.uid,
+    row.user_id,
+    row.userId
+  );
+
+  if (
+    returnedUid !== null &&
+    returnedUid !== uid
+  ) {
+    return false;
+  }
+
+  const returnedType =
+    row.exam_type ?? row.examType;
+
+  if (
+    returnedType != null &&
+    backendHistoryType(returnedType) !==
+      backendHistoryType(examType)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * true  = positively verified course
+ * false = explicit course mismatch
+ * null  = insufficient evidence
+ */
 export async function verifyExamHistoryCourse({
   cid,
   uid,
@@ -620,144 +630,156 @@ export async function verifyExamHistoryCourse({
     return null;
   }
 
-  const type = typeOf(examType);
+  const type = normalizeHistoryType(examType);
 
-  if (!isSupportedExamHistoryType(type)) {
+  if (!isHistoryTypeEnabled(type)) {
     return false;
   }
 
-  const response = await requestApi(
+  // Step 1: Confirm saved attempt identity.
+  const saved = await requestApi(
     "getExamAnalyticDetails",
     {
       cid: safeCid,
       uid: safeUid,
       id: safeAttemptId,
-      exam_type: backendType(type),
+      exam_type: backendHistoryType(type),
     }
   );
 
-  if (!response) {
-    console.warn("EXAM VERIFICATION UNAVAILABLE", {
-      cid: safeCid,
-      examType: type,
-      examId: safeExamId,
-      attemptId: safeAttemptId,
-    });
+  let identityVerified = false;
 
-    return null;
+  if (saved) {
+    for (const row of extractRows(saved)) {
+      if (
+        !row ||
+        typeof row !== "object" ||
+        Array.isArray(row)
+      ) {
+        continue;
+      }
+
+      if (
+        !identityMatches({
+          row,
+          attemptId: safeAttemptId,
+          examId: safeExamId,
+          uid: safeUid,
+          examType: type,
+        })
+      ) {
+        continue;
+      }
+
+      identityVerified = true;
+
+      const returnedCid = positiveId(
+        getHistoryCourseId(row)
+      );
+
+      if (
+        returnedCid !== null &&
+        returnedCid !== safeCid
+      ) {
+        return false;
+      }
+
+      if (returnedCid === safeCid) {
+        return true;
+      }
+
+      break;
+    }
   }
 
-  const rows = extractRows(response);
+  // Step 2: Check the original exam's course.
+  // This is independent of the saved attempt lookup.
+  const details = await loadDetails({
+    cid: safeCid,
+    uid: safeUid,
+    examId: safeExamId,
+    examType: type,
+  });
 
-  if (!rows.length) {
-    return null;
-  }
+  const matchingExam = details
+    ? getMatchingExam(
+        details,
+        safeExamId,
+        type
+      )
+    : null;
 
-  let foundMatchingIdentity = false;
-  let foundCourseMismatch = false;
-
-  for (const row of rows) {
-    if (
-      !row ||
-      typeof row !== "object" ||
-      Array.isArray(row)
-    ) {
-      continue;
-    }
-
-    const rowAttemptId = firstId(
-      row.id,
-      row.attempt_id,
-      row.attemptId,
-      row.pauseid,
-      row.pause_id
+  if (matchingExam) {
+    const examCid = positiveId(
+      getHistoryCourseId(matchingExam)
     );
 
-    const rowExamId = firstId(
-      row.exam_id,
-      row.examId,
-      row.examid,
-      row.test_id,
-      row.testId
-    );
-
-    const rowUid = firstId(
-      row.uid,
-      row.user_id,
-      row.userId
-    );
-
-    const rawType =
-      row.exam_type ??
-      row.examType ??
-      null;
-
-    // Ignore unrelated records in nested responses.
-
     if (
-      rowAttemptId !== null &&
-      rowAttemptId !== safeAttemptId
+      examCid !== null &&
+      examCid !== safeCid
     ) {
-      continue;
+      return false;
     }
 
     if (
-      rowExamId !== null &&
-      rowExamId !== safeExamId
+      identityVerified &&
+      examCid === safeCid
     ) {
-      continue;
-    }
-
-    if (
-      rowUid !== null &&
-      rowUid !== safeUid
-    ) {
-      continue;
-    }
-
-    if (
-      rawType != null &&
-      backendType(rawType) !== backendType(type)
-    ) {
-      continue;
-    }
-
-    // Require at least one matching identifier.
-
-    if (
-      rowAttemptId === null &&
-      rowExamId === null
-    ) {
-      continue;
-    }
-
-    foundMatchingIdentity = true;
-
-    const rowCid = getCourseId(row);
-
-    if (rowCid === safeCid) {
       return true;
     }
+  }
 
-    if (rowCid !== null) {
-      foundCourseMismatch = true;
+  // Step 3: Study Plan analytics.
+  // Only explicit attempt + course identity can
+  // establish course ownership.
+  if (type === "studyplan") {
+    const analytics = await loadUserAnalytics({
+      cid: safeCid,
+      uid: safeUid,
+      examId: safeExamId,
+      examType: type,
+    });
+
+    for (const row of extractRows(analytics)) {
+      if (
+        !row ||
+        typeof row !== "object" ||
+        Array.isArray(row)
+      ) {
+        continue;
+      }
+
+      const analyticsId = firstId(
+        row.attempt_id,
+        row.attemptId,
+        row.pauseid,
+        row.pause_id,
+        row.id
+      );
+
+      if (analyticsId !== safeAttemptId) {
+        continue;
+      }
+
+      const returnedCid = positiveId(
+        getHistoryCourseId(row)
+      );
+
+      if (
+        returnedCid !== null &&
+        returnedCid !== safeCid
+      ) {
+        return false;
+      }
+
+      if (
+        returnedCid === safeCid &&
+        identityVerified
+      ) {
+        return true;
+      }
     }
   }
-
-  if (
-    foundMatchingIdentity &&
-    foundCourseMismatch
-  ) {
-    return false;
-  }
-
-  console.warn("EXAM COURSE NOT CONFIRMED", {
-    cid: safeCid,
-    examType: type,
-    examId: safeExamId,
-    attemptId: safeAttemptId,
-    reason: "Analytics response lacks course evidence",
-  });
 
   return null;
 }

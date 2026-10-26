@@ -11,12 +11,6 @@ import {
   Trophy,
 } from "lucide-react";
 
-import {
-  useState,
-} from "react";
-
-import PremiumMockTestModal from "./PremiumMockTestModal";
-
 export default function MockTestCard({
   test,
   uid = 0,
@@ -26,11 +20,6 @@ export default function MockTestCard({
   governmentExamsSlug,
   pauseId,
 }) {
-  const [
-    showPremiumModal,
-    setShowPremiumModal,
-  ] = useState(false);
-
   if (
     !test?.id ||
     !governmentExamsSlug
@@ -80,17 +69,7 @@ export default function MockTestCard({
     },
   };
 
-  function openPremiumModal(
-    event
-  ) {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-
-    setShowPremiumModal(true);
-  }
-
   return (
-    <>
       <article
         className={`
           group
@@ -286,11 +265,14 @@ export default function MockTestCard({
           "
         >
           {premium ? (
-            <button
-              type="button"
-              onClick={
-                openPremiumModal
-              }
+            <Link
+              href={pauseId ? startPath : {
+                pathname: examPath,
+                query: {
+                  uid: String(uid),
+                  title: testTitle,
+                },
+              }}
               className="
                 inline-flex
                 w-full
@@ -317,12 +299,10 @@ export default function MockTestCard({
                 hover:bg-amber-200
               "
             >
-              <LockKeyhole
-                size={14}
-              />
-
-              Unlock Premium
-            </button>
+              <LockKeyhole size={14} />
+              View Premium Test
+              <ArrowRight size={14} />
+            </Link>
           ) : (
             <Link
               href={pauseId ? startPath : {
@@ -366,20 +346,6 @@ export default function MockTestCard({
           )}
         </div>
       </article>
-
-      <PremiumMockTestModal
-        open={showPremiumModal}
-        test={test}
-        governmentExamsSlug={
-          governmentExamsSlug
-        }
-        onClose={() =>
-          setShowPremiumModal(
-            false
-          )
-        }
-      />
-    </>
   );
 }
 

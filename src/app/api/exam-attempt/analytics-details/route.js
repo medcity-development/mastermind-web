@@ -1,8 +1,7 @@
+
 import { NextResponse } from "next/server";
 
-import {
-  getStudentSession,
-} from "@/lib/auth/getStudentSession";
+import { getStudentSession } from "@/lib/auth/getStudentSession";
 
 import {
   getExamAnalyticDetails,
@@ -11,24 +10,21 @@ import {
 import {
   backendHistoryType,
   normalizeHistoryType,
+  isHistoryTypeEnabled,
 } from "@/lib/examHistoryApi";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const allowed = new Set([
-  "mock",
-  "pqp",
-  "scert",
-  "topicwise",
-  "studyplan",
-]);
-
 function positiveId(value) {
-  const number = Number(value);
+  if (value == null || String(value).trim() === "") {
+    return null;
+  }
 
-  return Number.isSafeInteger(number) && number > 0
-    ? number
+  const n = Number(value);
+
+  return Number.isSafeInteger(n) && n > 0
+    ? n
     : null;
 }
 
@@ -87,22 +83,25 @@ function extractDetails(result) {
     if (
       candidate &&
       typeof candidate === "object" &&
-      !Array.isArray(candidate) &&
-      (
-        candidate.id != null ||
-        candidate.attempt_id != null ||
-        candidate.attemptId != null ||
-        candidate.pauseid != null ||
-        candidate.pause_id != null ||
-        candidate.exam_id != null ||
-        candidate.user_answers != null
-      )
+      !Array.isArray(candidate)
     ) {
       return [candidate];
     }
   }
 
   return [];
+}
+
+function backendMessage(result) {
+  const message = String(
+    result?.message || result?.msg || ""
+  );
+
+  if (/Undefined variable|Fatal error|Warning:/i.test(message)) {
+    return "The exam backend could not load this attempt.";
+  }
+
+  return message || "Unable to load saved exam result.";
 }
 
 function hasValue(value) {
@@ -113,29 +112,16 @@ function hasValue(value) {
   );
 }
 
-function backendMessage(result) {
-  const message = String(
-    result?.message || result?.msg || ""
-  );
-
-  if (
-    /Undefined variable|Fatal error|Warning:/i.test(
-      message
-    )
-  ) {
-    return "The exam backend could not load this attempt.";
-  }
-
-  return message || "Unable to load saved exam result.";
-}
-
 export async function POST(request) {
   try {
     const session = await getStudentSession();
     const uid = positiveId(session?.uid);
 
     if (!uid) {
-      return fail("Please sign in to continue.", 401);
+      return fail(
+        "Please sign in to continue.",
+        401
+      );
     }
 
     let body;
@@ -143,7 +129,7 @@ export async function POST(request) {
     try {
       body = await request.json();
     } catch {
-      return fail("Invalid JSON request.");
+      return fail("Invalid JSON request.", 400);
     }
 
     const cid = positiveId(body?.cid);
@@ -164,19 +150,10 @@ export async function POST(request) {
       return fail("Valid saved attempt ID is required.");
     }
 
-    if (!allowed.has(type)) {
+    if (!isHistoryTypeEnabled(type)) {
       return fail("Unsupported exam type.");
     }
 
-    // Retains the entitlement restriction in your second version.
-    if (type === "studyplan") {
-      return fail(
-        "Study Plan entitlement verification is required.",
-        403
-      );
-    }
-
-    // topicwise / twe → backend "twe"
     const examType = backendHistoryType(type);
 
     const result = await getExamAnalyticDetails({
@@ -187,13 +164,9 @@ export async function POST(request) {
     });
 
     if (!result || failed(result.status)) {
-      const upstreamStatus = Number(
-        result?.httpStatus
-      );
+      const upstreamStatus = Number(result?.httpStatus);
 
-      const status = [429, 503, 504].includes(
-        upstreamStatus
-      )
+      const status = [429, 503, 504].includes(upstreamStatus)
         ? upstreamStatus
         : 502;
 
@@ -215,21 +188,21 @@ export async function POST(request) {
       );
     }
 
-    const mismatched = details.some((row) => {
+    const matching = details.filter((row) => {
       if (
         !row ||
         typeof row !== "object" ||
         Array.isArray(row)
       ) {
-        return true;
+        return false;
       }
 
       const returnedId =
-        row.id ??
         row.attempt_id ??
         row.attemptId ??
         row.pauseid ??
-        row.pause_id;
+        row.pause_id ??
+        row.id;
 
       const returnedCid =
         row.cid ??
@@ -238,43 +211,37 @@ export async function POST(request) {
         row.courseid;
 
       const returnedUid =
-        row.uid ?? row.user_id;
+        row.uid ??
+        row.user_id ??
+        row.userId;
 
-      // Only exam_type is used for the returned type check.
-      const returnedType = row.exam_type;
+      const returnedType =
+        row.exam_type ?? row.examType;
 
       return (
-        (
-          hasValue(returnedId) &&
-          Number(returnedId) !== attemptId
-        ) ||
-        (
-          hasValue(returnedCid) &&
-          Number(returnedCid) !== cid
-        ) ||
-        (
-          hasValue(returnedUid) &&
-          Number(returnedUid) !== uid
-        ) ||
-        (
-          hasValue(returnedType) &&
-          backendHistoryType(returnedType) !== examType
-        )
+        (!hasValue(returnedId) ||
+          Number(returnedId) === attemptId) &&
+        (!hasValue(returnedCid) ||
+          Number(returnedCid) === cid) &&
+        (!hasValue(returnedUid) ||
+          Number(returnedUid) === uid) &&
+        (!hasValue(returnedType) ||
+          backendHistoryType(returnedType) === examType)
       );
     });
 
-    if (mismatched) {
+    if (!matching.length) {
       return fail(
-        "Saved attempt did not match the requested student, attempt, course or exam type.",
-        502
+        "Saved attempt did not match the requested student, course, attempt or exam type.",
+        403
       );
     }
 
     return reply({
       ...result,
       status: true,
-      details,
-      data: details,
+      details: matching,
+      data: matching,
     });
   } catch (error) {
     console.error(

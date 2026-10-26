@@ -1,3 +1,4 @@
+import { applyPackageAccess } from "@/lib/packageAccess";
 // src/lib/pyqHelper.js
 
 export async function getPreviousQuestions({
@@ -68,7 +69,7 @@ export async function getPreviousQuestions({
     }
 
     const result =
-      await response.json();
+      await applyPackageAccess(await response.json(), { cid, contentType: "pqp" });
 
     return {
       status:

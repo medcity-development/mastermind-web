@@ -1,16 +1,27 @@
-
 import "server-only";
 
-export const ENABLE_STUDY_PLAN_HISTORY = false;
+export const ENABLE_STUDY_PLAN_HISTORY = true;
 
 const TYPE_MAP = {
   mock: "mock",
+  mocktest: "mock",
+  "mock test": "mock",
+
   pyq: "pqp",
   pqp: "pqp",
+
   scert: "scert",
+
   twe: "topicwise",
   topicwise: "topicwise",
   "topic-wise": "topicwise",
+  "topic wise": "topicwise",
+  topic_wise: "topicwise",
+
+  studyplan: "studyplan",
+  "study-plan": "studyplan",
+  "study plan": "studyplan",
+  study_plan: "studyplan",
 };
 
 const BACKEND_TYPES = {
@@ -18,6 +29,7 @@ const BACKEND_TYPES = {
   pqp: "pqp",
   scert: "scert",
   topicwise: "twe",
+  studyplan: "studyplan",
 };
 
 const SUPPORTED_TYPES = [
@@ -25,10 +37,12 @@ const SUPPORTED_TYPES = [
   "pqp",
   "scert",
   "topicwise",
+  "studyplan",
 ];
 
 const cache = new Map();
-const TTL = 30000;
+
+const TTL = 30_000;
 const MAX_CACHE = 200;
 
 let cooldownUntil = 0;
@@ -43,6 +57,7 @@ export function normalizeHistoryType(value) {
 
 export function backendHistoryType(value) {
   const type = normalizeHistoryType(value);
+
   return BACKEND_TYPES[type] || type;
 }
 
@@ -57,29 +72,53 @@ export function isHistoryTypeEnabled(value) {
 }
 
 export function getHistoryCourseId(row) {
+  if (
+    !row ||
+    typeof row !== "object" ||
+    Array.isArray(row)
+  ) {
+    return null;
+  }
+
   return (
-    row?.cid ??
-    row?.course_id ??
-    row?.courseId ??
-    row?.courseid ??
-    row?.course?.cid ??
-    row?.course?.id ??
-    row?.course_details?.cid ??
-    row?.course_details?.course_id ??
+    row.c_id ??
+    row.cid ??
+    row.course_id ??
+    row.courseId ??
+    row.courseid ??
+    row.course?.c_id ??
+    row.course?.cid ??
+    row.course?.id ??
+    row.course_details?.c_id ??
+    row.course_details?.cid ??
+    row.course_details?.course_id ??
     null
   );
 }
 
-export function filterExamHistoryByCourse(rows, cid) {
+export function filterExamHistoryByCourse(
+  rows,
+  cid
+) {
   if (!Array.isArray(rows)) return [];
+
+  const expectedCid = Number(cid);
+
+  if (
+    !Number.isSafeInteger(expectedCid) ||
+    expectedCid <= 0
+  ) {
+    return [];
+  }
 
   return rows.filter((row) => {
     const found = getHistoryCourseId(row);
 
     return (
-      found == null ||
-      found === "" ||
-      Number(found) === Number(cid)
+      found !== null &&
+      found !== undefined &&
+      String(found).trim() !== "" &&
+      Number(found) === expectedCid
     );
   });
 }
@@ -94,6 +133,7 @@ function fail(
     message,
     details: [],
     data: [],
+    total: 0,
     httpStatus,
     retryAfter,
     rateLimited: httpStatus === 429,
@@ -101,7 +141,7 @@ function fail(
 }
 
 function retryMs(value) {
-  if (value != null && value !== "") {
+  if (value !== null && value !== undefined) {
     const seconds = Number(value);
 
     if (Number.isFinite(seconds)) {
@@ -115,11 +155,13 @@ function retryMs(value) {
     }
   }
 
-  return 60000;
+  return 60_000;
 }
 
 function extractRecords(value) {
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) {
+    return value;
+  }
 
   const candidates = [
     value?.details,
@@ -174,6 +216,7 @@ async function requestHistory(uid, cid, type) {
   form.append("api", api);
   form.append("uid", String(uid));
   form.append("cid", String(cid));
+
   form.append(
     "exam_type",
     backendHistoryType(type)
@@ -194,12 +237,12 @@ async function requestHistory(uid, cid, type) {
     );
 
     if (response.status === 429) {
-      const header =
-        response.headers.get("retry-after");
-
       cooldownUntil = Math.max(
         cooldownUntil,
-        Date.now() + retryMs(header)
+        Date.now() +
+          retryMs(
+            response.headers.get("retry-after")
+          )
       );
 
       return fail(
@@ -254,8 +297,6 @@ async function requestHistory(uid, cid, type) {
       );
     }
 
-    // Preserve the records.
-    // The history route must verify course ownership.
     return {
       status: true,
       exam_type: type,
@@ -270,7 +311,7 @@ async function requestHistory(uid, cid, type) {
       "AbortError",
     ].includes(error?.name);
 
-    console.error("EXAM HISTORY NETWORK:", {
+    console.error("[Exam History] Network error:", {
       type,
       cid,
       message: error?.message,
@@ -306,22 +347,31 @@ export async function getCourseExamHistory({
     !Number.isSafeInteger(safeUid) ||
     safeUid <= 0
   ) {
-    return fail("Invalid student session.", 401);
+    return fail(
+      "Invalid student session.",
+      401
+    );
   }
 
   if (
     !Number.isSafeInteger(safeCid) ||
     safeCid <= 0
   ) {
-    return fail("Invalid course ID.", 400);
+    return fail(
+      "Invalid course ID.",
+      400
+    );
   }
 
   const key = `${safeUid}:${safeCid}:${type}`;
-  const now = Date.now();
 
+  const now = Date.now();
   const previous = cache.get(key);
 
-  if (previous && previous.expiresAt > now) {
+  if (
+    previous &&
+    previous.expiresAt > now
+  ) {
     return previous.promise;
   }
 
@@ -348,7 +398,9 @@ export async function getCourseExamHistory({
   cache.set(key, entry);
 
   if (cache.size > MAX_CACHE) {
-    cache.delete(cache.keys().next().value);
+    cache.delete(
+      cache.keys().next().value
+    );
   }
 
   return entry.promise;

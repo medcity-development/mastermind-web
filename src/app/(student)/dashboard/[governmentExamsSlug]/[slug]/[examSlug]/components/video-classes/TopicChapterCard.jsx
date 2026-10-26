@@ -1,5 +1,7 @@
 "use client";
 
+import { usePackageAccess } from "@/components/packages/PackageAccessContext";
+
 import {
   Clock3,
   LockKeyhole,
@@ -10,11 +12,12 @@ export default function TopicChapterCard({
   chapter,
   onClick,
 }) {
+  const packageAccess = usePackageAccess();
   if (!chapter) {
     return null;
   }
 
-  const isPaid =
+  const isPaid = !packageAccess &&
     String(
       chapter?.type ||
         chapter?.access ||

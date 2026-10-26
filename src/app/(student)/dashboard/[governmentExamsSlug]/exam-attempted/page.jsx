@@ -1,207 +1,217 @@
+
 import {
-    notFound,
-    redirect,
+  notFound,
+  redirect,
 } from "next/navigation";
 
 import {
-    getGovernmentExamConfig,
+  getGovernmentExamConfig,
 } from "@/lib/governmentExamConfig";
 
 import {
-    getStudentSession,
+  getStudentSession,
 } from "@/lib/auth/getStudentSession";
-
-import {
-    getExamHistoryTypes,
-} from "@/lib/examHistoryTypes";
-
-import {
-    getStudentProfile,
-} from "@/lib/studentProfileHelper";
 
 import ExamHistoryClient from "./ExamHistoryClient";
 
-export const dynamic =
-    "force-dynamic";
+/* =========================================================
+   PAGE CONFIGURATION
+========================================================= */
 
-export async function generateMetadata({
-    params,
-}) {
-    const {
-        governmentExamsSlug,
-    } = await params;
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-    const config =
-        getGovernmentExamConfig(
-            governmentExamsSlug
-        );
+const SUPPORTED_EXAM_TYPES = [
+  "mock",
+  "pqp",
+  "scert",
+  "topicwise",
+  "studyplan",
+];
 
-    if (!config) {
-        return {};
-    }
+/* =========================================================
+   HELPERS
+========================================================= */
 
-    return {
-        title:
-            `Exam History | ${config.shortName || config.name} | MasterMind Academy`,
+function getValidId(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    String(value).trim() === ""
+  ) {
+    return null;
+  }
 
-        description:
-            `View attempted exams and analytics for ${config.name}.`,
+  const parsed = Number(value);
 
-        robots: {
-            index: false,
-            follow: false,
-        },
-    };
+  return Number.isSafeInteger(parsed) &&
+    parsed > 0
+    ? parsed
+    : null;
 }
 
-export default async function ExamHistoryPage({
-    params,
+function getCourseName(config) {
+  return (
+    config?.shortName ||
+    config?.name ||
+    "Government Exams"
+  );
+}
+
+function getDashboardPath(slug) {
+  return `/dashboard/${encodeURIComponent(slug)}/exam-attempted`;
+}
+
+/* =========================================================
+   METADATA
+========================================================= */
+
+export async function generateMetadata({
+  params,
 }) {
-    const {
-        governmentExamsSlug,
-    } = await params;
+  const { governmentExamsSlug } = await params;
 
-    /* =======================================================
-       CONFIG
-    ======================================================= */
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
-    const config =
-        getGovernmentExamConfig(
-            governmentExamsSlug
-        );
+  if (!config) {
+    return {
+      title: "Exam History | MasterMind Academy",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
 
-    if (!config) {
-        notFound();
-    }
+  const courseName = getCourseName(config);
 
-    const cid =
-        Number(
-            config?.cid
-        );
+  return {
+    title: `Exam History | ${courseName} | MasterMind Academy`,
 
-    if (
-        !Number.isFinite(cid) ||
-        cid <= 0
-    ) {
-        notFound();
-    }
+    description:
+      `Review attempted exams, results and performance analytics for ${courseName}.`,
 
-    /* =======================================================
-       SESSION
-    ======================================================= */
+    robots: {
+      index: false,
+      follow: false,
+    },
+  };
+}
 
-    const session =
-        await getStudentSession();
+/* =========================================================
+   EXAM HISTORY PAGE
 
-    const uid =
-        Number(
-            session?.uid
-        );
+   Shared page for:
+   - Kerala PSC
+   - RRB & SSC
 
-    if (
-        !Number.isFinite(uid) ||
-        uid <= 0
-    ) {
-        const redirectPath =
-            `/dashboard/${governmentExamsSlug}/exam-attempted`;
+   History categories:
+   - Mock Tests
+   - Previous Questions
+   - SCERT
+   - Topic Wise
+   - Study Plan
+========================================================= */
 
-        redirect(
-            `/login?redirect=${encodeURIComponent(
-                redirectPath
-            )}`
-        );
-    }
+export default async function ExamHistoryPage({
+  params,
+}) {
+  /* -------------------------------------------------------
+     ROUTE PARAMETERS
+  ------------------------------------------------------- */
 
-    /* =======================================================
-       STUDENT PROFILE & ACTIVE PLAN CHECK
-    ======================================================= */
+  const { governmentExamsSlug } = await params;
 
-    let profile = null;
-    try {
-        const profileResult = await getStudentProfile({
-            uid,
-            cid,
-        });
+  if (
+    typeof governmentExamsSlug !== "string" ||
+    !governmentExamsSlug.trim()
+  ) {
+    notFound();
+  }
 
-        profile =
-            profileResult?.profile ||
-            profileResult?.data?.profile ||
-            profileResult?.data ||
-            null;
-    } catch (error) {
-        console.warn("STUDENT PROFILE CHECK ERROR:", error?.message);
-    }
+  /* -------------------------------------------------------
+     GOVERNMENT EXAM CONFIGURATION
+  ------------------------------------------------------- */
 
-    const isPlanActive = Boolean(
-        profile?.active === "active" ||
-        profile?.active === true ||
-        profile?.active === 1 ||
-        profile?.active === "1" ||
-        profile?.status === "active" ||
-        profile?.is_active === 1 ||
-        profile?.is_active === true ||
-        profile?.is_active === "1" ||
-        profile?.package_status === "active" ||
-        profile?.plan_status === "active" ||
-        profile?.subscription_status === "active" ||
-        profile?.payment_status === "active" ||
-        profile?.stage === "active" ||
-        profile?.stage === "completed" ||
-        session?.active === "active" ||
-        session?.active === true ||
-        session?.status === "active"
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
+
+  if (!config) {
+    notFound();
+  }
+
+  const cid = getValidId(config.cid);
+
+  if (!cid) {
+    notFound();
+  }
+
+  /* -------------------------------------------------------
+     STUDENT AUTHENTICATION
+  ------------------------------------------------------- */
+
+  const session = await getStudentSession();
+
+  const uid = getValidId(session?.uid);
+
+  if (!uid) {
+    const redirectPath = getDashboardPath(
+      governmentExamsSlug
     );
 
-    /* =======================================================
-       SUPPORTED BACKEND TYPES
-    ======================================================= */
+    redirect(
+      `/login?redirect=${encodeURIComponent(
+        redirectPath
+      )}`
+    );
+  }
 
-    const examTypes = isPlanActive
-        ? [...getExamHistoryTypes(), "studyplan"]
-        : getExamHistoryTypes();
+  /* -------------------------------------------------------
+     DISPLAY CONFIGURATION
+  ------------------------------------------------------- */
 
-    /* =======================================================
-       PAGE
-    ======================================================= */
+  const examName = getCourseName(config);
 
-    return (
-        <main
-            className="
+  const examTypes = [...SUPPORTED_EXAM_TYPES];
+
+  /* -------------------------------------------------------
+     PAGE RENDER
+  ------------------------------------------------------- */
+
+  return (
+    <main
+      className="
         min-h-screen
+        w-full
         bg-[#f4f7fc]
-
-        px-4
-        py-6
-
-        sm:px-6
+        px-3
+        py-5
+        sm:px-5
+        sm:py-6
         lg:px-8
+        lg:py-8
       "
-        >
-            <div
-                className="
+    >
+      <div
+        className="
           mx-auto
           w-full
           max-w-[1450px]
         "
-            >
-                <ExamHistoryClient
-                    cid={cid}
-                    examTypes={
-                        examTypes
-                    }
-                    examName={
-                        config?.shortName ||
-                        config?.name ||
-                        ""
-                    }
-                    governmentExamsSlug={
-                        governmentExamsSlug
-                    }
-                    hasActivePlan={
-                        isPlanActive
-                    }
-                />
-            </div>
-        </main>
-    );
+      >
+        <ExamHistoryClient
+          key={`${governmentExamsSlug}-${cid}`}
+          cid={cid}
+          examTypes={examTypes}
+          examName={examName}
+          governmentExamsSlug={
+            governmentExamsSlug
+          }
+        />
+      </div>
+    </main>
+  );
 }

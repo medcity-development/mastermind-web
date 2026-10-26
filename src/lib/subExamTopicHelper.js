@@ -1,3 +1,4 @@
+import { applyPackageAccess } from "@/lib/packageAccess";
 const API_BASE_URL =
   process.env.PSC_API_BASE_URL;
 
@@ -79,7 +80,7 @@ async function postRequest(
     );
   }
 
-  return response.json();
+  return applyPackageAccess(await response.json(), fields);
 }
 
 /* =========================================================
@@ -231,6 +232,7 @@ export async function getSubExamTopicChapters({
           : [],
 
       nextOffset,
+      mocktest: result?.mocktest ?? result?.mock_test ?? result?.mocktest_id ?? null,
 
       message:
         result?.message ||

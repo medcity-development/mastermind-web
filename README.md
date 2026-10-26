@@ -28,6 +28,20 @@ The admin enquiry inbox at `/forAdmin-enquiries@masterMind` requires these serve
 - `ENQUIRY_ADMIN_PASSWORD` for admin sign-in.
 - `ENQUIRY_ADMIN_SESSION_SECRET` for signing admin sessions. Use a secret with at least 32 characters.
 
+## Razorpay payment configuration
+
+Package checkout requires the following server-side environment variables:
+
+- `RAZORPAY_KEY_ID` for the Razorpay checkout key.
+- `RAZORPAY_KEY_SECRET` for creating orders and verifying payment signatures.
+- `PSC_API_BASE_URL` and `PSC_API_KEY` for activating purchased packages.
+
+Use Razorpay test credentials while developing and production credentials only in the production environment. Never expose `RAZORPAY_KEY_SECRET` in client-side code.
+
+## Premium test access
+
+Dashboard premium-test access is checked server-side against `getActivePlans` and `getPackagesDetails`. A plan must be active and unexpired, and its included course ID or course name must match the test metadata. The same check runs before premium questions are returned.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

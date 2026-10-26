@@ -339,7 +339,7 @@ export default async function TopicWiseTestListPage({
 
                   {/* ACTION */}
 
-                  {isFree && destination ? (
+                  {(isFree || isPaid) && destination ? (
                     <Link
                       href={destination}
                       className="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-[#017dc0] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#164fa5]"

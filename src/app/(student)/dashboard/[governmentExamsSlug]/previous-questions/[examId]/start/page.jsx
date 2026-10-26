@@ -1,5 +1,6 @@
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -14,6 +15,9 @@ import {
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
+import {
+  checkPremiumExamAccess,
+} from "@/lib/premiumExamAccess";
 
 import ExamClient from "../components/ExamClient";
 
@@ -48,28 +52,43 @@ export default async function StartExamPage({
   const examType = "pqp";
   const initialPauseId = Number(query?.pauseId);
 
-  const [
-    detailsResult,
-    questionsResult,
-  ] = await Promise.all([
-    getPyqExamDetails({
-      uid,
-      cid,
-      examId,
-      type: examType,
-    }),
-
-    getPyqQuestions({
-      uid,
-      cid,
-      examId,
-      examType,
-    }),
-  ]);
+  const detailsResult = await getPyqExamDetails({
+    uid,
+    cid,
+    examId,
+    type: examType,
+  });
 
   if (!detailsResult?.exam) {
     notFound();
   }
+
+  if (
+    String(detailsResult.exam.access ?? "")
+      .trim()
+      .toLowerCase() === "paid"
+  ) {
+    const access = await checkPremiumExamAccess({
+      uid,
+      cid,
+      examId,
+      type: examType,
+      exam: detailsResult.exam,
+    });
+
+    if (!access.hasAccess) {
+      redirect(
+        `/dashboard/${governmentExamsSlug}?showPackages=1`
+      );
+    }
+  }
+
+  const questionsResult = await getPyqQuestions({
+    uid,
+    cid,
+    examId,
+    examType,
+  });
 
   const questions = Array.isArray(
     questionsResult?.data

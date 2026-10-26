@@ -16,7 +16,6 @@ export default function LevelMockTestCard({
   cid = 1,
   uid = 0,
   governmentExamsSlug = "kerala-psc",
-  onPremiumClick,
 }) {
   if (!exam) {
     return null;
@@ -306,13 +305,8 @@ export default function LevelMockTestCard({
         "
       >
         {isPaid ? (
-          <button
-            type="button"
-            onClick={() =>
-              onPremiumClick?.(
-                exam
-              )
-            }
+          <Link
+            href={href}
             className="
               group/button
               flex
@@ -339,7 +333,7 @@ export default function LevelMockTestCard({
               size={15}
             />
 
-            Unlock Premium
+            View Premium Test
 
             <ArrowRight
               size={14}
@@ -348,7 +342,7 @@ export default function LevelMockTestCard({
                 group-hover/button:translate-x-1
               "
             />
-          </button>
+          </Link>
         ) : (
           <Link
             href={href}

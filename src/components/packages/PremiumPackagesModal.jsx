@@ -20,6 +20,7 @@ import {
   Percent,
   ReceiptText,
   ShoppingBag,
+  Tag,
   X,
 } from "lucide-react";
 
@@ -37,7 +38,16 @@ export default function PremiumPackagesModal({
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
   const [selectedPrice, setSelectedPrice] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState("");
+  const [paymentValidity, setPaymentValidity] = useState(null);
+  const [promocode, setPromocode] = useState("");
+  const [appliedPromocode, setAppliedPromocode] = useState(null);
+  const [promocodeLoading, setPromocodeLoading] = useState(false);
+  const [promocodeError, setPromocodeError] = useState("");
   const autoOpenedPackageRef = useRef("");
+  const successCloseTimeoutRef = useRef(null);
 
   const openPackageDetails = useCallback(async (item) => {
     setSelectedPackage(item);
@@ -60,6 +70,12 @@ export default function PremiumPackagesModal({
 
       setDetails(result.details);
       setSelectedPrice(result.details.priceOptions?.[0] || null);
+      setPaymentError("");
+      setPaymentSuccess("");
+      setPaymentValidity(null);
+      setPromocode("");
+      setAppliedPromocode(null);
+      setPromocodeError("");
     } catch (loadError) {
       setDetailsError(
         loadError?.message || "Unable to load package details."
@@ -74,6 +90,26 @@ export default function PremiumPackagesModal({
     [packages, preferredPackage]
   );
   const visiblePackages = preferredMatch ? [preferredMatch] : packages;
+  const hasPreferredContent = Boolean(
+    preferredPackage.id || preferredPackage.name || preferredPackage.courseId ||
+    preferredPackage.courseName || preferredPackage.testName
+  );
+  useEffect(() => {
+    if (open && !hasPreferredContent && packages.some((item) => item.packageAccess)) {
+      onClose();
+    }
+  }, [open, hasPreferredContent, packages, onClose]);
+
+  const availablePromocodes = (details?.promocodes || []).filter((item) => {
+    const status = String(item?.status ?? item?.active ?? "1")
+      .trim()
+      .toLowerCase();
+
+    return (
+      item?.code &&
+      !["0", "false", "inactive", "disabled", "expired"].includes(status)
+    );
+  });
 
   useEffect(() => {
     if (!open) {
@@ -90,13 +126,22 @@ export default function PremiumPackagesModal({
       return;
     }
 
-    autoOpenedPackageRef.current = matchKey;
-    openPackageDetails(preferredMatch);
+    if (preferredMatch.packageAccess) {
+      onClose();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      autoOpenedPackageRef.current = matchKey;
+      openPackageDetails(preferredMatch);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [
     details,
     detailsLoading,
     open,
     openPackageDetails,
+    onClose,
     preferredMatch,
     preferredPackage,
   ]);
@@ -157,10 +202,180 @@ export default function PremiumPackagesModal({
     loadPackages();
     return () => {
       controller.abort();
+      if (successCloseTimeoutRef.current) {
+        window.clearTimeout(successCloseTimeoutRef.current);
+        successCloseTimeoutRef.current = null;
+      }
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
     };
   }, [cid, open]);
+
+  const handleApplyPromocode = async (event) => {
+    event.preventDefault();
+    if (!selectedPackage || !selectedPrice || promocodeLoading) {
+      return;
+    }
+
+    setPromocodeLoading(true);
+    setPromocodeError("");
+    setAppliedPromocode(null);
+
+    try {
+      const response = await fetch("/api/payments/razorpay/promocode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cid,
+          pid: selectedPackage.id,
+          priceId: selectedPrice.id,
+          promocode: promocode.trim(),
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result?.status !== true) {
+        throw new Error(result?.message || "Unable to apply this promocode.");
+      }
+
+      setAppliedPromocode(result);
+    } catch (error) {
+      setPromocodeError(
+        error instanceof Error
+          ? error.message
+          : "Unable to apply this promocode."
+      );
+    } finally {
+      setPromocodeLoading(false);
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+    if (!selectedPackage || !selectedPrice || paymentLoading) {
+      return;
+    }
+
+    setPaymentLoading(true);
+    setPaymentError("");
+    setPaymentSuccess("");
+    setPaymentValidity(null);
+
+    try {
+      const orderResponse = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cid,
+          pid: selectedPackage.id,
+          priceId: selectedPrice.id,
+          promocode: appliedPromocode?.promocode || "",
+        }),
+      });
+      const orderResult = await orderResponse.json();
+
+      if (!orderResponse.ok || orderResult?.status !== true) {
+        throw new Error(
+          orderResult?.message || "Unable to start payment. Please try again."
+        );
+      }
+
+      await loadRazorpayCheckout();
+
+      const checkout = new window.Razorpay({
+        key: orderResult.keyId,
+        order_id: orderResult.order.id,
+        amount: orderResult.order.amount,
+        currency: orderResult.order.currency,
+        name: "MasterMind Academy",
+        description: [
+          orderResult.package.name,
+          orderResult.package.validity,
+        ]
+          .filter(Boolean)
+          .join(" - "),
+        prefill: {
+          name: orderResult.student.name,
+          email: orderResult.student.email,
+        },
+        theme: {
+          color: "#164fa5",
+        },
+        handler: async (payment) => {
+          try {
+            const verifyResponse = await fetch(
+              "/api/payments/razorpay/verify",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  ...payment,
+                  cid,
+                  pid: selectedPackage.id,
+                  priceId: selectedPrice.id,
+                }),
+              }
+            );
+            const verifyResult = await verifyResponse.json();
+
+            if (!verifyResponse.ok || verifyResult?.status !== true) {
+              throw new Error(
+                verifyResult?.message ||
+                  "Payment could not be verified. Please contact support."
+              );
+            }
+
+            setPaymentSuccess(
+              verifyResult.message ||
+                "Payment successful. Your plan is now active."
+            );
+            setPaymentValidity({
+              days: verifyResult.durationDays,
+              validFrom: verifyResult.validFrom,
+              validUntil: verifyResult.validUntil,
+            });
+            setDetails((currentDetails) =>
+              currentDetails
+                ? { ...currentDetails, premium: true }
+                : currentDetails
+            );
+            successCloseTimeoutRef.current = window.setTimeout(() => {
+              successCloseTimeoutRef.current = null;
+              onClose();
+              const destination = new URL(window.location.href);
+              destination.searchParams.delete("showPackages");
+              window.location.replace(destination.toString());
+            }, 1200);
+          } catch (verificationError) {
+            setPaymentError(
+              verificationError instanceof Error
+                ? verificationError.message
+                : "Payment could not be verified. Please contact support."
+            );
+          } finally {
+            setPaymentLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setPaymentLoading(false),
+        },
+      });
+
+      checkout.open();
+    } catch (paymentRequestError) {
+      setPaymentError(
+        paymentRequestError instanceof Error
+          ? paymentRequestError.message
+          : "Unable to start payment. Please try again."
+      );
+      setPaymentLoading(false);
+    }
+  };
 
   if (!open) {
     return null;
@@ -286,7 +501,15 @@ export default function PremiumPackagesModal({
                             type="button"
                             key={option.id || `${option.validity}-${index}`}
                             aria-pressed={selectedPrice === option}
-                            onClick={() => setSelectedPrice(option)}
+                            onClick={() => {
+                              setSelectedPrice(option);
+                              setPaymentError("");
+                              setPaymentSuccess("");
+                              setPaymentValidity(null);
+                              setAppliedPromocode(null);
+                              setPromocodeError("");
+                            }}
+                            disabled={paymentLoading || promocodeLoading}
                             className={`rounded-xl border p-4 text-left transition ${
                               selectedPrice === option
                                 ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
@@ -295,7 +518,10 @@ export default function PremiumPackagesModal({
                           >
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
                               <CalendarDays size={15} className="text-blue-700" />
-                              {option.validity || `${option.days || ""} days`}
+                              {option.validity || ""}
+                              {option.days
+                                ? ` (${option.days} days)`
+                                : ""}
                             </div>
                             <p className="mt-3 text-2xl font-black text-[#071f55]">
                               ₹{option.current || option.final}
@@ -315,14 +541,36 @@ export default function PremiumPackagesModal({
                       {selectedPrice ? (() => {
                         const amount = Number(selectedPrice.current || 0);
                         const originalAmount = Number(selectedPrice.original || 0);
-                        const subtotal = Number(selectedPrice.subtotal || amount);
-                        const gstRate = Number(selectedPrice.gst || 0);
+                        const baseSubtotal = Number(
+                          selectedPrice.subtotal || amount
+                        );
+                        const promoDiscount = Number(
+                          appliedPromocode?.discountAmount || 0
+                        );
+                        const subtotal = Number(
+                          appliedPromocode?.subtotal ?? baseSubtotal
+                        );
+                        const gstRate = Number(
+                          appliedPromocode?.gstRate ?? selectedPrice.gst ?? 0
+                        );
                         const discountAmount = Math.max(0, originalAmount - amount);
                         const discountPercent = originalAmount > 0
                           ? Math.round((discountAmount / originalAmount) * 100)
                           : 0;
-                        const gstAmount = (subtotal * gstRate) / 100;
-                        const totalPayment = Number(selectedPrice.final || amount);
+                        const gstAmount = Number(
+                          appliedPromocode?.gstAmount ??
+                            Math.round(
+                              ((baseSubtotal * gstRate) / 100 +
+                                Number.EPSILON) *
+                                100
+                            ) /
+                              100
+                        );
+                        const totalPayment = Number(
+                          appliedPromocode?.total ??
+                            selectedPrice.final ??
+                            baseSubtotal + gstAmount
+                        );
                         const formatAmount = (value) =>
                           new Intl.NumberFormat("en-IN", {
                             maximumFractionDigits: 2,
@@ -336,7 +584,7 @@ export default function PremiumPackagesModal({
                             <div className="mt-3 divide-y divide-blue-100 text-xs">
                               <PriceRow
                                 icon={<CalendarDays size={14} />}
-                                label="Validity"
+                                label="Duration"
                                 value={`${selectedPrice.validity || "-"}${selectedPrice.days ? ` (${selectedPrice.days} days)` : ""}`}
                               />
                               <PriceRow
@@ -355,6 +603,14 @@ export default function PremiumPackagesModal({
                                 label="Subtotal"
                                 value={`₹${formatAmount(subtotal)}`}
                               />
+                              {appliedPromocode && (
+                                <PriceRow
+                                  icon={<Tag size={14} />}
+                                  label={`Promocode (${appliedPromocode.promocode}${appliedPromocode.mode === "percent" ? ` - ${formatAmount(appliedPromocode.value)}% off` : ""})`}
+                                  value={`− ₹${formatAmount(promoDiscount)}`}
+                                  valueClassName="text-emerald-700"
+                                />
+                              )}
                               <PriceRow
                                 icon={<Percent size={14} />}
                                 label={`GST (${formatAmount(gstRate)}%)`}
@@ -367,18 +623,167 @@ export default function PremiumPackagesModal({
                                 emphasized
                               />
                             </div>
+                            <form
+                              className="mt-4"
+                              onSubmit={handleApplyPromocode}
+                            >
+                              <label
+                                className="mb-2 block text-xs font-bold text-slate-700"
+                                htmlFor="premium-promocode"
+                              >
+                                Have a promocode?
+                              </label>
+                              {availablePromocodes.length > 0 && (
+                                <div className="mb-2 flex flex-wrap gap-2">
+                                  {availablePromocodes.map((item) => (
+                                    <button
+                                      className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 transition hover:border-blue-300"
+                                      disabled={
+                                        promocodeLoading ||
+                                        paymentLoading ||
+                                        Boolean(paymentSuccess)
+                                      }
+                                      key={
+                                        item.id ??
+                                        `${item.code}-${item.amount}`
+                                      }
+                                      onClick={() => {
+                                        setPromocode(item.code);
+                                        setAppliedPromocode(null);
+                                        setPromocodeError("");
+                                      }}
+                                      type="button"
+                                    >
+                                      {item.code}
+                                      {item.amount != null &&
+                                        ` (₹${formatAmount(
+                                          Number(item.amount) || 0
+                                        )} off)`}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex gap-2">
+                                <input
+                                  autoComplete="off"
+                                  className="min-w-0 flex-1 rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-xs font-semibold uppercase text-slate-800 outline-none placeholder:font-normal placeholder:normal-case placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                                  disabled={
+                                    promocodeLoading ||
+                                    paymentLoading ||
+                                    Boolean(paymentSuccess)
+                                  }
+                                  id="premium-promocode"
+                                  maxLength={50}
+                                  onChange={(event) => {
+                                    setPromocode(event.target.value);
+                                    setAppliedPromocode(null);
+                                    setPromocodeError("");
+                                  }}
+                                  placeholder="Enter promocode"
+                                  value={promocode}
+                                />
+                                {appliedPromocode ? (
+                                  <button
+                                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                                    onClick={() => {
+                                      setAppliedPromocode(null);
+                                      setPromocode("");
+                                      setPromocodeError("");
+                                    }}
+                                    type="button"
+                                  >
+                                    Remove
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={
+                                      !promocode.trim() ||
+                                      promocodeLoading ||
+                                      paymentLoading
+                                    }
+                                    type="submit"
+                                  >
+                                    {promocodeLoading ? "Checking..." : "Apply"}
+                                  </button>
+                                )}
+                              </div>
+                              {promocodeError && (
+                                <p
+                                  className="mt-2 text-xs font-semibold text-red-600"
+                                  role="alert"
+                                >
+                                  {promocodeError}
+                                </p>
+                              )}
+                              {appliedPromocode && (
+                                <p
+                                  className="mt-2 text-xs font-semibold text-emerald-700"
+                                  role="status"
+                                >
+                                  Promocode applied. You save ₹
+                                  {formatAmount(promoDiscount)}.
+                                </p>
+                              )}
+                            </form>
+                            {paymentError && (
+                              <p
+                                className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"
+                                role="alert"
+                              >
+                                {paymentError}
+                              </p>
+                            )}
+                            {paymentSuccess && (
+                              <div
+                                className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800"
+                                role="status"
+                              >
+                                <p>{paymentSuccess}</p>
+                                {paymentValidity?.days &&
+                                  paymentValidity?.validUntil && (
+                                    <p className="mt-1">
+                                      Valid for {paymentValidity.days} days,
+                                      through{" "}
+                                      {formatLocalDate(
+                                        paymentValidity.validUntil
+                                      )}
+                                      .
+                                    </p>
+                                  )}
+                              </div>
+                            )}
                             <button
                               type="button"
-                              disabled
-                              title="Payment setup will be connected later."
-                              className="mt-4 inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#164fa5] to-[#017cc0] px-5 text-xs font-black text-white opacity-60"
+                              disabled={
+                                paymentLoading ||
+                                !selectedPrice?.id ||
+                                Boolean(paymentSuccess) ||
+                                Boolean(details.premium)
+                              }
+                              onClick={handleProceedToPayment}
+                              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#164fa5] to-[#017cc0] px-5 text-xs font-black text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              <ShoppingBag size={15} />
-                              Proceed to payment
+                              {paymentLoading ? (
+                                <LoaderCircle
+                                  aria-hidden="true"
+                                  className="animate-spin"
+                                  size={15}
+                                />
+                              ) : (
+                                <ShoppingBag size={15} />
+                              )}
+                              {paymentSuccess || details.premium
+                                ? "Plan activated"
+                                : paymentLoading
+                                  ? "Opening secure checkout..."
+                                  : "Proceed to payment"}
                             </button>
-                            <p className="mt-2 text-center text-[11px] text-slate-500">
-                              Online payment will be available soon.
-                            </p>
+                            {!paymentSuccess && !details.premium && (
+                              <p className="mt-2 text-center text-[11px] text-slate-500">
+                                Secure payment powered by Razorpay.
+                              </p>
+                            )}
                           </div>
                         );
                       })() : null}
@@ -435,7 +840,7 @@ export default function PremiumPackagesModal({
               {visiblePackages.map((item) => (
                 <article
                   key={item.id}
-                  className="flex min-h-56 flex-col rounded-2xl border border-blue-100 bg-white p-4 shadow-sm"
+                  className={`flex min-h-56 flex-col rounded-2xl border p-4 shadow-sm ${item.packageAccess ? "border-emerald-200 bg-emerald-50" : "border-blue-100 bg-white"}`}
                 >
                   <div className="relative h-24 overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-sky-100">
                     {item.imageUrl ? (
@@ -451,8 +856,8 @@ export default function PremiumPackagesModal({
                         <Crown size={34} strokeWidth={1.8} />
                       </div>
                     )}
-                    <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 shadow-sm">
-                      <Crown size={16} />
+                    <span className={`absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg shadow-sm ${item.packageAccess ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      {item.packageAccess ? <CheckCircle2 size={16} /> : <Crown size={16} />}
                     </span>
                   </div>
                   <h3 className="mt-3 text-base font-black text-[#071f55]">
@@ -465,10 +870,10 @@ export default function PremiumPackagesModal({
                   ) : null}
                   <button
                     type="button"
-                    onClick={() => openPackageDetails(item)}
+                    onClick={() => item.packageAccess ? onClose() : openPackageDetails(item)}
                     className="mt-auto flex w-full items-center justify-between gap-2 pt-5 text-left text-xs font-black text-blue-700 hover:text-blue-900"
                   >
-                    <span>View details</span>
+                    <span>{item.packageAccess ? "Active ? Continue learning" : "View details"}</span>
                     <ArrowRight size={15} />
                   </button>
                 </article>
@@ -479,6 +884,50 @@ export default function PremiumPackagesModal({
       </section>
     </div>
   );
+}
+
+function loadRazorpayCheckout() {
+  if (window.Razorpay) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(
+      'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+    );
+
+    const script = existingScript || document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => {
+      if (window.Razorpay) {
+        resolve();
+      } else {
+        reject(new Error("Unable to load Razorpay checkout."));
+      }
+    };
+    script.onerror = () =>
+      reject(new Error("Unable to load Razorpay checkout."));
+
+    if (!existingScript) {
+      document.body.appendChild(script);
+    }
+  });
+}
+
+function formatLocalDate(dateValue) {
+  const [year, month, day] = String(dateValue).split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return dateValue;
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function normalizeMatch(value) {

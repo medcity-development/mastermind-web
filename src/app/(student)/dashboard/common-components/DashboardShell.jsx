@@ -2,13 +2,19 @@
 
 import { Suspense } from "react";
 import {
+  useCallback,
+  useEffect,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
 import DashboardSelectedTestNotice from "./DashboardSelectedTestNotice";
 import DashboardPremiumPackagesPrompt from "./DashboardPremiumPackagesPrompt";
+import PurchasedPackagesModal from "./PurchasedPackagesModal";
+import DashboardSearchDetailsModal from "./DashboardSearchDetailsModal";
+import DashboardNotificationsModal from "./DashboardNotificationsModal";
 
 export default function DashboardShell({
   config,
@@ -17,10 +23,107 @@ export default function DashboardShell({
   dashboardOptions = [],
   children,
 }) {
+  const router = useRouter();
   const [
     sidebarOpen,
     setSidebarOpen,
   ] = useState(false);
+
+  const [
+    purchasesOpen,
+    setPurchasesOpen,
+  ] = useState(false);
+
+  const [
+    notificationsOpen,
+    setNotificationsOpen,
+  ] = useState(false);
+
+  const [
+    unreadNotificationsCount,
+    setUnreadNotificationsCount,
+  ] = useState(0);
+
+  const [
+    purchasesCount,
+    setPurchasesCount,
+  ] = useState(null);
+
+  const [
+    selectedSearchResult,
+    setSelectedSearchResult,
+  ] = useState(null);
+
+  const handleTransactionsLoaded = useCallback((transactions) => {
+    setPurchasesCount(transactions.length);
+  }, []);
+
+  const handleUnreadNotificationsChange = useCallback((count) => {
+    setUnreadNotificationsCount(count);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPurchasesCount() {
+      try {
+        const response = await fetch("/api/student/transactions", {
+          cache: "no-store",
+        });
+        const result = await response.json();
+
+        if (!response.ok || result?.status !== true) {
+          throw new Error(result?.message || "Unable to load purchase count.");
+        }
+
+        if (active) {
+          setPurchasesCount(Array.isArray(result.data) ? result.data.length : 0);
+        }
+      } catch (error) {
+        console.error("Dashboard purchase count:", error);
+      }
+    }
+
+    loadPurchasesCount();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadUnreadNotifications() {
+      try {
+        const response = await fetch(
+          `/api/student/notifications?slug=${encodeURIComponent(config.slug)}`,
+          { cache: "no-store" }
+        );
+        const result = await response.json();
+
+        if (!response.ok || result?.status !== true) {
+          throw new Error(result?.message || "Unable to load notification count.");
+        }
+
+        const notifications = Array.isArray(result.data) ? result.data : [];
+        const count = notifications.filter(
+          (notification) =>
+            String(notification?.nstatus ?? "").trim().toLowerCase() !== "read"
+        ).length;
+
+        if (active) setUnreadNotificationsCount(count);
+      } catch (error) {
+        console.error("Dashboard unread notification count:", error);
+      }
+    }
+
+    loadUnreadNotifications();
+
+    return () => {
+      active = false;
+    };
+  }, [config.slug]);
 
   /* =========================================================
      OPEN MOBILE SIDEBAR
@@ -92,9 +195,44 @@ export default function DashboardShell({
           onMenuClick={
             handleOpenSidebar
           }
+          onPurchasesClick={() => setPurchasesOpen(true)}
+          purchasesCount={purchasesCount}
+          unreadNotificationsCount={unreadNotificationsCount}
+          onNotificationsClick={() => setNotificationsOpen(true)}
+          onSearchResultSelect={(item, href) => {
+            setSelectedSearchResult({ item, href });
+          }}
         />
 
-        {/* PAGE CONTENT */}
+        {notificationsOpen ? (
+          <DashboardNotificationsModal
+            slug={config.slug}
+            onClose={() => setNotificationsOpen(false)}
+            onUnreadCountChange={handleUnreadNotificationsChange}
+          />
+        ) : null}
+
+        {selectedSearchResult ? (
+          <DashboardSearchDetailsModal
+            item={selectedSearchResult.item}
+            governmentExamsSlug={config.slug}
+            onClose={() => setSelectedSearchResult(null)}
+            onOpenFullDetails={() => {
+              const { href } = selectedSearchResult;
+              setSelectedSearchResult(null);
+              router.push(href);
+            }}
+          />
+        ) : null}
+
+        {purchasesOpen ? (
+          <PurchasedPackagesModal
+            onClose={() => setPurchasesOpen(false)}
+            onTransactionsLoaded={handleTransactionsLoaded}
+          />
+        ) : null}
+
+          {/* PAGE CONTENT */}
 
         <main
           className="

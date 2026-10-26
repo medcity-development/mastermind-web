@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import {
   ArrowRight,
@@ -11,7 +10,6 @@ import {
   Gift,
   Pause,
   Target,
-  X,
 } from "lucide-react";
 
 export default function PreviousQuestionCard({
@@ -22,11 +20,6 @@ export default function PreviousQuestionCard({
   governmentExamsSlug,
   pauseId,
 }) {
-  const [
-    showPremiumModal,
-    setShowPremiumModal,
-  ] = useState(false);
-
   if (!item) {
     return null;
   }
@@ -44,12 +37,7 @@ export default function PreviousQuestionCard({
   const isPaid =
     access === "paid";
 
-  function handlePremiumClick() {
-    setShowPremiumModal(true);
-  }
-
   return (
-    <>
       <article
         className={`
           group
@@ -287,11 +275,8 @@ export default function PreviousQuestionCard({
 
         <div className="mt-auto pt-5">
           {isPaid && !pauseId ? (
-            <button
-              type="button"
-              onClick={
-                handlePremiumClick
-              }
+            <Link
+              href={`/dashboard/${governmentExamsSlug}/previous-questions/${id}?uid=${uid}&cid=${cid}&type=${type}`}
               className="
                 inline-flex
                 w-full
@@ -313,8 +298,9 @@ export default function PreviousQuestionCard({
             >
               <Crown size={14} />
 
-              Premium
-            </button>
+              View Premium Test
+              <ArrowRight size={14} />
+            </Link>
           ) : (
             <Link
               href={pauseId
@@ -365,123 +351,6 @@ export default function PreviousQuestionCard({
         </div>
       </article>
 
-      {showPremiumModal && (
-        <div
-          className="
-            fixed
-            inset-0
-            z-[9999]
-            flex
-            items-center
-            justify-center
-            bg-slate-950/50
-            px-4
-            backdrop-blur-[3px]
-          "
-          onClick={() =>
-            setShowPremiumModal(
-              false
-            )
-          }
-        >
-          <div
-            className="
-              relative
-              w-full
-              max-w-[420px]
-              rounded-[22px]
-              bg-white
-              p-6
-              shadow-2xl
-            "
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <button
-              type="button"
-              onClick={() =>
-                setShowPremiumModal(
-                  false
-                )
-              }
-              className="
-                absolute
-                right-4
-                top-4
-                flex
-                h-8
-                w-8
-                items-center
-                justify-center
-                rounded-full
-                bg-slate-100
-                text-slate-500
-              "
-            >
-              <X size={16} />
-            </button>
-
-            <div
-              className="
-                flex
-                h-12
-                w-12
-                items-center
-                justify-center
-                rounded-[14px]
-                bg-amber-50
-                text-amber-600
-              "
-            >
-              <Crown size={22} />
-            </div>
-
-            <h3
-              className="
-                mt-5
-                text-[21px]
-                font-extrabold
-                text-[#0b1f44]
-              "
-            >
-              Premium Access
-            </h3>
-
-            <p
-              className="
-                mt-2
-                text-[14px]
-                leading-6
-                text-slate-500
-              "
-            >
-              Please purchase a plan
-              to access this exam.
-            </p>
-
-            <Link
-              href={`/dashboard/${governmentExamsSlug}?showPackages=1`}
-              className="
-                block
-                mt-6
-                w-full
-                rounded-[12px]
-                bg-[#0b216c]
-                px-4
-                py-3
-                text-center
-                text-[13px]
-                font-bold
-                text-white
-              "
-            >
-              OK
-            </Link>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
 

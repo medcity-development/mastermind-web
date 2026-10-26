@@ -1,3 +1,5 @@
+import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { applyPackageAccess } from "@/lib/packageAccess";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +88,7 @@ function normalizeTest(item) {
     id,
     exam_id: id,
     type: "studyplan",
+    packageAccess: item.packageAccess === true,
     topicid:
       item.topicid ??
       item.topic_id ??
@@ -126,6 +129,8 @@ export async function GET(request) {
   }
 
   try {
+    const session = await getStudentSession();
+    const uid = Number(session?.uid) || 0;
     // STEP 1: Retrieve the linked test ID.
     let mockTestId = requestedMockTestId;
     if (!mockTestId) {
@@ -133,7 +138,7 @@ export async function GET(request) {
         "getChaptersList",
         {
           cid,
-          uid: 0,
+          uid,
           topicid: topicId,
         }
       );
@@ -160,7 +165,7 @@ export async function GET(request) {
       "getMockTestDetails",
       {
         cid,
-        uid: 0,
+        uid,
         examid: mockTestId,
         type: "studyplan",
       }
@@ -188,7 +193,7 @@ export async function GET(request) {
     });
 
     const test = selected
-      ? normalizeTest(selected)
+      ? normalizeTest(await applyPackageAccess(selected, { cid, contentType: "studyplan" }))
       : null;
 
     return json({

@@ -1,3 +1,4 @@
+import { applyPackageAccess } from "@/lib/packageAccess";
 const API_BASE_URL =
   process.env.PSC_API_BASE_URL;
 
@@ -86,7 +87,7 @@ async function postStatementTypeRequest(
     );
   }
 
-  return response.json();
+  return applyPackageAccess(await response.json(), fields);
 }
 
 /* =========================================================

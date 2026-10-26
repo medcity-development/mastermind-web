@@ -1,3 +1,4 @@
+import { applyPackageAccess } from "@/lib/packageAccess";
 /* =========================================================
    ENVIRONMENT
 ========================================================= */
@@ -127,7 +128,7 @@ async function postScertRequest(
     );
   }
 
-  return response.json();
+  return applyPackageAccess(await response.json(), fields);
 }
 
 /* =========================================================

@@ -98,6 +98,7 @@ export async function getSubCategories({
       status: false,
       filePath: "",
       data: [],
+      message: error?.message || "Unable to load exam categories.",
     };
   }
 }
@@ -162,6 +163,10 @@ export async function resolveSubCategory({
       cid,
       uid,
     });
+
+  if (!result.status) {
+    throw new Error(result.message || "Unable to load exam categories. Please try again.");
+  }
 
   const categories =
     Array.isArray(
