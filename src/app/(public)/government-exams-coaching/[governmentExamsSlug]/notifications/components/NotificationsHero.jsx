@@ -13,7 +13,6 @@ export default function NotificationsHero({
     <section
       className="
         relative
-        mt-20
         overflow-hidden
         rounded-[28px]
         bg-gradient-to-br

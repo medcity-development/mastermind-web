@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePackageAccess } from "@/components/packages/PackageAccessContext";
 
 import {
   ArrowRight,
@@ -16,6 +17,8 @@ export default function LevelPyqCard({
   cid = 1,
   governmentExamsSlug = "kerala-psc",
 }) {
+  const packageAccess = usePackageAccess();
+
   if (!exam?.id) {
     return null;
   }
@@ -272,7 +275,7 @@ export default function LevelPyqCard({
       >
         {isPaid ? (
           <Link
-            href={href}
+            href={isPaid && !packageAccess && exam?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : href}
             className="
               flex
               w-full
@@ -315,7 +318,7 @@ export default function LevelPyqCard({
           // =================================================
 
           <Link
-            href={href}
+            href={isPaid && !packageAccess && exam?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : href}
             className="
               flex
               w-full

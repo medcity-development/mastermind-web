@@ -16,8 +16,6 @@ import {
   usePackageAccess,
 } from "@/components/packages/PackageAccessContext";
 
-import PremiumTestPurchaseModal from "@/components/mock-tests/PremiumTestPurchaseModal";
-
 function hasValue(value) {
   return (
     value !== null &&
@@ -46,8 +44,6 @@ export default function StudyPlanMockTests({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const [showPurchaseModal, setShowPurchaseModal] =
-    useState(false);
 
   const hasTopicId = hasValue(topicId);
   const hasMockTestId = hasValue(mockTestId);
@@ -148,7 +144,7 @@ export default function StudyPlanMockTests({
     if (!test) return;
 
     if (!hasAccess) {
-      setShowPurchaseModal(true);
+      showAvailablePackages();
       return;
     }
 
@@ -179,9 +175,7 @@ export default function StudyPlanMockTests({
     );
   }
 
-  function handlePurchaseConfirmation() {
-    setShowPurchaseModal(false);
-
+  function showAvailablePackages() {
     if (!governmentExamsSlug) {
       setError("Unable to open available packages.");
       return;
@@ -340,13 +334,6 @@ export default function StudyPlanMockTests({
           </button>
         </article>
       </section>
-
-      <PremiumTestPurchaseModal
-        open={showPurchaseModal}
-        testName={test?.exam_name || "Study Plan Test"}
-        onClose={() => setShowPurchaseModal(false)}
-        onConfirm={handlePurchaseConfirmation}
-      />
     </>
   );
 }

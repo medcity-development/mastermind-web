@@ -41,7 +41,6 @@ export default function MockTestHero({
     <section
       className="
         relative
-        mt-20
         overflow-hidden
         rounded-[24px]
         px-6

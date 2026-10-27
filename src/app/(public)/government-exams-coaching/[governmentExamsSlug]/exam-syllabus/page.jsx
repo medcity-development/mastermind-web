@@ -91,10 +91,7 @@ export default async function ExamSyllabusPage({
       className="
         min-h-screen
         bg-[#f4f9ff]
-        pb-12
-        pt-[100px]
-        lg:pt-[115px]
-      "
+        pb-12 pt-10"
     >
       <div
         className="

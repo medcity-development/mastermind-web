@@ -276,7 +276,7 @@ export default function PreviousQuestionCard({
         <div className="mt-auto pt-5">
           {isPaid && !pauseId ? (
             <Link
-              href={`/dashboard/${governmentExamsSlug}/previous-questions/${id}?uid=${uid}&cid=${cid}&type=${type}`}
+              href={isPaid && item?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : `/dashboard/${governmentExamsSlug}/previous-questions/${id}?uid=${uid}&cid=${cid}&type=${type}`}
               className="
                 inline-flex
                 w-full

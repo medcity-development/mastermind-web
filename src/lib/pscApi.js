@@ -1026,6 +1026,7 @@ export async function markAllStudentNotificationsRead({
   );
 }
 
+
 /* =========================================================
    USER TRANSACTIONS
 ========================================================= */
@@ -1035,9 +1036,12 @@ export async function getUserTransactions({
 } = {}) {
   try {
     if (!validPositiveId(uid)) {
-      throw new Error(
-        "A valid student ID is required."
-      );
+      return {
+        status: false,
+        transactions: [],
+        message:
+          "A valid student ID is required.",
+      };
     }
 
     const result = await postRequest({
@@ -1048,19 +1052,48 @@ export async function getUserTransactions({
       cache: "no-store",
     });
 
-    return {
-      status: isPscSuccessStatus(
-        result?.status
-      ),
-      transactions: Array.isArray(
-        result?.data
-      )
+    const transactions =
+      Array.isArray(result?.data)
         ? result.data
-        : [],
-      message: result?.message ?? "",
+        : Array.isArray(result?.details)
+          ? result.details
+          : Array.isArray(result?.transactions)
+            ? result.transactions
+            : [];
+
+    const status =
+      isPscSuccessStatus(result?.status);
+
+    if (!status) {
+      console.warn(
+        "Purchase history backend returned failure:",
+        {
+          status: result?.status,
+          message:
+            result?.message ??
+            result?.msg ??
+            "",
+          dataCount:
+            transactions.length,
+        }
+      );
+    }
+
+    return {
+      status,
+      transactions,
+      message:
+        result?.message ??
+        result?.msg ??
+        (status
+          ? ""
+          : "Purchase history is temporarily unavailable."),
     };
   } catch (error) {
-    console.error("getUserTransactions:", error);
+    console.error(
+      "getUserTransactions failed:",
+      error
+    );
 
     return {
       status: false,
@@ -1082,15 +1115,21 @@ export async function getUserTransactionDetails({
 } = {}) {
   try {
     if (!validPositiveId(uid)) {
-      throw new Error(
-        "A valid student ID is required."
-      );
+      return {
+        status: false,
+        transaction: null,
+        message:
+          "A valid student ID is required.",
+      };
     }
 
     if (!validPositiveId(tid)) {
-      throw new Error(
-        "A valid transaction ID is required."
-      );
+      return {
+        status: false,
+        transaction: null,
+        message:
+          "A valid transaction ID is required.",
+      };
     }
 
     const result = await postRequest({
@@ -1102,20 +1141,33 @@ export async function getUserTransactionDetails({
       cache: "no-store",
     });
 
+    const raw =
+      result?.data ??
+      result?.details ??
+      result?.transaction ??
+      null;
+
+    const transaction =
+      Array.isArray(raw)
+        ? raw[0] ?? null
+        : raw;
+
+    const status =
+      isPscSuccessStatus(result?.status);
+
     return {
-      status: isPscSuccessStatus(
-        result?.status
-      ),
-      transaction: Array.isArray(
-        result?.data
-      )
-        ? result.data[0] ?? null
-        : result?.data ?? null,
-      message: result?.message ?? "",
+      status,
+      transaction,
+      message:
+        result?.message ??
+        result?.msg ??
+        (status
+          ? ""
+          : "Transaction details are unavailable."),
     };
   } catch (error) {
     console.error(
-      "getUserTransactionDetails:",
+      "getUserTransactionDetails failed:",
       error
     );
 
@@ -1128,6 +1180,7 @@ export async function getUserTransactionDetails({
     };
   }
 }
+
 
 /* =========================================================
    EXAM SYLLABUS

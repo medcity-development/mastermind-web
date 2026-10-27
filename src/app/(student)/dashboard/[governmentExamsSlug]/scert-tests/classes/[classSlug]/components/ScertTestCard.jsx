@@ -3,6 +3,7 @@
 import {
   useState,
 } from "react";
+import PremiumPackagesModal from "@/components/packages/PremiumPackagesModal";
 
 import Link from "next/link";
 
@@ -271,7 +272,7 @@ export default function ScertTestCard({
             pt-6
           "
         >
-          {isPaid ? (
+          {isPaid && test?.packageAccess !== true ? (
             <button
               type="button"
               onClick={() =>
@@ -337,14 +338,14 @@ export default function ScertTestCard({
       </article>
 
       {showPremiumModal ? (
-        <PremiumModal
+        <PremiumPackagesModal
+          open={showPremiumModal}
+          cid={governmentExamsSlug === "rrb-ssc" ? 2 : 1}
+          governmentExamsSlug={governmentExamsSlug}
           onClose={() =>
             setShowPremiumModal(
               false
             )
-          }
-          plansPath={
-            `/dashboard/${governmentExamsSlug}?showPackages=1`
           }
         />
       ) : null}
@@ -402,124 +403,6 @@ function StatBox({
       >
         {value ?? 0}
       </p>
-    </div>
-  );
-}
-
-function PremiumModal({
-  onClose,
-  plansPath,
-}) {
-  return (
-    <div
-      onClick={onClose}
-      className="
-        fixed
-        inset-0
-        z-[100]
-        flex
-        items-center
-        justify-center
-        bg-[#020817]/65
-        p-4
-        backdrop-blur-sm
-      "
-    >
-      <div
-        onClick={(event) =>
-          event.stopPropagation()
-        }
-        className="
-          w-full
-          max-w-md
-          rounded-[26px]
-          border
-          border-amber-200
-          bg-gradient-to-br
-          from-amber-50
-          via-[#fffaf0]
-          to-white
-          p-7
-          shadow-2xl
-        "
-      >
-        <div
-          className="
-            flex
-            h-14
-            w-14
-            items-center
-            justify-center
-            rounded-2xl
-            bg-amber-100
-            text-amber-700
-          "
-        >
-          <Crown
-            size={27}
-          />
-        </div>
-
-        <h2
-          className="
-            mt-5
-            text-2xl
-            font-black
-            text-[#071f55]
-          "
-        >
-          Premium SCERT Test
-        </h2>
-
-        <p
-          className="
-            mt-3
-            text-sm
-            leading-7
-            text-slate-500
-          "
-        >
-          Login and choose a plan
-          to access this premium
-          SCERT test.
-        </p>
-
-        <Link
-          href={plansPath}
-          className="
-            block
-            mt-6
-            w-full
-            rounded-xl
-            bg-amber-500
-            px-5
-            py-3.5
-            text-center
-            text-sm
-            font-bold
-            text-white
-            hover:bg-amber-600
-          "
-        >
-          OK
-        </Link>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="
-            mt-2
-            w-full
-            px-5
-            py-3
-            text-sm
-            font-bold
-            text-slate-500
-          "
-        >
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }

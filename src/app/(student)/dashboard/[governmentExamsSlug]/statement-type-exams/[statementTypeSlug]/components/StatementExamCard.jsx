@@ -326,7 +326,7 @@ export default function StatementExamCard({
           ACTION
       ================================================= */}
 
-      {isPaid ? (
+      {isPaid && exam?.packageAccess !== true ? (
         <div className="mt-auto pt-6">
           <PremiumStatementExamButton
             cid={cid}

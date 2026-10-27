@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePackageAccess } from "@/components/packages/PackageAccessContext";
 
 import {
   ArrowRight,
@@ -17,6 +18,8 @@ export default function LevelMockTestCard({
   uid = 0,
   governmentExamsSlug = "kerala-psc",
 }) {
+  const packageAccess = usePackageAccess();
+
   if (!exam) {
     return null;
   }
@@ -306,7 +309,7 @@ export default function LevelMockTestCard({
       >
         {isPaid ? (
           <Link
-            href={href}
+            href={isPaid && !packageAccess && exam?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : href}
             className="
               group/button
               flex
@@ -345,7 +348,7 @@ export default function LevelMockTestCard({
           </Link>
         ) : (
           <Link
-            href={href}
+            href={isPaid && !packageAccess && exam?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : href}
             className="
               group/button
               flex

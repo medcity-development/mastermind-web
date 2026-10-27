@@ -266,7 +266,7 @@ export default function MockTestCard({
         >
           {premium ? (
             <Link
-              href={pauseId ? startPath : {
+              href={premium && test?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : pauseId ? startPath : {
                 pathname: examPath,
                 query: {
                   uid: String(uid),
@@ -305,7 +305,7 @@ export default function MockTestCard({
             </Link>
           ) : (
             <Link
-              href={pauseId ? startPath : {
+              href={premium && test?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : pauseId ? startPath : {
                 pathname: examPath,
                 query: {
                   uid: String(uid),

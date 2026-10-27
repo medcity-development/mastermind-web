@@ -341,7 +341,7 @@ export default async function TopicWiseTestListPage({
 
                   {(isFree || isPaid) && destination ? (
                     <Link
-                      href={destination}
+                      href={isPaid && test?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : destination}
                       className="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-[#017dc0] px-5 py-3.5 text-sm font-black text-white transition hover:bg-[#164fa5]"
                     >
                       {hasPausedAttempt ? (

@@ -156,6 +156,10 @@ export default async function TopicWiseExamDetailsPage({
         })
       : null;
 
+  if (access === "paid" && !premiumAccess?.hasAccess) {
+    redirect(`/dashboard/${governmentExamsSlug}?showPackages=1`);
+  }
+
   if (
     access !== "free" &&
     !premiumAccess?.hasAccess

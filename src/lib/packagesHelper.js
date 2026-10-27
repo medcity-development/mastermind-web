@@ -378,24 +378,27 @@ export async function getPackagesList({
   }
 }
 
-export async function getActivePlans({
-  uid,
-  cid,
-} = {}) {
-  if (!hasValidCid(cid)) {
-    throw new Error("getActivePlans: cid is required.");
+
+
+
+export async function getActivePlans({ uid, cid } = {}) {
+  const userId = Number(uid);
+  const categoryId = Number(cid);
+
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    throw new Error("getActivePlans: valid uid is required.");
   }
 
-  if (!Number.isSafeInteger(Number(uid)) || Number(uid) <= 0) {
-    throw new Error("getActivePlans: a valid uid is required.");
+  if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
+    throw new Error("getActivePlans: valid cid is required.");
   }
 
   const { apiBaseUrl, apiKey } = getApiConfig();
-  const formData = new FormData();
 
+  const formData = new FormData();
   formData.append("api", apiKey);
-  formData.append("uid", String(uid));
-  formData.append("cid", String(cid));
+  formData.append("uid", String(userId));
+  formData.append("cid", String(categoryId));
 
   const response = await fetch(
     `${apiBaseUrl}/getActivePlans`,
@@ -403,6 +406,7 @@ export async function getActivePlans({
       method: "POST",
       body: formData,
       cache: "no-store",
+      signal: AbortSignal.timeout(20000),
     }
   );
 
@@ -411,31 +415,43 @@ export async function getActivePlans({
     "getActivePlans"
   );
 
-  if (result?.status === false) {
-    throw new Error(
-      result?.message || "getActivePlans returned an unsuccessful status."
-    );
-  }
-
   const plans =
     result?.data ??
     result?.activeplans ??
     result?.activePlans ??
     result?.plans;
 
-  if (!Array.isArray(plans)) {
-    throw new Error("getActivePlans returned an invalid plan list.");
+  const successful = ["true", "1", "success"].includes(
+    String(result?.status ?? "").trim().toLowerCase()
+  );
+
+  if (successful) {
+    if (!Array.isArray(plans)) {
+      throw new Error("Invalid active plans response.");
+    }
+
+    return plans;
   }
 
-  return plans;
+  // Only use this branch if the backend explicitly
+  // defines this response as "no subscriptions".
+  if (
+    result?.status === false &&
+    Array.isArray(result?.data) &&
+    result.data.length === 0 &&
+    !result?.message &&
+    !result?.msg
+  ) {
+    return [];
+  }
+
+  throw new Error(
+    result?.message ||
+    result?.msg ||
+    "Unable to verify active subscriptions."
+  );
 }
 
-/* =========================================================
-   PACKAGE DETAILS
-
-   Dynamic:
-   caller MUST provide cid
-========================================================= */
 
 export async function getPackageDetails({
   uid = 0,

@@ -1,11 +1,13 @@
+
 "use client";
 
-import { Suspense } from "react";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useState,
 } from "react";
+
 import { useRouter } from "next/navigation";
 
 import DashboardSidebar from "./DashboardSidebar";
@@ -16,6 +18,48 @@ import PurchasedPackagesModal from "./PurchasedPackagesModal";
 import DashboardSearchDetailsModal from "./DashboardSearchDetailsModal";
 import DashboardNotificationsModal from "./DashboardNotificationsModal";
 
+function normalizeTransactions(data) {
+  return Array.isArray(data) ? data : [];
+}
+
+function countUnreadNotifications(data) {
+  if (!Array.isArray(data)) {
+    return 0;
+  }
+
+  return data.filter((notification) => {
+    const status = String(
+      notification?.nstatus ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
+    return status !== "read";
+  }).length;
+}
+
+async function fetchJson(url, signal) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal,
+  });
+
+  let result;
+
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(
+      "The server returned an invalid response."
+    );
+  }
+
+  return {
+    response,
+    result,
+  };
+}
+
 export default function DashboardShell({
   config,
   user,
@@ -24,15 +68,12 @@ export default function DashboardShell({
   children,
 }) {
   const router = useRouter();
-  const [
-    sidebarOpen,
-    setSidebarOpen,
-  ] = useState(false);
 
-  const [
-    purchasesOpen,
-    setPurchasesOpen,
-  ] = useState(false);
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false);
+
+  const [purchasesOpen, setPurchasesOpen] =
+    useState(false);
 
   const [
     notificationsOpen,
@@ -50,197 +91,315 @@ export default function DashboardShell({
   ] = useState(null);
 
   const [
+    purchasesLoading,
+    setPurchasesLoading,
+  ] = useState(false);
+
+  const [
     selectedSearchResult,
     setSelectedSearchResult,
   ] = useState(null);
 
-  const handleTransactionsLoaded = useCallback((transactions) => {
-    setPurchasesCount(transactions.length);
-  }, []);
+  const slug = String(config?.slug ?? "");
+  const cid = config?.cid;
 
-  const handleUnreadNotificationsChange = useCallback((count) => {
-    setUnreadNotificationsCount(count);
-  }, []);
+  /* =========================================================
+     PURCHASE COUNT
+  ========================================================= */
+
+  const loadPurchasesCount = useCallback(
+    async (signal) => {
+      setPurchasesLoading(true);
+
+      try {
+        const { response, result } =
+          await fetchJson(
+            "/api/student/transactions",
+            signal
+          );
+
+        if (
+          !response.ok ||
+          result?.status !== true
+        ) {
+          // Do not incorrectly show zero purchases
+          // when the backend is unavailable.
+          setPurchasesCount(null);
+
+          if (process.env.NODE_ENV === "development") {
+            console.warn(
+              "Purchase count unavailable:",
+              {
+                httpStatus: response.status,
+                reason:
+                  result?.reason ?? null,
+                message:
+                  result?.message ||
+                  "Transaction service unavailable.",
+              }
+            );
+          }
+
+          return;
+        }
+
+        const transactions =
+          normalizeTransactions(result?.data);
+
+        setPurchasesCount(
+          transactions.length
+        );
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        setPurchasesCount(null);
+
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            "Purchase count request failed:",
+            error?.message
+          );
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setPurchasesLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
 
-    async function loadPurchasesCount() {
-      try {
-        const response = await fetch("/api/student/transactions", {
-          cache: "no-store",
-        });
-        const result = await response.json();
-
-        if (!response.ok || result?.status !== true) {
-          throw new Error(result?.message || "Unable to load purchase count.");
-        }
-
-        if (active) {
-          setPurchasesCount(Array.isArray(result.data) ? result.data.length : 0);
-        }
-      } catch (error) {
-        console.error("Dashboard purchase count:", error);
-      }
-    }
-
-    loadPurchasesCount();
+    loadPurchasesCount(controller.signal);
 
     return () => {
-      active = false;
+      controller.abort();
     };
-  }, []);
+  }, [loadPurchasesCount]);
+
+  const handleTransactionsLoaded = useCallback(
+    (transactions) => {
+      if (!Array.isArray(transactions)) {
+        return;
+      }
+
+      setPurchasesCount(
+        transactions.length
+      );
+    },
+    []
+  );
+
+  const handleOpenPurchases = useCallback(
+    () => {
+      setPurchasesOpen(true);
+    },
+    []
+  );
+
+  const handleClosePurchases = useCallback(
+    () => {
+      setPurchasesOpen(false);
+    },
+    []
+  );
+
+  /* =========================================================
+     UNREAD NOTIFICATIONS
+  ========================================================= */
 
   useEffect(() => {
-    let active = true;
+    if (!slug) {
+      setUnreadNotificationsCount(0);
+      return;
+    }
+
+    const controller =
+      new AbortController();
 
     async function loadUnreadNotifications() {
       try {
-        const response = await fetch(
-          `/api/student/notifications?slug=${encodeURIComponent(config.slug)}`,
-          { cache: "no-store" }
-        );
-        const result = await response.json();
+        const { response, result } =
+          await fetchJson(
+            `/api/student/notifications?slug=${encodeURIComponent(slug)}`,
+            controller.signal
+          );
 
-        if (!response.ok || result?.status !== true) {
-          throw new Error(result?.message || "Unable to load notification count.");
+        if (
+          !response.ok ||
+          result?.status !== true
+        ) {
+          return;
         }
 
-        const notifications = Array.isArray(result.data) ? result.data : [];
-        const count = notifications.filter(
-          (notification) =>
-            String(notification?.nstatus ?? "").trim().toLowerCase() !== "read"
-        ).length;
-
-        if (active) setUnreadNotificationsCount(count);
+        if (!controller.signal.aborted) {
+          setUnreadNotificationsCount(
+            countUnreadNotifications(
+              result?.data
+            )
+          );
+        }
       } catch (error) {
-        console.error("Dashboard unread notification count:", error);
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            "Unread notification count unavailable:",
+            error?.message
+          );
+        }
       }
     }
 
     loadUnreadNotifications();
 
     return () => {
-      active = false;
+      controller.abort();
     };
-  }, [config.slug]);
+  }, [slug]);
+
+  const handleUnreadNotificationsChange =
+    useCallback((count) => {
+      const value = Number(count);
+
+      setUnreadNotificationsCount(
+        Number.isFinite(value)
+          ? Math.max(0, Math.floor(value))
+          : 0
+      );
+    }, []);
 
   /* =========================================================
-     OPEN MOBILE SIDEBAR
+     SIDEBAR
   ========================================================= */
 
-  function handleOpenSidebar() {
-    setSidebarOpen(
-      true
-    );
-  }
+  const handleOpenSidebar = useCallback(
+    () => setSidebarOpen(true),
+    []
+  );
+
+  const handleCloseSidebar = useCallback(
+    () => setSidebarOpen(false),
+    []
+  );
 
   /* =========================================================
-     CLOSE MOBILE SIDEBAR
+     SEARCH
   ========================================================= */
 
-  function handleCloseSidebar() {
-    setSidebarOpen(
-      false
-    );
-  }
+  const handleSearchResultSelect =
+    useCallback((item, href) => {
+      setSelectedSearchResult({
+        item,
+        href,
+      });
+    }, []);
+
+  const handleOpenFullDetails =
+    useCallback(() => {
+      const href =
+        selectedSearchResult?.href;
+
+      setSelectedSearchResult(null);
+
+      if (
+        typeof href === "string" &&
+        href.startsWith("/") &&
+        !href.startsWith("//")
+      ) {
+        router.push(href);
+      }
+    }, [router, selectedSearchResult]);
 
   /* =========================================================
      RENDER
   ========================================================= */
 
   return (
-    <div
-      className="
-        min-h-screen
-        bg-[#f4f7fc]
-      "
-    >
-      {/* =====================================================
-          SIDEBAR
-      ===================================================== */}
-
+    <div className="min-h-screen bg-[#f4f7fc]">
       <DashboardSidebar
         config={config}
         user={user}
         learningToolGrid={learningToolGrid}
-        mobileOpen={
-          sidebarOpen
-        }
-        onMobileClose={
-          handleCloseSidebar
-        }
+        mobileOpen={sidebarOpen}
+        onMobileClose={handleCloseSidebar}
       />
-
-      {/* =====================================================
-          MAIN CONTENT AREA
-      ===================================================== */}
 
       <div
         className="
           min-h-screen
-
           transition-all
           duration-300
-
           xl:pl-[270px]
         "
       >
-        {/* HEADER */}
-
         <DashboardHeader
           config={config}
           user={user}
           dashboardOptions={dashboardOptions}
-          onMenuClick={
-            handleOpenSidebar
-          }
-          onPurchasesClick={() => setPurchasesOpen(true)}
+          onMenuClick={handleOpenSidebar}
+          onPurchasesClick={handleOpenPurchases}
           purchasesCount={purchasesCount}
-          unreadNotificationsCount={unreadNotificationsCount}
-          onNotificationsClick={() => setNotificationsOpen(true)}
-          onSearchResultSelect={(item, href) => {
-            setSelectedSearchResult({ item, href });
-          }}
+          unreadNotificationsCount={
+            unreadNotificationsCount
+          }
+          onNotificationsClick={() =>
+            setNotificationsOpen(true)
+          }
+          onSearchResultSelect={
+            handleSearchResultSelect
+          }
         />
 
-        {notificationsOpen ? (
+        {notificationsOpen && (
           <DashboardNotificationsModal
-            slug={config.slug}
-            onClose={() => setNotificationsOpen(false)}
-            onUnreadCountChange={handleUnreadNotificationsChange}
+            slug={slug}
+            onClose={() =>
+              setNotificationsOpen(false)
+            }
+            onUnreadCountChange={
+              handleUnreadNotificationsChange
+            }
           />
-        ) : null}
+        )}
 
-        {selectedSearchResult ? (
+        {selectedSearchResult && (
           <DashboardSearchDetailsModal
-            item={selectedSearchResult.item}
-            governmentExamsSlug={config.slug}
-            onClose={() => setSelectedSearchResult(null)}
-            onOpenFullDetails={() => {
-              const { href } = selectedSearchResult;
-              setSelectedSearchResult(null);
-              router.push(href);
-            }}
+            item={
+              selectedSearchResult.item
+            }
+            governmentExamsSlug={slug}
+            onClose={() =>
+              setSelectedSearchResult(null)
+            }
+            onOpenFullDetails={
+              handleOpenFullDetails
+            }
           />
-        ) : null}
+        )}
 
-        {purchasesOpen ? (
+        {purchasesOpen && (
           <PurchasedPackagesModal
-            onClose={() => setPurchasesOpen(false)}
-            onTransactionsLoaded={handleTransactionsLoaded}
+            onClose={
+              handleClosePurchases
+            }
+            onTransactionsLoaded={
+              handleTransactionsLoaded
+            }
           />
-        ) : null}
-
-          {/* PAGE CONTENT */}
+        )}
 
         <main
           className="
             min-h-[calc(100vh-88px)]
-
             px-4
             py-5
-
             sm:px-5
             md:px-6
             lg:px-7
@@ -257,11 +416,13 @@ export default function DashboardShell({
           >
             <Suspense fallback={null}>
               <DashboardSelectedTestNotice />
+
               <DashboardPremiumPackagesPrompt
-                governmentExamsSlug={config.slug}
-                cid={config.cid}
+                governmentExamsSlug={slug}
+                cid={cid}
               />
             </Suspense>
+
             {children}
           </div>
         </main>

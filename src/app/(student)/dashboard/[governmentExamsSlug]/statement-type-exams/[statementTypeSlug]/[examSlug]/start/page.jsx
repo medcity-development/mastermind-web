@@ -163,9 +163,9 @@ export default async function StatementTypeExamStartPage({
     ).toLowerCase() ===
     "paid";
 
-  if (isPaid) {
+  if (isPaid && selectedExam?.packageAccess !== true) {
     redirect(
-      `/dashboard/${governmentExamsSlug}/premium-packages`
+      `/dashboard/${governmentExamsSlug}?showPackages=1`
     );
   }
 
