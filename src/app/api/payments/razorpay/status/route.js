@@ -10,11 +10,11 @@ import {
 
 import {
   getPaymentRecord,
-  releasePayment,
 } from "@/lib/paymentRecord";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function reply(body, status = 200) {
   return NextResponse.json(body, {
@@ -34,9 +34,27 @@ function normalizeId(value) {
 
   const id = Number(text);
 
-  return Number.isSafeInteger(id)
-    ? id
-    : null;
+  return Number.isSafeInteger(id) ? id : null;
+}
+
+function lockedResponse({
+  state = "unknown",
+  message,
+  orderId = null,
+  paymentReceived = false,
+  reason = null,
+}) {
+  return {
+    status: true,
+    state,
+    locked: true,
+    purchased: false,
+    paymentReceived,
+    packageActivated: false,
+    orderId,
+    reason,
+    message,
+  };
 }
 
 async function getRazorpayOrder(orderId) {
@@ -50,7 +68,7 @@ async function getRazorpayOrder(orderId) {
 
   if (!keyId || !secret) {
     throw new Error(
-      "Razorpay credentials unavailable."
+      "Razorpay credentials are missing."
     );
   }
 
@@ -59,8 +77,11 @@ async function getRazorpayOrder(orderId) {
   ).toString("base64");
 
   const response = await fetch(
-    `https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`,
+    `https://api.razorpay.com/v1/orders/${encodeURIComponent(
+      orderId
+    )}`,
     {
+      method: "GET",
       headers: {
         Authorization: `Basic ${authorization}`,
         Accept: "application/json",
@@ -72,7 +93,7 @@ async function getRazorpayOrder(orderId) {
 
   if (!response.ok) {
     throw new Error(
-      "Unable to confirm Razorpay order."
+      "Unable to retrieve the Razorpay order."
     );
   }
 
@@ -110,7 +131,9 @@ export async function GET(request) {
     );
   }
 
-  const params = new URL(request.url).searchParams;
+  const params = new URL(
+    request.url
+  ).searchParams;
 
   const cid = normalizeId(params.get("cid"));
   const pid = normalizeId(params.get("pid"));
@@ -128,7 +151,8 @@ export async function GET(request) {
   }
 
   try {
-    // FIRST: Check the actual PSC subscription.
+    // The PSC subscription is the source of truth
+    // for whether this user already owns the package.
     const eligibility =
       await checkPackagePurchaseEligibility({
         uid,
@@ -136,37 +160,45 @@ export async function GET(request) {
         pid,
       });
 
-    if (eligibility.reason === "ALREADY_ACTIVE") {
+    if (eligibility?.reason === "ALREADY_ACTIVE") {
       return reply({
         status: true,
         state: "activated",
         locked: true,
         purchased: true,
-        paymentReceived: false,
+        paymentReceived: true,
         packageActivated: true,
-        pid,
         cid,
-        validUntil: eligibility.expiryDate,
-        expiryDate: eligibility.expiryDate,
+        pid,
+        validUntil:
+          eligibility?.expiryDate ?? null,
+        expiryDate:
+          eligibility?.expiryDate ?? null,
         message:
           "You have already purchased this package.",
       });
     }
 
-    if (!eligibility.allowed) {
+    if (!eligibility?.allowed) {
       return reply(
         {
           status: false,
           state: "unknown",
           locked: true,
-          reason: eligibility.reason,
-          message: eligibility.message,
+          purchased: false,
+          paymentReceived: false,
+          packageActivated: false,
+          reason:
+            eligibility?.reason ??
+            "OWNERSHIP_VERIFICATION_FAILED",
+          message:
+            eligibility?.message ??
+            "Unable to verify package ownership.",
         },
         503
       );
     }
 
-    // SECOND: Check saved Razorpay payment tracking.
     const record = await getPaymentRecord(
       uid,
       cid,
@@ -179,77 +211,157 @@ export async function GET(request) {
         state: "none",
         locked: false,
         purchased: false,
+        paymentReceived: false,
         packageActivated: false,
+        message: "Package is available for purchase.",
       });
-    }
-
-    if (record.state === "activated") {
-      // Local activation was recorded, but PSC does not
-      // currently confirm an active subscription.
-      // Do not allow a new payment automatically.
-      return reply({
-        status: true,
-        state: "unknown",
-        locked: true,
-        purchased: false,
-        paymentReceived: true,
-        packageActivated: false,
-        message:
-          "A previous package activation is recorded, but the current subscription could not be confirmed. Please contact support before paying again.",
-      });
-    }
-
-    if (
-      record.state === "checkout_created" &&
-      Number.isFinite(Number(record.createdAt)) &&
-      Date.now() - Number(record.createdAt) >
-        30 * 60 * 1000 &&
-      record.orderId
-    ) {
-      const order = await getRazorpayOrder(
-        record.orderId
-      );
-
-      // Release only when Razorpay confirms no payment
-      // was made against the order.
-      if (
-        order?.id === record.orderId &&
-        order?.status === "created" &&
-        Number(order?.amount_paid) === 0
-      ) {
-        await releasePayment(uid, cid, pid);
-
-        return reply({
-          status: true,
-          state: "none",
-          locked: false,
-          purchased: false,
-        });
-      }
     }
 
     const state = String(
-      record.state ?? "unknown"
+      record?.state ?? "unknown"
+    ).trim();
+
+    const orderId = String(
+      record?.orderId ?? ""
+    ).trim();
+
+    if (state === "activated") {
+      return reply(
+        lockedResponse({
+          state: "unknown",
+          paymentReceived: true,
+          orderId: orderId || null,
+          reason: "ACTIVATION_NOT_CONFIRMED",
+          message:
+            "A previous activation was recorded, but the PSC subscription is not currently confirmed. Please contact support before paying again.",
+        })
+      );
+    }
+
+    if (state === "captured_pending") {
+      return reply(
+        lockedResponse({
+          state,
+          paymentReceived: true,
+          orderId: orderId || null,
+          reason: "ACTIVATION_PENDING",
+          message:
+            record?.failureMessage ||
+            "Payment received. Package activation is pending. Do not pay again.",
+        })
+      );
+    }
+
+    if (state === "creating") {
+      return reply(
+        lockedResponse({
+          state: "creating",
+          orderId: orderId || null,
+          reason: "ORDER_CREATION_UNCONFIRMED",
+          message:
+            "A previous payment initiation is not yet confirmed. The system must verify whether the PSC backend created an order before another checkout can begin.",
+        })
+      );
+    }
+
+    if (state === "unknown") {
+      return reply(
+        lockedResponse({
+          state: "unknown",
+          orderId: orderId || null,
+          reason: "PAYMENT_STATUS_UNKNOWN",
+          message:
+            record?.failureMessage ||
+            "An earlier payment attempt requires verification. Do not pay again.",
+        })
+      );
+    }
+
+    if (state === "checkout_created") {
+      if (!orderId) {
+        return reply(
+          lockedResponse({
+            state: "unknown",
+            reason: "ORDER_ID_MISSING",
+            message:
+              "A checkout was recorded without a Razorpay order ID. Contact support before retrying.",
+          })
+        );
+      }
+
+      let order;
+
+      try {
+        order = await getRazorpayOrder(orderId);
+      } catch (error) {
+        console.error(
+          "Razorpay order status error:",
+          error?.message
+        );
+
+        return reply(
+          lockedResponse({
+            state: "unknown",
+            orderId,
+            reason: "RAZORPAY_STATUS_UNAVAILABLE",
+            message:
+              "Unable to verify the previous Razorpay order. Please try refreshing the payment status later.",
+          })
+        );
+      }
+
+      if (order?.id !== orderId) {
+        return reply(
+          lockedResponse({
+            state: "unknown",
+            orderId,
+            reason: "ORDER_MISMATCH",
+            message:
+              "The previous Razorpay order could not be matched.",
+          })
+        );
+      }
+
+      const amountPaid = Number(
+        order?.amount_paid ?? 0
+      );
+
+      if (
+        order?.status === "paid" ||
+        amountPaid > 0
+      ) {
+        return reply(
+          lockedResponse({
+            state: "captured_pending",
+            orderId,
+            paymentReceived: true,
+            reason: "PAYMENT_REQUIRES_RECONCILIATION",
+            message:
+              "Razorpay reports a payment against this order. Package activation must be reconciled before another payment.",
+          })
+        );
+      }
+
+      return reply(
+        lockedResponse({
+          state: "checkout_created",
+          orderId,
+          reason: "CHECKOUT_PENDING",
+          message:
+            "A previous Razorpay checkout exists. Its payment status must be resolved before creating another order.",
+        })
+      );
+    }
+
+    return reply(
+      lockedResponse({
+        state: "unknown",
+        orderId: orderId || null,
+        reason: "UNRECOGNIZED_PAYMENT_STATE",
+        message:
+          "The previous payment has an unrecognized status. Contact support before retrying.",
+      })
     );
-
-    const paymentReceived = [
-      "captured_pending",
-      "activated",
-    ].includes(state);
-
-    return reply({
-      status: true,
-      state,
-      locked: true,
-      purchased: false,
-      paymentReceived,
-      packageActivated: false,
-      orderId: record.orderId ?? null,
-      message:
-        record.failureMessage || (state === "captured_pending"
-          ? "Payment received. Package activation is pending. Do not pay again."
-          : "An earlier checkout or payment requires verification before another payment."),
-    });
   } catch (error) {
     console.error(
       "Package payment status failed:",
@@ -262,6 +374,8 @@ export async function GET(request) {
         state: "unknown",
         locked: true,
         purchased: false,
+        paymentReceived: false,
+        packageActivated: false,
         message:
           "Unable to verify your previous payment or subscription. Checkout is temporarily disabled.",
       },

@@ -18,6 +18,12 @@ const TYPE_MAP = {
   "topic wise": "topicwise",
   topic_wise: "topicwise",
 
+   tst: "tst",
+  statement: "tst",
+  statementtype: "tst",
+  "statement-type": "tst",
+  "statement type": "tst",
+
   studyplan: "studyplan",
   "study-plan": "studyplan",
   "study plan": "studyplan",
@@ -29,6 +35,7 @@ const BACKEND_TYPES = {
   pqp: "pqp",
   scert: "scert",
   topicwise: "twe",
+  tst: "tst",
   studyplan: "studyplan",
 };
 
@@ -37,9 +44,9 @@ const SUPPORTED_TYPES = [
   "pqp",
   "scert",
   "topicwise",
+  "tst",
   "studyplan",
 ];
-
 const cache = new Map();
 
 const TTL = 30_000;

@@ -1,7 +1,9 @@
 
 import { NextResponse } from "next/server";
 
-import { getStudentSession } from "@/lib/auth/getStudentSession";
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
 
 import {
   getUserTransactionDetails,
@@ -58,7 +60,10 @@ function isSuccess(value) {
 
 function getMessage(result, fallback) {
   const message =
-    result?.message ?? result?.msg;
+    result?.message ??
+    result?.msg ??
+    result?.raw?.message ??
+    result?.raw?.msg;
 
   return typeof message === "string" &&
     message.trim()
@@ -66,15 +71,90 @@ function getMessage(result, fallback) {
     : fallback;
 }
 
+function getTransactionsArray(result) {
+  if (Array.isArray(result?.transactions)) {
+    return result.transactions;
+  }
+
+  if (Array.isArray(result?.data)) {
+    return result.data;
+  }
+
+  if (Array.isArray(result?.raw?.data)) {
+    return result.raw.data;
+  }
+
+  if (Array.isArray(result?.raw?.transactions)) {
+    return result.raw.transactions;
+  }
+
+  return null;
+}
+
+function getTransactionObject(result) {
+  const candidates = [
+    result?.transaction,
+    result?.details,
+    result?.data,
+    result?.raw?.transaction,
+    result?.raw?.details,
+    result?.raw?.data,
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      candidate &&
+      typeof candidate === "object" &&
+      !Array.isArray(candidate)
+    ) {
+      return candidate;
+    }
+
+    if (
+      Array.isArray(candidate) &&
+      candidate.length === 1 &&
+      candidate[0] &&
+      typeof candidate[0] === "object" &&
+      !Array.isArray(candidate[0])
+    ) {
+      return candidate[0];
+    }
+  }
+
+  return null;
+}
+
+function matchesTransactionId(transaction, tid) {
+  const transactionId =
+    transaction?.id ??
+    transaction?.tid ??
+    transaction?.transaction_record_id;
+
+  if (transactionId === undefined || transactionId === null) {
+    return true;
+  }
+
+  return String(transactionId) === String(tid);
+}
+
+function matchesAuthenticatedUser(transaction, uid) {
+  const transactionUid =
+    transaction?.uid ??
+    transaction?.user_id ??
+    transaction?.userId;
+
+  if (transactionUid === undefined || transactionUid === null) {
+    return true;
+  }
+
+  return String(transactionUid) === String(uid);
+}
+
 /* =========================================================
    GET TRANSACTIONS
 ========================================================= */
 
 export async function GET(request) {
-  /* =======================================================
-     AUTHENTICATE STUDENT
-  ======================================================= */
-
   let session;
 
   try {
@@ -88,8 +168,7 @@ export async function GET(request) {
     return reply(
       {
         status: false,
-        message:
-          "Unable to verify your session.",
+        message: "Unable to verify your session.",
         data: [],
       },
       503
@@ -110,16 +189,11 @@ export async function GET(request) {
     );
   }
 
-  /* =======================================================
-     VALIDATE TRANSACTION ID
-  ======================================================= */
-
   const searchParams = new URL(
     request.url
   ).searchParams;
 
-  const requestedTid =
-    searchParams.get("tid");
+  const requestedTid = searchParams.get("tid");
 
   const tid =
     requestedTid === null
@@ -132,13 +206,14 @@ export async function GET(request) {
         status: false,
         message:
           "A valid transaction ID is required.",
+        transaction: null,
       },
       400
     );
   }
 
   /* =======================================================
-     FETCH BACKEND DATA
+     FETCH PSC BACKEND
   ======================================================= */
 
   let result;
@@ -182,12 +257,9 @@ export async function GET(request) {
 
   if (
     !result ||
-    typeof result !== "object"
+    typeof result !== "object" ||
+    Array.isArray(result)
   ) {
-    console.error(
-      "Invalid transaction API response."
-    );
-
     return reply(
       {
         status: false,
@@ -201,33 +273,49 @@ export async function GET(request) {
     );
   }
 
+  const responseStatus =
+    result.status ??
+    result.raw?.status;
+
+  if (!isSuccess(responseStatus)) {
+    console.error(
+      "Purchase history backend returned failure:",
+      {
+        type: tid ? "details" : "list",
+        status: responseStatus,
+        message: getMessage(
+          result,
+          "Backend reported failure."
+        ),
+      }
+    );
+
+    return reply(
+      {
+        status: false,
+        message: getMessage(
+          result,
+          tid
+            ? "Unable to load transaction details."
+            : "Unable to load your purchases."
+        ),
+        ...(tid
+          ? { transaction: null }
+          : { data: [] }),
+      },
+      502
+    );
+  }
+
   /* =======================================================
      TRANSACTION DETAILS
   ======================================================= */
 
   if (tid) {
-    if (!isSuccess(result.status)) {
-      return reply(
-        {
-          status: false,
-          message: getMessage(
-            result,
-            "Unable to load transaction details."
-          ),
-          transaction: null,
-        },
-        502
-      );
-    }
-
     const transaction =
-      result.transaction ?? null;
+      getTransactionObject(result);
 
-    if (
-      !transaction ||
-      typeof transaction !== "object" ||
-      Array.isArray(transaction)
-    ) {
+    if (!transaction) {
       return reply(
         {
           status: false,
@@ -239,9 +327,20 @@ export async function GET(request) {
       );
     }
 
-    // The helper must retrieve the transaction
-    // using the authenticated uid and requested tid.
-    // Do not use this endpoint to grant premium access.
+    if (
+      !matchesTransactionId(transaction, tid) ||
+      !matchesAuthenticatedUser(transaction, uid)
+    ) {
+      return reply(
+        {
+          status: false,
+          message:
+            "The requested transaction could not be verified.",
+          transaction: null,
+        },
+        502
+      );
+    }
 
     return reply({
       status: true,
@@ -253,37 +352,20 @@ export async function GET(request) {
      TRANSACTION LIST
   ======================================================= */
 
-  if (!isSuccess(result.status)) {
+  const transactions =
+    getTransactionsArray(result);
+
+  if (!transactions) {
     console.error(
-      "Purchase history backend returned failure:",
+      "Purchase history response has no valid transaction array.",
       {
-        status: result.status,
-        message:
-          result.message ??
-          result.msg ??
-          null,
+        hasTransactions:
+          Array.isArray(result.transactions),
+        hasData:
+          Array.isArray(result.data),
+        hasRawData:
+          Array.isArray(result.raw?.data),
       }
-    );
-
-    // Do not convert status:false into a successful
-    // empty list. It could indicate a backend error.
-
-    return reply(
-      {
-        status: false,
-        message: getMessage(
-          result,
-          "Unable to load your purchases."
-        ),
-        data: [],
-      },
-      502
-    );
-  }
-
-  if (!Array.isArray(result.transactions)) {
-    console.error(
-      "Purchase history response has no valid transactions array."
     );
 
     return reply(
@@ -297,13 +379,22 @@ export async function GET(request) {
     );
   }
 
-  /* =======================================================
-     SUCCESS
-  ======================================================= */
+  // Validate the ownership of returned records.
+  // Do not allow records explicitly belonging
+  // to a different student into the response.
+  const ownedTransactions =
+    transactions.filter((transaction) => {
+      return (
+        transaction &&
+        typeof transaction === "object" &&
+        !Array.isArray(transaction) &&
+        matchesAuthenticatedUser(transaction, uid)
+      );
+    });
 
   return reply({
     status: true,
-    data: result.transactions,
-    count: result.transactions.length,
+    data: ownedTransactions,
+    count: ownedTransactions.length,
   });
 }

@@ -14,6 +14,9 @@ import ExamHistoryHeader from "./components/ExamHistoryHeader";
 import ExamHistoryTabs from "./components/ExamHistoryTabs";
 import AttemptedExamTable from "./components/AttemptedExamTable";
 import ExamHistoryPagination from "./components/ExamHistoryPagination";
+import {
+  getExamHistoryTabType,
+} from "./utils/examHistoryUtils";
 
 import {
   buildExamHistoryTabs,
@@ -42,6 +45,7 @@ const HISTORY_TYPES = [
   "pqp",
   "scert",
   "topicwise",
+  "tst",
   "studyplan",
 ];
 
@@ -51,6 +55,11 @@ const TYPE_ALIASES = {
   "topic-wise": "topicwise",
   "topic wise": "topicwise",
   "topic_wise": "topicwise",
+  tst: "tst",
+statement: "tst",
+statementtype: "tst",
+"statement-type": "tst",
+"statement type": "tst",
   "mock test": "mock",
   mocktest: "mock",
   "study-plan": "studyplan",
@@ -639,12 +648,12 @@ export default function ExamHistoryClient({
         getAttemptExamType(attempt)
       );
 
-      if (
-        activeTab !== "all" &&
-        type !== activeTab
-      ) {
-        return false;
-      }
+     if (
+  activeTab !== "all" &&
+  getExamHistoryTabType(type) !== activeTab
+) {
+  return false;
+}
 
       if (!query) {
         return true;

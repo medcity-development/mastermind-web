@@ -26,6 +26,7 @@ const SUPPORTED_EXAM_TYPES = [
   "pqp",
   "scert",
   "topicwise",
+  "tst",
   "studyplan",
 ];
 

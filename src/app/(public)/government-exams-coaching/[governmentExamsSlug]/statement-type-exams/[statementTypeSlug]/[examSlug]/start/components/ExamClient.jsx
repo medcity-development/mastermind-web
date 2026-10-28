@@ -523,38 +523,41 @@ export default function ExamClient({
      SCORE
   ======================================================= */
 
-  function calculateScore(
-    correctCount
-  ) {
-    const totalMark =
-      Number(
-        exam?.total_mark
-      ) || 0;
+ /* =========================================================
+   SCORE CALCULATION
+   SAME AS ANDROID
+========================================================= */
 
-    const totalQuestions =
-      Number(
-        exam?.total_questions
-      ) ||
-      questions.length;
+function calculateScore(correctCount, wrongCount) {
+  const correct = Number(correctCount) || 0;
+  const wrong = Number(wrongCount) || 0;
 
-    if (
-      totalQuestions <= 0
-    ) {
-      return 0;
-    }
+  // 1 mark for each correct answer
+  const totalCorrectMark = correct;
 
-    const markPerQuestion =
-      totalMark /
-      totalQuestions;
+  // 0.333 negative marks per wrong answer
+  const totalWrong = wrong * 0.333;
 
-    return Number(
-      (
-        correctCount *
-        markPerQuestion
-      ).toFixed(2)
-    );
-  }
+  // Round negative marks to 2 decimal places
+  const totalWrongMark =
+    Math.round(totalWrong * 100.0) / 100.0;
 
+  // Calculate final marks
+  const totalMark =
+    totalCorrectMark - totalWrongMark;
+
+  // Round final score to 2 decimal places
+  const userScore =
+    Math.round(totalMark * 100.0) / 100.0;
+
+  return {
+    correct,
+    wrong,
+    totalCorrectMark,
+    totalWrongMark,
+    userScore,
+  };
+}
   /* =======================================================
      LOGIN MODAL
   ======================================================= */
@@ -659,10 +662,10 @@ export default function ExamClient({
       } =
         buildAnswerData();
 
-      const userScore =
-        calculateScore(
-          correctAnswerArray.length
-        );
+      const scoreResult = calculateScore(
+  correctAnswerArray.length,
+  wrongAnswerArray.length
+);
 
       const payload = {
         uid:
@@ -704,11 +707,9 @@ export default function ExamClient({
             exam?.total_mark
           ) || 0,
 
-        user_score:
-          userScore,
+       user_score: scoreResult.userScore,
 
-        minus_mark:
-          0,
+minus_mark: scoreResult.totalWrongMark,
 
         answer_array:
           answerArray,

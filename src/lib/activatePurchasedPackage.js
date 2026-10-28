@@ -70,14 +70,12 @@ export async function activatePurchasedPackage({
 
   formData.set("api", apiKey);
   formData.set("uid", String(userId));
+  formData.set("pid", String(packageId));
   formData.set(
     "transaction_id",
     verifiedPaymentId
   );
   formData.set("orderid", verifiedOrderId);
-
-  // PSC resolves the package and duration from the previously initiated order.
-  // Keep pid for local validation; the activation API does not require it.
 
   let response;
 
@@ -101,7 +99,7 @@ export async function activatePurchasedPackage({
     );
 
     throw new Error(
-      "Payment was received, but the activation response is unavailable. Do not pay again."
+      "Payment may have been received, but the activation response is unavailable. Do not pay again."
     );
   }
 
@@ -131,7 +129,7 @@ export async function activatePurchasedPackage({
     );
 
     throw new Error(
-      "Payment received, but package activation could not be confirmed. Do not pay again."
+      "Payment may have been received, but package activation could not be confirmed. Do not pay again."
     );
   }
 

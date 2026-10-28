@@ -19,7 +19,7 @@ import {
           text-white
           sm:px-8
           lg:px-10
-          lg:py-10 mt-20
+          lg:py-10
         "
       >
         {/* GRID */}

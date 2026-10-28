@@ -162,7 +162,12 @@ export function getExamTypeLabel(
   if (normalized === "mock") {
     return "Mock";
   }
-
+if (
+  normalized === "tst" ||
+  normalized === "statementtype"
+) {
+  return "Statement Type";
+}
   return normalized
     .replace(
       /[-_]+/g,
@@ -532,54 +537,33 @@ export function getDynamicExamTypes(
     { key: "topicwise", label: "Topic Wise", count: 0 },
     { key: "studyplan", label: "Study Plan", count: 0 },
   ];
+
   const typeMap = new Map(
-    standardTypes.map((type) => [type.key, type])
+    standardTypes.map((type) => [
+      type.key,
+      { ...type },
+    ])
   );
 
-  attempts.forEach(
-    (attempt) => {
-      const key =
-        getAttemptExamType(
-          attempt
-        );
+  for (const attempt of attempts) {
+    const key = getExamHistoryTabType(
+      getAttemptExamType(attempt)
+    );
 
-      if (!key) {
-        return;
-      }
+    if (!key) continue;
 
-      if (
-        !typeMap.has(
-          key
-        )
-      ) {
-        typeMap.set(
-          key,
-          {
-            key,
-
-            label:
-              getExamTypeLabel(
-                key
-              ),
-
-            count: 0,
-          }
-        );
-      }
-
-      const current =
-        typeMap.get(
-          key
-        );
-
-      current.count +=
-        1;
+    if (!typeMap.has(key)) {
+      typeMap.set(key, {
+        key,
+        label: getExamTypeLabel(key),
+        count: 0,
+      });
     }
-  );
 
-  return Array.from(
-    typeMap.values()
-  );
+    typeMap.get(key).count += 1;
+  }
+
+  return [...typeMap.values()];
 }
 
 /* =========================================================
@@ -741,4 +725,13 @@ export function sortAttemptsNewestFirst(
         first
       )
   );
+}
+export function getExamHistoryTabType(value) {
+  const type = getAttemptExamType({
+    _examType: value,
+  });
+
+  return type === "tst"
+    ? "topicwise"
+    : type;
 }
