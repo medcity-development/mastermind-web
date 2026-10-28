@@ -57,6 +57,14 @@ test("a category id is not mistaken for an included course", () => {
   assert.equal(packageIncludesExam({ courses: [{ id: 42 }] }, { sub_id: 42 }), false);
 });
 
+test("an unrelated explicit course ID cannot be unlocked by a matching display name", () => {
+  const { packageIncludesExam } = setup();
+  assert.equal(packageIncludesExam(
+    { courses: [{ id: 42, exam: "General Science" }] },
+    { course_id: 99, course_name: "General Science" }
+  ), false);
+});
+
 
 test("legacy test without course metadata is unlocked by verified paginated membership", async () => {
   const offsets = [];
@@ -152,4 +160,26 @@ test("a guest cannot unlock Study Plan tests or videos by supplying topic or use
   const videos = await api.applyPackageAccess({ data: [{ subjectid: 46, type: "paid" }] }, { uid: 7, cid: 1, topicid: 184 });
   assert.equal(exam.access, "paid");
   assert.equal(videos.data[0].type, "paid");
+});
+
+test("a purchased study-plan day unlocks mixed-subject videos and notes without a Study Plan subject hint", async () => {
+  const api = setup({ plans: [active], fetch: studyPlanBackend });
+  const data = [
+    { id: 983, subjectid: 22, type: "paid", notes: "geography.pdf" },
+    { id: 984, subjectid: 8, type: "paid", notes: "biology.pdf" },
+    { id: 985, subjectid: 11, type: "paid" },
+    { id: 986, subjectid: 37, type: "paid" },
+  ];
+  const covered = await api.applyPackageAccess({ data }, { cid: 1, topicid: 184 });
+  assert.ok(covered.data.every((item) => item.type === "free" && item.packageAccess === true));
+  assert.equal(covered.data[0].notes, "geography.pdf");
+  assert.equal(covered.data[1].notes, "biology.pdf");
+  const unrelated = await api.applyPackageAccess({ data }, { cid: 1, topicid: 999 });
+  assert.ok(unrelated.data.every((item) => item.type === "paid" && !item.packageAccess));
+});
+
+test("study-plan membership is still checked when chapter subject metadata is absent", async () => {
+  const api = setup({ plans: [active], fetch: studyPlanBackend });
+  const result = await api.applyPackageAccess({ data: [{ type: "paid" }] }, { cid: 1, topicid: 184 });
+  assert.equal(result.data[0].packageAccess, true);
 });

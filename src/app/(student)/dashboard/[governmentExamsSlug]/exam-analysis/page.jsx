@@ -28,6 +28,7 @@ export const metadata = {
 
 const ALLOWED_EXAM_TYPES = new Set([
   "mock",
+  "studyplan",
   "pqp",
   "scert",
   "topicwise",

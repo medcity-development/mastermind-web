@@ -133,8 +133,9 @@ export function packageIncludesExam(packageDetails, exam) {
     .map(getCourseId)
     .filter(Boolean);
 
-  if (examCourseIds.some((id) => packageCourseIds.has(id))) {
-    return true;
+  if (examCourseIds.length) {
+    // A display-name match must not override an explicit unrelated course ID.
+    return examCourseIds.some((id) => packageCourseIds.has(id));
   }
 
   const examCourseNames = [
@@ -356,15 +357,14 @@ async function getOwnedCourseTopics(
       }
     );
 
-    const selected = categories.filter((category) =>
-      studyPlan
-        ? /^study\s*plan$/i.test(
-            String(
-              category.subject || category.title || ""
-            ).trim()
-          )
-        : requestedSubjectIds.has(String(category.id))
-    );
+    const selected = categories.filter((category) => {
+      const isStudyPlan = /^study\s*plan$/i.test(
+        String(category.subject || category.title || "").trim()
+      );
+      // A study-plan day combines chapters from other subjects. Their subject
+      // IDs do not identify the day itself, so also search the Study Plan list.
+      return isStudyPlan || (!studyPlan && requestedSubjectIds.has(String(category.id)));
+    });
 
     for (const category of selected) {
       const items = await cachedAccess(
@@ -414,10 +414,6 @@ export async function hasOwnedTopicAccess(
         .filter(Boolean)
     ),
   ];
-
-  if (!subjectIds.length) {
-    return false;
-  }
 
   const topics = await getOwnedCourseTopics(uid, cid, {
     subjectIds,

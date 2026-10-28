@@ -19,333 +19,296 @@ export default function MockTestCard({
   shortName,
   governmentExamsSlug,
   pauseId,
+  examType,
 }) {
-  if (
-    !test?.id ||
-    !governmentExamsSlug
-  ) {
+  if (!test?.id || !governmentExamsSlug) {
     return null;
   }
 
-  const examId =
-    test.id;
+  const examId = test.id;
 
   const testTitle =
     test?.exam_name ||
     `${examName} Mock Test`;
 
-  const totalQuestions =
-    test?.total_questions;
+  const totalQuestions = test?.total_questions;
+  const totalMark = test?.total_mark;
 
-  const totalMark =
-    test?.total_mark;
+  const course = test?.course;
+  const subcourse = test?.subcourse;
 
-  const course =
-    test?.course;
+  const access = String(test?.access || "")
+    .toLowerCase()
+    .trim();
 
-  const subcourse =
-    test?.subcourse;
-
-  const access =
-    String(
-      test?.access || ""
-    )
-      .toLowerCase()
-      .trim();
-
-  const premium =
-    access === "paid";
+  const premium = access === "paid";
 
   /* =======================================================
-     PRIVATE DASHBOARD ROUTE
+     EXAM TYPE
+
+     Study Plan exams must retain studyplan throughout
+     navigation. Ordinary Mock Tests remain unchanged.
+  ======================================================= */
+
+  const normalizedType = String(
+  examType ??
+    test?.exam_type ??
+    test?.examType ??
+    test?.type ??
+    "mock"
+)
+  .trim()
+  .toLowerCase()
+  .replace(/[-_\s]/g, "");
+
+const resolvedExamType =
+  normalizedType === "studyplan"
+    ? "studyplan"
+    : "mock";
+
+  /* =======================================================
+     PRIVATE DASHBOARD ROUTES
   ======================================================= */
 
   const examPath =
     `/dashboard/${governmentExamsSlug}/mock-tests/${examId}`;
+
+  const detailsPath = {
+    pathname: examPath,
+    query: {
+      uid: String(uid),
+      title: testTitle,
+      type: resolvedExamType,
+    },
+  };
+
   const startPath = {
     pathname: `${examPath}/start`,
     query: {
       title: testTitle,
+      type: resolvedExamType,
+      ...(pauseId
+        ? {
+            mode: "resume",
+            pauseId: String(pauseId),
+          }
+        : {}),
     },
   };
 
+  /* =======================================================
+     EXISTING PREMIUM ACCESS LOGIC
+  ======================================================= */
+
+  const premiumLocked =
+    premium && test?.packageAccess !== true;
+
+  const href = premiumLocked
+    ? `/dashboard/${governmentExamsSlug}?showPackages=1`
+    : pauseId
+      ? startPath
+      : detailsPath;
+
   return (
-      <article
-        className={`
-          group
-          relative
-
-          flex
-          h-full
-          flex-col
-
-          overflow-hidden
-
-          rounded-[22px]
-
-          border
-
-          p-5
-
-          shadow-[0_10px_30px_rgba(15,23,42,0.04)]
-
-          transition-all
-          duration-300
-
-          hover:-translate-y-1
-          hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]
-
-          ${
-            premium
-              ? `
-                  border-amber-200
-                  bg-gradient-to-br
-                  from-amber-50
-                  via-white
-                  to-orange-50
-                `
-              : `
-                  border-emerald-200
-                  bg-gradient-to-br
-                  from-emerald-50
-                  via-white
-                  to-green-50
-                `
-          }
-        `}
-      >
-        {/* HEADER */}
-
-        <div
-          className="
-            flex
-            items-start
-            justify-between
-          "
-        >
-          <div
-            className={`
-              flex
-              h-11
-              w-11
-              items-center
-              justify-center
-
-              rounded-[13px]
-
-              ${
-                premium
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-emerald-100 text-emerald-700"
-              }
-            `}
-          >
-            {premium && !pauseId ? (
-              <Crown size={20} />
-            ) : (
-              <BookOpen size={20} />
-            )}
-          </div>
-
-          <span
-            className={`
-              rounded-full
-
-              px-3
-              py-1.5
-
-              text-[9px]
-              font-black
-              uppercase
-
-              ${
-                premium
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-emerald-100 text-emerald-700"
-              }
-            `}
-          >
-            {premium
-              ? "Premium"
-              : "Free"}
-          </span>
-        </div>
-
-        {/* TITLE */}
-
-        <div className="mt-5">
-          <p
-            className={`
-              text-[9px]
-              font-black
-              uppercase
-              tracking-[0.1em]
-
-              ${
-                premium
-                  ? "text-amber-700"
-                  : "text-emerald-700"
-              }
-            `}
-          >
-            {shortName || examName}
-          </p>
-
-          <h3
-            className="
-              mt-2
-
-              text-[17px]
-              font-extrabold
-              leading-6
-
-              text-[#0b1f44]
-            "
-          >
-            {testTitle}
-          </h3>
-
-          {subcourse ? (
-            <p
-              className="
-                mt-2
-                text-[11px]
-                text-slate-500
-              "
-            >
-              {subcourse}
-            </p>
-          ) : null}
-
-          {course ? (
-            <p
-              className="
-                mt-1
-                text-[10px]
-                text-slate-400
-              "
-            >
-              {course}
-            </p>
-          ) : null}
-        </div>
-
-        {/* INFO */}
-
-        <div
-          className="
-            mt-5
-
-            grid
-            grid-cols-2
-            gap-3
-          "
-        >
-          <InfoBox
-            icon={FileQuestion}
-            label="Questions"
-            value={totalQuestions}
-            premium={premium}
-          />
-
-          <InfoBox
-            icon={Trophy}
-            label="Marks"
-            value={totalMark}
-            premium={premium}
-          />
-        </div>
-
-        {/* ACTION */}
-
-        <div
-          className="
-            mt-auto
-            pt-5
-          "
-        >
-          {premium ? (
-            <Link
-              href={premium && test?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : pauseId ? startPath : {
-                pathname: examPath,
-                query: {
-                  uid: String(uid),
-                  title: testTitle,
-                },
-              }}
-              className="
-                inline-flex
-                w-full
-                items-center
-                justify-center
-                gap-2
-
-                rounded-[13px]
-
-                border
+    <article
+      className={`
+        group
+        relative
+        flex
+        h-full
+        flex-col
+        overflow-hidden
+        rounded-[22px]
+        border
+        p-5
+        shadow-[0_10px_30px_rgba(15,23,42,0.04)]
+        transition-all
+        duration-300
+        hover:-translate-y-1
+        hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]
+        ${
+          premium
+            ? `
                 border-amber-200
-
-                bg-amber-100
-
-                px-5
-                py-3.5
-
-                text-[11px]
-                font-extrabold
-                text-amber-700
-
-                transition
-
-                hover:bg-amber-200
-              "
-            >
-              <LockKeyhole size={14} />
-              View Premium Test
-              <ArrowRight size={14} />
-            </Link>
-          ) : (
-            <Link
-              href={premium && test?.packageAccess !== true ? `/dashboard/${governmentExamsSlug}?showPackages=1` : pauseId ? startPath : {
-                pathname: examPath,
-                query: {
-                  uid: String(uid),
-                  title: testTitle,
-                },
-              }}
-              className="
-                inline-flex
-                w-full
-                items-center
-                justify-center
-                gap-2
-
-                rounded-[13px]
-
-                border
+                bg-gradient-to-br
+                from-amber-50
+                via-white
+                to-orange-50
+              `
+            : `
                 border-emerald-200
-                bg-emerald-100
+                bg-gradient-to-br
+                from-emerald-50
+                via-white
+                to-green-50
+              `
+        }
+      `}
+    >
+      {/* HEADER */}
 
-                px-5
-                py-3.5
-
-                text-[11px]
-                font-extrabold
-                text-emerald-700
-
-                transition-all
-
-                hover:bg-emerald-200
-              "
-            >
-              {pauseId ? "Resume Exam" : "Start Exam"}
-
-              <ArrowRight
-                size={14}
-              />
-            </Link>
+      <div className="flex items-start justify-between">
+        <div
+          className={`
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-[13px]
+            ${
+              premium
+                ? "bg-amber-100 text-amber-700"
+                : "bg-emerald-100 text-emerald-700"
+            }
+          `}
+        >
+          {premium && !pauseId ? (
+            <Crown size={20} />
+          ) : (
+            <BookOpen size={20} />
           )}
         </div>
-      </article>
+
+        <span
+          className={`
+            rounded-full
+            px-3
+            py-1.5
+            text-[9px]
+            font-black
+            uppercase
+            ${
+              premium
+                ? "bg-amber-100 text-amber-700"
+                : "bg-emerald-100 text-emerald-700"
+            }
+          `}
+        >
+          {premium ? "Premium" : "Free"}
+        </span>
+      </div>
+
+      {/* TITLE */}
+
+      <div className="mt-5">
+        <p
+          className={`
+            text-[9px]
+            font-black
+            uppercase
+            tracking-[0.1em]
+            ${
+              premium
+                ? "text-amber-700"
+                : "text-emerald-700"
+            }
+          `}
+        >
+          {shortName || examName}
+        </p>
+
+        <h3
+          className="
+            mt-2
+            text-[17px]
+            font-extrabold
+            leading-6
+            text-[#0b1f44]
+          "
+        >
+          {testTitle}
+        </h3>
+
+        {subcourse ? (
+          <p className="mt-2 text-[11px] text-slate-500">
+            {subcourse}
+          </p>
+        ) : null}
+
+        {course ? (
+          <p className="mt-1 text-[10px] text-slate-400">
+            {course}
+          </p>
+        ) : null}
+      </div>
+
+      {/* INFO */}
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <InfoBox
+          icon={FileQuestion}
+          label="Questions"
+          value={totalQuestions}
+          premium={premium}
+        />
+
+        <InfoBox
+          icon={Trophy}
+          label="Marks"
+          value={totalMark}
+          premium={premium}
+        />
+      </div>
+
+      {/* ACTION */}
+
+      <div className="mt-auto pt-5">
+        {premium ? (
+          <Link
+            href={href}
+            className="
+              inline-flex
+              w-full
+              items-center
+              justify-center
+              gap-2
+              rounded-[13px]
+              border
+              border-amber-200
+              bg-amber-100
+              px-5
+              py-3.5
+              text-[11px]
+              font-extrabold
+              text-amber-700
+              transition
+              hover:bg-amber-200
+            "
+          >
+            <LockKeyhole size={14} />
+            View Premium Test
+            <ArrowRight size={14} />
+          </Link>
+        ) : (
+          <Link
+            href={href}
+            className="
+              inline-flex
+              w-full
+              items-center
+              justify-center
+              gap-2
+              rounded-[13px]
+              border
+              border-emerald-200
+              bg-emerald-100
+              px-5
+              py-3.5
+              text-[11px]
+              font-extrabold
+              text-emerald-700
+              transition-all
+              hover:bg-emerald-200
+            "
+          >
+            {pauseId ? "Resume Exam" : "Start Exam"}
+
+            <ArrowRight size={14} />
+          </Link>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -359,22 +322,13 @@ function InfoBox({
     <div
       className={`
         rounded-[14px]
-
         border
-
         px-3
         py-3
-
         ${
           premium
-            ? `
-                border-amber-100
-                bg-amber-50
-              `
-            : `
-                border-emerald-100
-                bg-emerald-50/70
-              `
+            ? "border-amber-100 bg-amber-50"
+            : "border-emerald-100 bg-emerald-50/70"
         }
       `}
     >
@@ -385,9 +339,7 @@ function InfoBox({
           w-7
           items-center
           justify-center
-
           rounded-[8px]
-
           ${
             premium
               ? "bg-amber-100 text-amber-700"
@@ -398,13 +350,7 @@ function InfoBox({
         <Icon size={14} />
       </div>
 
-      <p
-        className="
-          mt-2
-          font-extrabold
-          text-[#0b1f44]
-        "
-      >
+      <p className="mt-2 font-extrabold text-[#0b1f44]">
         {value ?? "-"}
       </p>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { getOptionDisplayText } from "@/lib/examOptionUtils";
+
 export default function MockQuestionCard({
   question,
   questionNumber,
@@ -342,7 +344,7 @@ export default function MockQuestionCard({
                         }
                       `}
                     >
-                      {option.value}
+                      {getOptionDisplayText(option.value, option.key)}
                     </span>
                   </button>
                 );

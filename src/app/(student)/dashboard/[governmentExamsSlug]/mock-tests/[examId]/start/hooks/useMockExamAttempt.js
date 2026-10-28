@@ -653,7 +653,7 @@ export default function useMockExamAttempt({
                     savedAttemptId
                 ),
 
-                examType: "mock",
+                examType,
 
                 ...(resolvedExamTitle
                     ? {

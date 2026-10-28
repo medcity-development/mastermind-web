@@ -442,12 +442,12 @@ export async function getStudyPlanHistory({
   if (unresolvedCount > 0) {
     console.warn(
       "[Study Plan History] Unresolved attempts:",
-      {
+      JSON.stringify({
         uid: safeUid,
         cid: safeCid,
         unresolvedCount,
         unresolvedAttempts,
-      }
+      })
     );
   }
 

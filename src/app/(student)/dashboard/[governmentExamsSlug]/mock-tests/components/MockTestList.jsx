@@ -446,36 +446,19 @@ export default function MockTestList({
             {pausedAttemptsError}
           </p>
         ) : null}
-        {tests.map(
-          (test) => (
-            <MockTestCard
-              key={
-                test?.id
-              }
-              test={
-                test
-              }
-              pauseId={
-                pausedAttempts[String(test?.id)]
-              }
-              uid={
-                uid
-              }
-              cid={
-                cid
-              }
-              examName={
-                examName
-              }
-              shortName={
-                shortName
-              }
-              governmentExamsSlug={
-                governmentExamsSlug
-              }
-            />
-          )
-        )}
+       {tests.map((test) => (
+  <MockTestCard
+    key={test?.id}
+    test={test}
+    pauseId={pausedAttempts[String(test?.id)]}
+    uid={uid}
+    cid={cid}
+    examName={examName}
+    shortName={shortName}
+    governmentExamsSlug={governmentExamsSlug}
+    examType="mock"
+  />
+))}
       </div>
 
       <div

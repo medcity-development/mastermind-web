@@ -604,6 +604,54 @@ function identityMatches({
   return true;
 }
 
+// Legacy study-plan exams carry a topic ID instead of a course ID.
+// Follow the course catalog to that topic; package expiry must not hide history.
+async function verifyStudyPlanTopicCourse({ cid, uid, examId, topicId }) {
+  if (!topicId) return null;
+
+  const categories = await requestApi("getSubCategoriesNew", { cid, uid });
+  if (!Array.isArray(categories?.data)) return null;
+
+  for (const category of categories.data) {
+    const categoryId = positiveId(category?.id);
+    if (!categoryId || Number(category.exam_id) !== cid) continue;
+
+    const courses = await requestApi("getSubExamsList", {
+      cid, uid, sub_id: categoryId,
+    });
+    if (!Array.isArray(courses?.data)) continue;
+
+    for (const course of courses.data) {
+      const courseId = positiveId(course?.id);
+      if (!courseId || Number(getHistoryCourseId(course)) !== cid) continue;
+
+      const subjects = await requestApi("getSubExamDetailsLatest", {
+        cid, uid, subexamid: courseId, type: "topic", offset: 0,
+      });
+      if (!Array.isArray(subjects?.items)) continue;
+
+      for (const subject of subjects.items) {
+        if (!/^study\s*plan$/i.test(String(subject?.subject ?? "").trim())) continue;
+        const subjectId = positiveId(subject.id);
+        if (!subjectId || Number(subject.exam) !== cid) continue;
+
+        const topics = await requestApi("getTopicListNew", {
+          cid, uid, subexamid: courseId, subid: subjectId,
+        });
+        if (!Array.isArray(topics?.data)) continue;
+
+        if (topics.data.some((topic) =>
+          positiveId(topic?.id) === topicId &&
+          firstId(topic?.examid, topic?.exam_id, topic?.mocktest) === examId &&
+          positiveId(topic?.sub_id) === subjectId
+        )) return true;
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * true  = positively verified course
  * false = explicit course mismatch
@@ -729,6 +777,17 @@ export async function verifyExamHistoryCourse({
     }
   }
 
+  // Verify legacy topic-based exams before requesting another analytics lookup.
+  if (type === "studyplan" && identityVerified && matchingExam) {
+    const topicVerified = await verifyStudyPlanTopicCourse({
+      cid: safeCid,
+      uid: safeUid,
+      examId: safeExamId,
+      topicId: firstId(matchingExam.topicid, matchingExam.topic_id),
+    });
+    if (topicVerified === true) return true;
+  }
+
   // Step 3: Study Plan analytics.
   // Only explicit attempt + course identity can
   // establish course ownership.
@@ -749,15 +808,13 @@ export async function verifyExamHistoryCourse({
         continue;
       }
 
-      const analyticsId = firstId(
-        row.attempt_id,
-        row.attemptId,
-        row.pauseid,
-        row.pause_id,
-        row.id
-      );
-
-      if (analyticsId !== safeAttemptId) {
+      if (!identityMatches({
+        row,
+        attemptId: safeAttemptId,
+        examId: safeExamId,
+        uid: safeUid,
+        examType: type,
+      })) {
         continue;
       }
 
@@ -773,8 +830,7 @@ export async function verifyExamHistoryCourse({
       }
 
       if (
-        returnedCid === safeCid &&
-        identityVerified
+        returnedCid === safeCid
       ) {
         return true;
       }

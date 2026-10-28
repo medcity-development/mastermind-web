@@ -10,6 +10,7 @@ import {
   FileQuestion,
   Trophy,
 } from "lucide-react";
+import { getDurationSeconds } from "../start/utils/mockTestUtils";
 
 /* =========================================================
    FORMAT TIME
@@ -81,17 +82,19 @@ export default function MockTestHeader({
   examTitle = "",
   examName = "",
   shortName = "",
-  remainingSeconds = 0,
+  remainingSeconds,
   backHref = "",
 }) {
   const router =
     useRouter();
 
+  const hasCountdown = remainingSeconds != null;
+
   const safeSeconds =
     Math.max(
       0,
       Number(
-        remainingSeconds
+        hasCountdown ? remainingSeconds : getDurationSeconds(exam)
       ) || 0
     );
 
@@ -100,6 +103,7 @@ export default function MockTestHeader({
    * timer is still 0 / not initialized.
    */
   const lowTime =
+    hasCountdown &&
     safeSeconds > 0 &&
     safeSeconds <=
       5 * 60;
@@ -498,7 +502,7 @@ export default function MockTestHeader({
                     text-blue-100/80
                   "
                 >
-                  Time Remaining
+                  {hasCountdown ? "Time Remaining" : "Duration"}
                 </p>
 
                 <p

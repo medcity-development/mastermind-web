@@ -8,7 +8,6 @@ import {
   useState,
 } from "react";
 
-import { useRouter } from "next/navigation";
 
 import ExamHistoryHeader from "./components/ExamHistoryHeader";
 import ExamHistoryTabs from "./components/ExamHistoryTabs";
@@ -482,7 +481,6 @@ export default function ExamHistoryClient({
   governmentExamsSlug = "",
   hasActivePlan = false,
 }) {
-  const router = useRouter();
 
   const [attempts, setAttempts] = useState([]);
 
@@ -502,6 +500,7 @@ export default function ExamHistoryClient({
   const [refreshKey, setRefreshKey] = useState(0);
 
   const attemptedNames = useRef(new Set());
+  const historyCourse = useRef(cid);
 
   const normalizedTypes = useMemo(() => {
     const requestedTypes =
@@ -529,6 +528,11 @@ export default function ExamHistoryClient({
   useEffect(() => {
     const controller = new AbortController();
 
+    if (historyCourse.current !== cid) {
+      historyCourse.current = cid;
+      setAttempts([]);
+    }
+
     let mounted = true;
 
     async function load() {
@@ -554,6 +558,7 @@ export default function ExamHistoryClient({
 
       const loaded = [];
       const failures = [];
+      const incompleteTypes = new Set();
 
       let hasPartialVerification = false;
 
@@ -561,6 +566,7 @@ export default function ExamHistoryClient({
         const type = normalizedTypes[index];
 
         if (result.status === "rejected") {
+          incompleteTypes.add(type);
           failures.push({
             type,
             message:
@@ -579,6 +585,7 @@ export default function ExamHistoryClient({
           result.value.partialVerification
         ) {
           hasPartialVerification = true;
+          incompleteTypes.add(type);
 
           console.warn(
             "[Exam History] Partial verification:",
@@ -598,9 +605,14 @@ export default function ExamHistoryClient({
         );
       }
 
-      setAttempts(
-        uniqueAttempts(loaded)
-      );
+      // A failed/partially verified response is not an authoritative empty list.
+      // Prefer fresh records, retaining previous records only for affected types.
+      setAttempts((previous) => uniqueAttempts([
+        ...loaded,
+        ...previous.filter((attempt) => incompleteTypes.has(
+          normalizeType(getAttemptExamType(attempt))
+        )),
+      ]));
 
       setHistoryIncomplete(
         failures.length > 0 ||
@@ -815,7 +827,7 @@ export default function ExamHistoryClient({
     refreshKey,
   ]);
 
-  function handleViewAnalysis(attempt) {
+  function getAnalysisHref(attempt) {
     const attemptId = attemptIdOf(attempt);
 
     const examType = normalizeType(
@@ -844,11 +856,7 @@ export default function ExamHistoryClient({
       title: resolveName(attempt),
     });
 
-    router.push(
-      `/dashboard/${encodeURIComponent(
-        governmentExamsSlug
-      )}/exam-analysis?${params.toString()}`
-    );
+    return `/dashboard/${encodeURIComponent(governmentExamsSlug)}/exam-analysis?${params.toString()}`;
   }
 
   const emptyMessage =
@@ -891,6 +899,12 @@ export default function ExamHistoryClient({
         />
       </div>
 
+      {!loading && historyIncomplete && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Some exam history could not be refreshed. Previously loaded attempts are kept where available. Please try refreshing again shortly.
+        </p>
+      )}
+
       <section
         className="
           w-full
@@ -907,7 +921,7 @@ export default function ExamHistoryClient({
           attempts={visibleAttempts}
           loading={loading}
           startIndex={startIndex}
-          onViewAnalysis={handleViewAnalysis}
+          getAnalysisHref={getAnalysisHref}
           emptyMessage={emptyMessage}
         />
 

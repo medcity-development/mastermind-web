@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Eye, FileQuestion } from "lucide-react";
 import { getAttemptEndTime, getAttemptStartTime, getAttemptExamName, getAttemptExamType, getExamTypeLabel } from "../utils/examHistoryUtils";
 import {
@@ -34,16 +35,19 @@ function AttemptTimes({ attempt }) {
     </div>
   );
 }
-function AnalysisButton({ attempt, onViewAnalysis }) {
+function AnalysisButton({ attempt, getAnalysisHref }) {
+  const href = getAnalysisHref?.(attempt);
+  if (!href) return null;
+
   return (
-    <button type="button" onClick={() => onViewAnalysis?.(attempt)}
+    <Link href={href} prefetch={false}
       aria-label="View exam analysis" title="View analysis"
       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-[#164fa5] to-[#017dc0] text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
       <Eye size={17} aria-hidden="true" />
-    </button>
+    </Link>
   );
 }
-export default function AttemptedExamTable({ attempts = [], startIndex = 0, loading = false, onViewAnalysis, emptyMessage = "No attempted exams found." }) {
+export default function AttemptedExamTable({ attempts = [], startIndex = 0, loading = false, getAnalysisHref, emptyMessage = "No attempted exams found." }) {
   if (loading) return <div className="space-y-3 p-4 sm:p-6" aria-label="Loading exam history">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>;
   if (!attempts.length) return <div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><FileQuestion size={32} className="text-slate-400" /><p className="font-bold text-slate-600">{emptyMessage}</p></div>;
 
@@ -80,7 +84,7 @@ export default function AttemptedExamTable({ attempts = [], startIndex = 0, load
                   <div className="rounded-xl bg-red-50 p-2"><p className="text-lg font-black text-red-500">{display(attempt.total_wrong)}</p><p className="text-[10px] font-semibold text-red-600">Wrong</p></div>
                 </div>
               )}
-              <div className="mt-4"><AnalysisButton attempt={attempt} onViewAnalysis={onViewAnalysis} /></div>
+              <div className="mt-4"><AnalysisButton attempt={attempt} getAnalysisHref={getAnalysisHref} /></div>
             </article>
           );
         })}
@@ -111,7 +115,7 @@ export default function AttemptedExamTable({ attempts = [], startIndex = 0, load
               <td className="hidden px-4 py-5 text-sm font-black text-emerald-600 lg:table-cell">{isFinished ? display(attempt.total_correct) : "—"}</td>
               <td className="hidden px-4 py-5 text-sm font-black text-red-500 lg:table-cell">{isFinished ? display(attempt.total_wrong) : "—"}</td>
               <td className="min-w-[230px] px-4 py-5 text-xs font-semibold text-slate-600"><AttemptTimes attempt={attempt} /></td>
-              <td className="sticky right-0 z-10 border-l border-slate-100 bg-white px-4 py-5 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]"><AnalysisButton attempt={attempt} onViewAnalysis={onViewAnalysis} /></td>
+              <td className="sticky right-0 z-10 border-l border-slate-100 bg-white px-4 py-5 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]"><AnalysisButton attempt={attempt} getAnalysisHref={getAnalysisHref} /></td>
             </tr>;
           })}</tbody>
         </table>

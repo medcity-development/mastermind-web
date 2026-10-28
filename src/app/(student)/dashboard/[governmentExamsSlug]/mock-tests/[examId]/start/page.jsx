@@ -5,9 +5,7 @@ import {
   redirect,
 } from "next/navigation";
 
-import {
-  ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import {
   getGovernmentExamConfig,
@@ -16,47 +14,37 @@ import {
 import {
   getStudentSession,
 } from "@/lib/auth/getStudentSession";
-import { checkPremiumExamAccess } from "@/lib/premiumExamAccess";
+
+import {
+  checkPremiumExamAccess,
+} from "@/lib/premiumExamAccess";
 
 import MockTestQuestions from "./components/MockTestQuestions";
 
-export const dynamic =
-  "force-dynamic";
+function positiveId(value) {
+  const number = Number(value);
 
-/* =========================================================
-   METADATA
-========================================================= */
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : 0;
+}
 
-export async function generateMetadata({
-  params,
-}) {
-  const {
-    governmentExamsSlug,
-  } = await params;
+export async function generateMetadata({ params }) {
+  const { governmentExamsSlug } = await params;
 
   const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+    getGovernmentExamConfig(governmentExamsSlug);
 
-  if (!config) {
-    return {};
-  }
+  if (!config) return {};
 
   return {
-    title:
-      `${config.name} Mock Test Exam | Student Dashboard | MasterMind Academy`,
-
+    title: `${config.name} Exam | MasterMind Academy`,
     robots: {
       index: false,
       follow: false,
     },
   };
 }
-
-/* =========================================================
-   PAGE
-========================================================= */
 
 export default async function MockExamStartPage({
   params,
@@ -67,220 +55,125 @@ export default async function MockExamStartPage({
     examId,
   } = await params;
 
-  const query =
-    await searchParams;
-  const examTitle =
-    String(query?.title ?? "").trim();
-  const examType =
-    String(query?.type || "mock").toLowerCase() === "studyplan"
-      ? "studyplan"
-      : "mock";
-
-  /* =======================================================
-     CONFIG
-  ======================================================= */
+  const query = await searchParams;
 
   const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+    getGovernmentExamConfig(governmentExamsSlug);
 
   if (!config) {
     notFound();
   }
 
-  const cid =
-    Number(
-      config?.cid
-    );
+  const {
+    cid,
+    name,
+    shortName,
+  } = config;
 
-  if (
-    !Number.isFinite(cid) ||
-    cid <= 0
-  ) {
-    notFound();
+  const session = await getStudentSession();
+
+  const uid = positiveId(session?.uid);
+
+  const title = String(query?.title ?? "");
+
+  const selectedExamId = positiveId(
+    query?.examId ??
+    (/^\d+$/.test(examId) ? examId : null)
+  );
+
+  const examType =
+    String(query?.type ?? "mock")
+      .trim()
+      .toLowerCase().replace(/[-_\s]/g, "") === "studyplan"
+      ? "studyplan"
+      : "mock";
+
+  const detailsPath =
+    `/dashboard/${governmentExamsSlug}/mock-tests/${examId}`;
+
+  if (!uid) {
+    const returnQuery = new URLSearchParams({
+      ...query,
+      type: examType,
+    });
+    redirect(`/login?redirect=${encodeURIComponent(`${detailsPath}/start?${returnQuery}`)}`);
   }
 
-  /* =======================================================
-     SESSION
-  ======================================================= */
-
-  const session =
-    await getStudentSession();
-
-  const uid =
-    Number(
-      session?.uid
-    );
-
-  if (
-    !Number.isFinite(uid) ||
-    uid <= 0
-  ) {
-    const redirectParams = new URLSearchParams({
-      type: examType,
-      ...(examTitle ? { title: examTitle } : {}),
-    });
-    const redirectUrl =
-      `/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start?${redirectParams}`;
-
-    redirect(
-      `/login?redirect=${encodeURIComponent(
-        redirectUrl
-      )}`
-    );
+  if (!selectedExamId) {
+    redirect(detailsPath);
   }
 
   const access = await checkPremiumExamAccess({
     uid,
     cid,
-    examId,
+    examId: selectedExamId,
     type: examType,
   });
 
   if (access.isPremium && !access.hasAccess) {
-    redirect(
-      `/dashboard/${governmentExamsSlug}?showPackages=1`
-    );
+    const packagesPath =
+      `/dashboard/${governmentExamsSlug}?showPackages=1`;
+
+    if (uid <= 0) {
+      redirect(
+        `/login?redirect=${encodeURIComponent(packagesPath)}`
+      );
+    }
+
+    redirect(packagesPath);
   }
 
-  /* =======================================================
-     EXAM TITLE
-
-     Comes from the real selected mock exam.
-  ======================================================= */
-
-  /* =======================================================
-     DETAILS PATH
-  ======================================================= */
-
-  const detailsPath =
-    `/dashboard/${governmentExamsSlug}/mock-tests/${examId}`;
-
-  /* =======================================================
-     RENDER
-  ======================================================= */
-
   return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f4f7fc]
-      "
-    >
+    <main className="min-h-screen bg-[#f5f9ff]">
       <div
         className="
-          mx-auto
-          w-full
-          max-w-[1450px]
-
-          px-4
-          py-6
-
-          sm:px-6
-          lg:px-8
+          mx-auto w-full max-w-[1450px]
+          px-4 py-6 sm:px-6 lg:px-8 lg:py-8
         "
       >
         <div
           className="
-            mb-5
-
-            flex
-            flex-col
-            gap-3
-
-            sm:flex-row
-            sm:items-end
-            sm:justify-between
+            mb-6 mt-20 flex flex-col gap-3
+            sm:flex-row sm:items-end sm:justify-between
           "
         >
           <div>
             <Link
               href={{
-                pathname:
-                  detailsPath,
-
-                query:
-                  {
-                    type: examType,
-                    ...(examTitle
-                      ? { title: examTitle }
-                      : {}),
-                  },
+                pathname: detailsPath,
+                query: {
+                  examId: String(selectedExamId),
+                  title,
+                  type: examType,
+                },
               }}
               className="
-                inline-flex
-                items-center
-                gap-2
-
-                rounded-full
-
-                border
-                border-blue-200
-
-                bg-blue-50
-
-                px-4
-                py-2
-
-                text-[11px]
-                font-bold
-                text-[#164fa5]
-
-                transition-all
-
-                hover:border-blue-300
-                hover:bg-blue-100
+                inline-flex items-center gap-2
+                rounded-full border border-blue-200
+                bg-blue-50 px-4 py-2
+                text-[11px] font-bold text-[#164fa5]
+                transition hover:bg-blue-100
               "
             >
-              <ArrowLeft
-                size={14}
-              />
-
+              <ArrowLeft size={14} />
               Back to Instructions
             </Link>
 
-            <p
-              className="
-                mt-3
-                text-[11px]
-                text-slate-500
-              "
-            >
-              Answer the{" "}
-              {examTitle ||
-                config.name}{" "}
-              questions before the
-              timer expires.
+            <p className="mt-3 text-[11px] text-slate-500">
+              Answer the {name} questions before the timer expires.
             </p>
           </div>
         </div>
 
         <MockTestQuestions
-          examId={
-            examId
-          }
-          uid={
-            uid
-          }
-          cid={
-            cid
-          }
-          examName={
-            config.name
-          }
-          shortName={
-            config.shortName
-          }
-          examTitle={
-            examTitle
-          }
-          examType={
-            examType
-          }
-          governmentExamsSlug={
-            governmentExamsSlug
-          }
+          examId={selectedExamId}
+          uid={uid}
+          cid={cid}
+          examTitle={title}
+          examName={name}
+          shortName={shortName}
+          examType={examType}
+          governmentExamsSlug={governmentExamsSlug}
           guestAction={query?.guestAction || ""}
         />
       </div>

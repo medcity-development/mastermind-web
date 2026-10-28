@@ -1,5 +1,7 @@
 "use client";
 
+import { getOptionDisplayText } from "@/lib/examOptionUtils";
+
 export default function MockTestQuestionCard({
   question,
   selectedAnswer,
@@ -151,7 +153,7 @@ export default function MockTestQuestionCard({
                     text-slate-700
                   "
                 >
-                  {option.value}
+                  {getOptionDisplayText(option.value, option.key)}
                 </span>
               </button>
             );
