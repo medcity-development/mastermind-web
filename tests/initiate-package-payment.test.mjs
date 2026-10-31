@@ -31,7 +31,7 @@ test("PSC initiation receives server-verified plan fields and its order is reuse
     promocode: "SAVE50", deduction: "50.00",
   });
   assert.equal(calls[1].url, "https://api.razorpay.com/v1/orders/order_example");
-  assert.equal(calls[1].options.method, undefined, "does not create a second Razorpay order");
+  assert.equal(calls[1].options.method, "GET", "does not create a second Razorpay order");
   assert.equal(result.order.id, "order_example");
 });
 

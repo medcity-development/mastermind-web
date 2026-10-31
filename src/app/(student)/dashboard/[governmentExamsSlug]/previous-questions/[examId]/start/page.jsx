@@ -20,6 +20,7 @@ import {
 } from "@/lib/premiumExamAccess";
 
 import ExamClient from "../components/ExamClient";
+import ExamLoadError from "../components/ExamLoadError";
 
 export const dynamic = "force-dynamic";
 
@@ -60,21 +61,23 @@ export default async function StartExamPage({
   });
 
   if (!detailsResult?.exam) {
-    notFound();
+    if (detailsResult?.httpStatus === 404) notFound();
+    return <ExamLoadError retryAfter={detailsResult?.retryAfter} />;
   }
 
-  if (
-    String(detailsResult.exam.access ?? "")
-      .trim()
-      .toLowerCase() === "paid"
-  ) {
-    const access = await checkPremiumExamAccess({
-      uid,
-      cid,
-      examId,
-      type: examType,
-      exam: detailsResult.exam,
-    });
+  {
+    let access;
+    try {
+      access = await checkPremiumExamAccess({
+        uid,
+        cid,
+        examId,
+        type: examType,
+        exam: detailsResult.exam,
+      });
+    } catch (error) {
+      return <ExamLoadError retryAfter={error?.retryAfter} />;
+    }
 
     if (!access.hasAccess) {
       redirect(
@@ -97,15 +100,7 @@ export default async function StartExamPage({
     : [];
 
   if (!questions.length) {
-    return (
-      <p
-        role="alert"
-        className="p-6 text-red-700"
-      >
-        Unable to load the question paper.
-        Please refresh and try again.
-      </p>
-    );
+    return <ExamLoadError retryAfter={questionsResult?.retryAfter} />;
   }
 
   const guestAction = [

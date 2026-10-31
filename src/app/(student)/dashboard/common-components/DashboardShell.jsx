@@ -18,9 +18,18 @@ import PurchasedPackagesModal from "./PurchasedPackagesModal";
 import DashboardSearchDetailsModal from "./DashboardSearchDetailsModal";
 import DashboardNotificationsModal from "./DashboardNotificationsModal";
 
-function normalizeTransactions(data) {
-  return Array.isArray(data) ? data : [];
-}
+/* =========================================================
+   NOTIFICATION REQUEST CACHE
+========================================================= */
+
+const notificationCache = new Map();
+const notificationRequests = new Map();
+
+const NOTIFICATION_TTL = 60000;
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function countUnreadNotifications(data) {
   if (!Array.isArray(data)) {
@@ -38,27 +47,85 @@ function countUnreadNotifications(data) {
   }).length;
 }
 
-async function fetchJson(url, signal) {
-  const response = await fetch(url, {
-    cache: "no-store",
-    signal,
-  });
+async function requestNotifications(slug) {
+  const cached =
+    notificationCache.get(slug);
 
-  let result;
-
-  try {
-    result = await response.json();
-  } catch {
-    throw new Error(
-      "The server returned an invalid response."
-    );
+  if (
+    cached &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.count;
   }
 
-  return {
-    response,
-    result,
+  if (
+    notificationRequests.has(slug)
+  ) {
+    return notificationRequests.get(slug);
+  }
+
+  const request = (async () => {
+    const response = await fetch(
+      `/api/student/notifications?slug=${encodeURIComponent(
+        slug
+      )}`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Notifications request failed: ${response.status}`
+      );
+    }
+
+    const result =
+      await response.json();
+
+    if (result?.status !== true) {
+      throw new Error(
+        result?.message ||
+        "Notifications unavailable."
+      );
+    }
+
+    const count =
+      countUnreadNotifications(
+        result?.data
+      );
+
+    notificationCache.set(slug, {
+      count,
+      expiresAt:
+        Date.now() + NOTIFICATION_TTL,
+    });
+
+    return count;
+  })();
+
+  notificationRequests.set(
+    slug,
+    request
+  );
+
+  const cleanup = () => {
+    if (
+      notificationRequests.get(slug) ===
+      request
+    ) {
+      notificationRequests.delete(slug);
+    }
   };
+
+  request.then(cleanup, cleanup);
+
+  return request;
 }
+
+/* =========================================================
+   DASHBOARD SHELL
+========================================================= */
 
 export default function DashboardShell({
   config,
@@ -91,98 +158,28 @@ export default function DashboardShell({
   ] = useState(null);
 
   const [
-    purchasesLoading,
-    setPurchasesLoading,
-  ] = useState(false);
-
-  const [
     selectedSearchResult,
     setSelectedSearchResult,
   ] = useState(null);
 
-  const slug = String(config?.slug ?? "");
-  const cid = config?.cid;
-
-  /* =========================================================
-     PURCHASE COUNT
-  ========================================================= */
-
-  const loadPurchasesCount = useCallback(
-    async (signal) => {
-      setPurchasesLoading(true);
-
-      try {
-        const { response, result } =
-          await fetchJson(
-            "/api/student/transactions",
-            signal
-          );
-
-        if (
-          !response.ok ||
-          result?.status !== true
-        ) {
-          // Do not incorrectly show zero purchases
-          // when the backend is unavailable.
-          setPurchasesCount(null);
-
-          if (process.env.NODE_ENV === "development") {
-            console.warn(
-              "Purchase count unavailable:",
-              {
-                httpStatus: response.status,
-                reason:
-                  result?.reason ?? null,
-                message:
-                  result?.message ||
-                  "Transaction service unavailable.",
-              }
-            );
-          }
-
-          return;
-        }
-
-        const transactions =
-          normalizeTransactions(result?.data);
-
-        setPurchasesCount(
-          transactions.length
-        );
-      } catch (error) {
-        if (error?.name === "AbortError") {
-          return;
-        }
-
-        setPurchasesCount(null);
-
-        if (process.env.NODE_ENV === "development") {
-          console.warn(
-            "Purchase count request failed:",
-            error?.message
-          );
-        }
-      } finally {
-        if (!signal?.aborted) {
-          setPurchasesLoading(false);
-        }
-      }
-    },
-    []
+  const slug = String(
+    config?.slug ?? ""
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const cid = config?.cid;
 
-    loadPurchasesCount(controller.signal);
+  /* =======================================================
+     PURCHASES
 
-    return () => {
-      controller.abort();
-    };
-  }, [loadPurchasesCount]);
+     Do not automatically fetch all transactions
+     on every dashboard mount.
 
-  const handleTransactionsLoaded = useCallback(
-    (transactions) => {
+     PurchasedPackagesModal loads transactions
+     when the user opens it.
+  ======================================================= */
+
+  const handleTransactionsLoaded =
+    useCallback((transactions) => {
       if (!Array.isArray(transactions)) {
         return;
       }
@@ -190,27 +187,21 @@ export default function DashboardShell({
       setPurchasesCount(
         transactions.length
       );
-    },
-    []
-  );
+    }, []);
 
-  const handleOpenPurchases = useCallback(
-    () => {
+  const handleOpenPurchases =
+    useCallback(() => {
       setPurchasesOpen(true);
-    },
-    []
-  );
+    }, []);
 
-  const handleClosePurchases = useCallback(
-    () => {
+  const handleClosePurchases =
+    useCallback(() => {
       setPurchasesOpen(false);
-    },
-    []
-  );
+    }, []);
 
-  /* =========================================================
-     UNREAD NOTIFICATIONS
-  ========================================================= */
+  /* =======================================================
+     NOTIFICATIONS
+  ======================================================= */
 
   useEffect(() => {
     if (!slug) {
@@ -218,80 +209,89 @@ export default function DashboardShell({
       return;
     }
 
-    const controller =
-      new AbortController();
+    let cancelled = false;
 
-    async function loadUnreadNotifications() {
+    async function loadUnreadCount() {
       try {
-        const { response, result } =
-          await fetchJson(
-            `/api/student/notifications?slug=${encodeURIComponent(slug)}`,
-            controller.signal
+        const count =
+          await requestNotifications(
+            slug
           );
 
-        if (
-          !response.ok ||
-          result?.status !== true
-        ) {
-          return;
-        }
-
-        if (!controller.signal.aborted) {
+        if (!cancelled) {
           setUnreadNotificationsCount(
-            countUnreadNotifications(
-              result?.data
-            )
+            count
           );
         }
       } catch (error) {
-        if (error?.name === "AbortError") {
-          return;
-        }
-
-        if (process.env.NODE_ENV === "development") {
+        if (
+          process.env.NODE_ENV ===
+          "development"
+        ) {
           console.warn(
-            "Unread notification count unavailable:",
+            "Notification count unavailable:",
             error?.message
           );
         }
       }
     }
 
-    loadUnreadNotifications();
+    loadUnreadCount();
 
     return () => {
-      controller.abort();
+      cancelled = true;
     };
   }, [slug]);
 
   const handleUnreadNotificationsChange =
-    useCallback((count) => {
-      const value = Number(count);
+    useCallback(
+      (count) => {
+        const number = Number(count);
 
-      setUnreadNotificationsCount(
-        Number.isFinite(value)
-          ? Math.max(0, Math.floor(value))
-          : 0
-      );
+        const safeCount =
+          Number.isFinite(number)
+            ? Math.max(
+                0,
+                Math.floor(number)
+              )
+            : 0;
+
+        setUnreadNotificationsCount(
+          safeCount
+        );
+
+        if (slug) {
+          notificationCache.set(
+            slug,
+            {
+              count: safeCount,
+              expiresAt:
+                Date.now() +
+                NOTIFICATION_TTL,
+            }
+          );
+        }
+      },
+      [slug]
+    );
+
+  /* =======================================================
+     SIDEBAR
+  ======================================================= */
+
+  const handleOpenSidebar =
+    useCallback(() => {
+      setSidebarOpen(true);
     }, []);
 
-  /* =========================================================
-     SIDEBAR
-  ========================================================= */
+  const handleCloseSidebar =
+    useCallback(() => {
+      setSidebarOpen(false);
+    }, []);
 
-  const handleOpenSidebar = useCallback(
-    () => setSidebarOpen(true),
-    []
-  );
-
-  const handleCloseSidebar = useCallback(
-    () => setSidebarOpen(false),
-    []
-  );
-
-  /* =========================================================
+  /* =======================================================
      SEARCH
-  ========================================================= */
+  ======================================================= */
 
   const handleSearchResultSelect =
     useCallback((item, href) => {
@@ -315,20 +315,27 @@ export default function DashboardShell({
       ) {
         router.push(href);
       }
-    }, [router, selectedSearchResult]);
+    }, [
+      router,
+      selectedSearchResult,
+    ]);
 
-  /* =========================================================
+  /* =======================================================
      RENDER
-  ========================================================= */
+  ======================================================= */
 
   return (
     <div className="min-h-screen bg-[#f4f7fc]">
       <DashboardSidebar
         config={config}
         user={user}
-        learningToolGrid={learningToolGrid}
+        learningToolGrid={
+          learningToolGrid
+        }
         mobileOpen={sidebarOpen}
-        onMobileClose={handleCloseSidebar}
+        onMobileClose={
+          handleCloseSidebar
+        }
       />
 
       <div
@@ -342,10 +349,18 @@ export default function DashboardShell({
         <DashboardHeader
           config={config}
           user={user}
-          dashboardOptions={dashboardOptions}
-          onMenuClick={handleOpenSidebar}
-          onPurchasesClick={handleOpenPurchases}
-          purchasesCount={purchasesCount}
+          dashboardOptions={
+            dashboardOptions
+          }
+          onMenuClick={
+            handleOpenSidebar
+          }
+          onPurchasesClick={
+            handleOpenPurchases
+          }
+          purchasesCount={
+            purchasesCount
+          }
           unreadNotificationsCount={
             unreadNotificationsCount
           }
@@ -361,7 +376,9 @@ export default function DashboardShell({
           <DashboardNotificationsModal
             slug={slug}
             onClose={() =>
-              setNotificationsOpen(false)
+              setNotificationsOpen(
+                false
+              )
             }
             onUnreadCountChange={
               handleUnreadNotificationsChange
@@ -374,9 +391,13 @@ export default function DashboardShell({
             item={
               selectedSearchResult.item
             }
-            governmentExamsSlug={slug}
+            governmentExamsSlug={
+              slug
+            }
             onClose={() =>
-              setSelectedSearchResult(null)
+              setSelectedSearchResult(
+                null
+              )
             }
             onOpenFullDetails={
               handleOpenFullDetails
@@ -418,7 +439,9 @@ export default function DashboardShell({
               <DashboardSelectedTestNotice />
 
               <DashboardPremiumPackagesPrompt
-                governmentExamsSlug={slug}
+                governmentExamsSlug={
+                  slug
+                }
                 cid={cid}
               />
             </Suspense>

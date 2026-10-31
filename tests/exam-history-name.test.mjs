@@ -2,12 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const source = await readFile(
-  new URL("../src/lib/examHistoryHelper.js", import.meta.url),
-  "utf8"
-);
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const { resolveExamHistoryName } = await import(moduleUrl);
+import { loadServerModule } from "./helpers/load-server-module.mjs";
+const { resolveExamHistoryName } = await loadServerModule("examHistoryHelper");
 
 test("resolves exam names with the backend details type for each category", async (context) => {
   const previousBaseUrl = process.env.PSC_API_BASE_URL;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getPscCooldownSeconds } from "@/lib/pscRequestManager";
 
 import {
   getStudentSession,
@@ -30,6 +31,7 @@ function reply(body, status = 200) {
     status,
     headers: {
       "Cache-Control": "no-store",
+      ...(status === 429 ? { "Retry-After": String(getPscCooldownSeconds() || 60) } : {}),
     },
   });
 }
@@ -107,16 +109,19 @@ export async function GET(request) {
     });
 
     if (!examName) {
+      const retryAfter = getPscCooldownSeconds();
       return reply(
         {
           status: false,
+          rateLimited: retryAfter > 0,
+          retryAfter: retryAfter || null,
           examName: "",
           examId,
           examType,
           message:
             "The backend did not provide an exam name.",
         },
-        502
+        retryAfter > 0 ? 429 : 502
       );
     }
 

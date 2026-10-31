@@ -2,18 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const asModule = (source) => `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const api = asModule((await readFile(new URL("../src/lib/examHistoryApi.js", import.meta.url), "utf8"))
-  .replace('import "server-only";', ""));
-const source = (await readFile(new URL("../src/lib/examHistoryHelper.js", import.meta.url), "utf8"))
-  .replace('import "server-only";', "")
-  .replace('"@/lib/examHistoryApi"', JSON.stringify(api));
-const { verifyExamHistoryCourse } = await import(asModule(source));
-const studySource = (await readFile(new URL("../src/lib/studyPlanHistoryHelper.js", import.meta.url), "utf8"))
-  .replace('import "server-only";', "")
-  .replace('"@/lib/examHistoryApi"', JSON.stringify(api))
-  .replace('"@/lib/examHistoryHelper"', JSON.stringify(asModule(source)));
-const { getStudyPlanHistory } = await import(asModule(studySource));
+import { loadServerModule } from "./helpers/load-server-module.mjs";
+const { verifyExamHistoryCourse } = await loadServerModule("examHistoryHelper");
+const { getStudyPlanHistory } = await loadServerModule("studyPlanHistoryHelper");
 
 test("study plan analytics can independently verify an attempt while rejecting mismatches", async (context) => {
   const previousFetch = globalThis.fetch;

@@ -16,6 +16,7 @@ function getAttemptRows(result) {
     result?.exams,
     result?.data?.details,
     result?.data?.data,
+    result?.data?.result,
     result?.result?.details,
   ];
 

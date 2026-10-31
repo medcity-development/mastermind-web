@@ -8,26 +8,18 @@ import {
 
 import {
   verifyExamHistoryCourse,
-  resolveExamHistoryName,
 } from "@/lib/examHistoryHelper";
 
-/* =========================================================
-   ID HELPERS
-========================================================= */
+const MAX_WORKERS = 2;
 
 function positiveId(value) {
-  if (
-    value === null ||
-    value === undefined ||
-    String(value).trim() === ""
-  ) {
+  if (value == null || String(value).trim() === "") {
     return null;
   }
 
   const number = Number(value);
 
-  return Number.isSafeInteger(number) &&
-    number > 0
+  return Number.isSafeInteger(number) && number > 0
     ? number
     : null;
 }
@@ -43,10 +35,6 @@ function firstId(...values) {
 
   return null;
 }
-
-/* =========================================================
-   RECORD HELPERS
-========================================================= */
 
 function examIdOf(row) {
   return firstId(
@@ -71,7 +59,7 @@ function attemptIdOf(row) {
   );
 }
 
-function nameOf(row) {
+function examNameOf(row) {
   const candidates = [
     row?._resolvedExamName,
     row?.exam_name,
@@ -80,9 +68,11 @@ function nameOf(row) {
     row?.examTitle,
     row?.test_name,
     row?.testName,
+    row?.test_title,
     row?.title,
     row?.name,
     row?.exam?.exam_name,
+    row?.exam?.title,
   ];
 
   const invalid = new Set([
@@ -92,69 +82,66 @@ function nameOf(row) {
     "null",
     "undefined",
     "unknown",
+    "n/a",
     "exam name unavailable",
   ]);
 
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") {
-      continue;
-    }
+  for (const value of candidates) {
+    if (typeof value !== "string") continue;
 
-    const value = candidate.trim();
+    const name = value.trim();
 
-    if (
-      value &&
-      !invalid.has(value.toLowerCase())
-    ) {
-      return value;
+    if (name && !invalid.has(name.toLowerCase())) {
+      return name;
     }
   }
 
   return "";
 }
 
-function getRecords(result) {
-  if (Array.isArray(result?.details)) {
-    return result.details;
-  }
-
-  if (Array.isArray(result?.data)) {
-    return result.data;
-  }
-
-  return [];
-}
-
-/* =========================================================
-   RESULT STRUCTURE
-========================================================= */
-
-function emptyResult(overrides = {}) {
+function resultShape(overrides = {}) {
   return {
     status: true,
     exam_type: "studyplan",
-
     details: [],
     data: [],
     total: 0,
-
     courseFilterVerified: true,
     partialVerification: false,
-
     unresolvedCount: 0,
     unresolvedAttempts: [],
-
     excludedCourseCount: 0,
     excludedUserCount: 0,
     excludedTypeCount: 0,
-
     ...overrides,
   };
 }
 
-/* =========================================================
-   STUDY PLAN HISTORY
-========================================================= */
+async function mapWithWorkers(items, handler) {
+  const output = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      output[index] = await handler(items[index]);
+    }
+  }
+
+  const count = Math.min(
+    MAX_WORKERS,
+    items.length
+  );
+
+  await Promise.all(
+    Array.from(
+      { length: count },
+      () => worker()
+    )
+  );
+
+  return output;
+}
 
 export async function getStudyPlanHistory({
   uid,
@@ -164,7 +151,7 @@ export async function getStudyPlanHistory({
   const safeCid = positiveId(cid);
 
   if (!safeUid || !safeCid) {
-    return emptyResult({
+    return resultShape({
       status: false,
       message: "Valid uid and cid are required.",
       httpStatus: 400,
@@ -172,93 +159,39 @@ export async function getStudyPlanHistory({
     });
   }
 
-  /* -------------------------------------------------------
-     FETCH ATTEMPTS
-  ------------------------------------------------------- */
-
-  const result = await getCourseExamHistory({
+  const history = await getCourseExamHistory({
     uid: safeUid,
     cid: safeCid,
     examType: "studyplan",
   });
 
-  if (!result?.status) {
-    return emptyResult({
+  if (!history?.status) {
+    return resultShape({
       status: false,
       message:
-        result?.message ||
+        history?.message ||
         "Unable to load Study Plan history.",
-
-      httpStatus: result?.httpStatus || 502,
-      retryAfter: result?.retryAfter,
-
+      httpStatus: history?.httpStatus || 502,
+      retryAfter: history?.retryAfter ?? null,
+      rateLimited: history?.rateLimited === true,
       courseFilterVerified: false,
     });
   }
 
-  const records = getRecords(result);
+  const records = Array.isArray(history.details)
+    ? history.details
+    : Array.isArray(history.data)
+      ? history.data
+      : [];
 
-  const accepted = [];
+  const candidates = [];
   const unresolvedAttempts = [];
-
   const seen = new Set();
-
   const verificationCache = new Map();
-  const nameCache = new Map();
 
-  let unresolvedCount = 0;
   let excludedCourseCount = 0;
   let excludedUserCount = 0;
   let excludedTypeCount = 0;
-
-  /* -------------------------------------------------------
-     RESOLVE NAME
-  ------------------------------------------------------- */
-
-  async function resolveName(row, examId) {
-    const existingName = nameOf(row);
-
-    if (existingName) {
-      return existingName;
-    }
-
-    const key = `${safeUid}:${safeCid}:${examId}`;
-
-    if (!nameCache.has(key)) {
-      nameCache.set(
-        key,
-        Promise.resolve()
-          .then(() =>
-            resolveExamHistoryName({
-              uid: safeUid,
-              cid: safeCid,
-              examId,
-              examType: "studyplan",
-              item: row,
-            })
-          )
-          .catch((error) => {
-            console.warn(
-              "[Study Plan] Name resolution failed:",
-              error?.message
-            );
-
-            return "";
-          })
-      );
-    }
-
-    const resolved = await nameCache.get(key);
-
-    return typeof resolved === "string" &&
-      resolved.trim()
-      ? resolved.trim()
-      : `Study Plan Exam ${examId}`;
-  }
-
-  /* -------------------------------------------------------
-     PROCESS RECORDS
-  ------------------------------------------------------- */
 
   for (const row of records) {
     if (
@@ -271,9 +204,9 @@ export async function getStudyPlanHistory({
 
     const type = normalizeHistoryType(
       row.exam_type ??
-      row.examType ??
-      row.type ??
-      "studyplan"
+        row.examType ??
+        row.type ??
+        "studyplan"
     );
 
     if (type !== "studyplan") {
@@ -281,32 +214,41 @@ export async function getStudyPlanHistory({
       continue;
     }
 
-    const rowUid = positiveId(
-      row.uid ??
-      row.user_id ??
-      row.userId
-    );
-
-    if (
-      rowUid !== null &&
-      rowUid !== safeUid
-    ) {
-      excludedUserCount++;
-      continue;
-    }
-
     const attemptId = attemptIdOf(row);
     const examId = examIdOf(row);
 
-    if (!attemptId || !examId) {
-      unresolvedCount++;
+    const rawUid =
+      row.uid ??
+      row.user_id ??
+      row.userId;
 
+    if (
+      rawUid != null &&
+      String(rawUid).trim() !== ""
+    ) {
+      const rowUid = positiveId(rawUid);
+
+      if (rowUid === null) {
+        unresolvedAttempts.push({
+          attemptId,
+          examId,
+          reason: "Invalid student ID",
+        });
+        continue;
+      }
+
+      if (rowUid !== safeUid) {
+        excludedUserCount++;
+        continue;
+      }
+    }
+
+    if (!attemptId) {
       unresolvedAttempts.push({
-        attemptId,
+        attemptId: null,
         examId,
-        reason: "Missing attempt or exam ID",
+        reason: "Missing attempt ID",
       });
-
       continue;
     }
 
@@ -318,155 +260,160 @@ export async function getStudyPlanHistory({
 
     seen.add(key);
 
-    /* -----------------------------------------------------
-       COURSE VALIDATION
-    ----------------------------------------------------- */
-
     const rawCid = getHistoryCourseId(row);
-    const explicitCid = positiveId(rawCid);
+
+    let explicitCid = null;
 
     if (
-      rawCid !== null &&
-      rawCid !== undefined &&
-      String(rawCid).trim() !== "" &&
-      explicitCid === null
+      rawCid != null &&
+      String(rawCid).trim() !== ""
     ) {
-      unresolvedCount++;
+      explicitCid = positiveId(rawCid);
 
-      unresolvedAttempts.push({
-        attemptId,
-        examId,
-        reason: "Invalid course ID",
-      });
-
-      continue;
-    }
-
-    if (
-      explicitCid !== null &&
-      explicitCid !== safeCid
-    ) {
-      excludedCourseCount++;
-      continue;
-    }
-
-    let verified = explicitCid === safeCid;
-
-    if (!verified) {
-      const verificationKey =
-        `${safeUid}:${safeCid}:${examId}:${attemptId}`;
-
-      if (!verificationCache.has(verificationKey)) {
-        verificationCache.set(
-          verificationKey,
-          Promise.resolve()
-            .then(() =>
-              verifyExamHistoryCourse({
-                uid: safeUid,
-                cid: safeCid,
-                examId,
-                examType: "studyplan",
-                attemptId,
-              })
-            )
-            .catch((error) => {
-              console.error(
-                "[Study Plan] Course verification failed:",
-                {
-                  examId,
-                  attemptId,
-                  error: error?.message,
-                }
-              );
-
-              return null;
-            })
-        );
+      if (explicitCid === null) {
+        unresolvedAttempts.push({
+          attemptId,
+          examId,
+          reason: "Invalid course ID",
+        });
+        continue;
       }
 
-      verified = await verificationCache.get(
-        verificationKey
-      );
+      if (explicitCid !== safeCid) {
+        excludedCourseCount++;
+        continue;
+      }
     }
 
-    if (verified === false) {
+    candidates.push({
+      row,
+      attemptId,
+      examId,
+      explicitCid,
+    });
+  }
+
+  async function verifyCandidate(candidate) {
+    const {
+      row,
+      attemptId,
+      examId,
+      explicitCid,
+    } = candidate;
+
+    if (explicitCid === safeCid) {
+      return {
+        ...candidate,
+        verified: true,
+      };
+    }
+
+    if (!examId) {
+      return {
+        ...candidate,
+        verified: null,
+      };
+    }
+
+    const key = [
+      safeUid,
+      safeCid,
+      "studyplan",
+      examId,
+      attemptId,
+    ].join(":");
+
+    if (!verificationCache.has(key)) {
+      const promise = Promise.resolve()
+        .then(() =>
+          verifyExamHistoryCourse({
+            uid: safeUid,
+            cid: safeCid,
+            examId,
+            examType: "studyplan",
+            attemptId,
+          })
+        )
+        .catch((error) => {
+          console.warn(
+            "[Study Plan] Verification failed:",
+            {
+              examId,
+              attemptId,
+              message: error?.message,
+            }
+          );
+
+          return null;
+        });
+
+      verificationCache.set(key, promise);
+    }
+
+    const verified = await verificationCache.get(key);
+
+    return {
+      row,
+      attemptId,
+      examId,
+      verified,
+    };
+  }
+
+  const checked = await mapWithWorkers(
+    candidates,
+    verifyCandidate
+  );
+
+  const accepted = [];
+
+  for (const item of checked) {
+    if (item.verified === false) {
       excludedCourseCount++;
       continue;
     }
 
-    const examName = await resolveName(
-      row,
-      examId
-    );
+    if (item.verified !== true) {
+      unresolvedAttempts.push({
+        attemptId: item.attemptId,
+        examId: item.examId,
+        reason:
+          "Course ownership could not be verified",
+      });
+      continue;
+    }
 
-    /* -----------------------------------------------------
-       NORMALIZE ATTEMPT
-    ----------------------------------------------------- */
+    const name = examNameOf(item.row);
 
-    const normalized = {
-      ...row,
+    accepted.push({
+      ...item.row,
 
       exam_type: "studyplan",
       _examType: "studyplan",
 
-      _historyId: attemptId,
-      _examId: examId,
+      _historyId: item.attemptId,
+      _examId: item.examId,
 
-      exam_name: examName,
-      _resolvedExamName: examName,
+      exam_name: name,
+      _resolvedExamName: name,
 
-      _courseVerified: verified === true,
-    };
-
-    if (verified !== true) {
-      unresolvedCount++;
-
-      unresolvedAttempts.push({
-        attemptId,
-        examId,
-        examName,
-        reason:
-          "Backend does not expose a verifiable course ID",
-      });
-
-      continue;
-    }
-
-    accepted.push(normalized);
+      _courseVerified: true,
+    });
   }
 
-  /* -------------------------------------------------------
-     DIAGNOSTICS
-  ------------------------------------------------------- */
-
-  if (unresolvedCount > 0) {
-    console.warn(
-      "[Study Plan History] Unresolved attempts:",
-      JSON.stringify({
-        uid: safeUid,
-        cid: safeCid,
-        unresolvedCount,
-        unresolvedAttempts,
-      })
-    );
-  }
-
-  /* -------------------------------------------------------
-     RESPONSE
-  ------------------------------------------------------- */
-
-  return emptyResult({
+  return resultShape({
     details: accepted,
     data: accepted,
     total: accepted.length,
 
-    courseFilterVerified:
-      unresolvedCount === 0,
+    courseFilterVerified: true,
 
     partialVerification:
-      unresolvedCount > 0,
+      unresolvedAttempts.length > 0,
 
-    unresolvedCount,
+    unresolvedCount:
+      unresolvedAttempts.length,
+
     unresolvedAttempts,
 
     excludedCourseCount,

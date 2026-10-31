@@ -1,4 +1,12 @@
 import "server-only";
+import { executePscRequest, setPscRateLimit } from "@/lib/pscRequestManager";
+
+function fetchPackageData(url, options) {
+  return executePscRequest({
+    key: JSON.stringify({ url, fields: [...options.body.entries()].filter(([key]) => key !== "api") }),
+    task: () => fetch(url, { ...options, signal: AbortSignal.timeout(20000) }),
+  });
+}
 
 const PSC_API_BASE_URL =
   process.env.PSC_API_BASE_URL;
@@ -158,6 +166,12 @@ async function parseJsonResponse(
     );
   }
 
+  if (Number(result?.status) === 429 || Number(result?.code) === 429 || result?.rateLimited === true ||
+      /too many requests|too many attempts|rate[\s-]?limit/i.test(String(result?.message ?? result?.msg ?? ""))) {
+    const retryAfter = setPscRateLimit(response.headers.get("Retry-After") ?? result?.retryAfter ?? result?.retry_after);
+    throw Object.assign(new Error("Package service is temporarily unavailable."), { httpStatus: 429, retryAfter });
+  }
+
   if (!response.ok) {
     throw new Error(
       result?.message ||
@@ -217,7 +231,7 @@ export async function getPackagesList({
       String(cid)
     );
 
-    const response = await fetch(
+    const response = await fetchPackageData(
       `${apiBaseUrl}/getPackagesList`,
       {
         method: "POST",
@@ -400,7 +414,7 @@ export async function getActivePlans({ uid, cid } = {}) {
   formData.append("uid", String(userId));
   formData.append("cid", String(categoryId));
 
-  const response = await fetch(
+  const response = await fetchPackageData(
     `${apiBaseUrl}/getActivePlans`,
     {
       method: "POST",
@@ -509,7 +523,7 @@ export async function getPackageDetails({
     );
 
     const response =
-      await fetch(
+      await fetchPackageData(
         `${apiBaseUrl}/getPackagesDetails`,
         {
           method:

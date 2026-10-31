@@ -13,26 +13,26 @@ test("maps only the latest paused attempt for each exam", () => {
   const pausedIds = getPausedAttemptIds({
     details: [
       {
-        id: "old-pause",
-        exam_id: "mock-1",
+        id: "10",
+        exam_id: "1",
         exam_status: "pause",
         updated_at: "2025-01-01T10:00:00Z",
       },
       {
-        id: "completed",
-        exam_id: "mock-1",
+        id: "11",
+        exam_id: "1",
         exam_status: "finish",
         updated_at: "2025-01-01T11:00:00Z",
       },
       {
-        id: "latest-pause",
-        exam_id: "mock-2",
+        id: "13",
+        exam_id: "2",
         exam_status: "paused",
         updated_at: "2025-01-01T12:00:00Z",
       },
       {
-        id: "older-pause",
-        exam_id: "mock-2",
+        id: "12",
+        exam_id: "2",
         exam_status: "pause",
         updated_at: "2025-01-01T09:00:00Z",
       },
@@ -40,7 +40,7 @@ test("maps only the latest paused attempt for each exam", () => {
   });
 
   assert.deepEqual(pausedIds, {
-    "mock-2": "latest-pause",
+    "2": "13",
   });
 });
 

@@ -1,21 +1,46 @@
+
 import { CheckCircle2 } from "lucide-react";
+
 import QuestionCard from "./QuestionCard";
 
+import {
+  isValidOptionAnswer,
+  normalizeOptionAnswer,
+} from "./utils/examUtils";
+
 export default function ExamQuestions({
-  questions,
-  startIndex,
-  answers,
-  submitted,
-  imagePath,
+  questions = [],
+  startIndex = 0,
+  answers = {},
+  submitted = false,
+  imagePath = "",
   onAnswer,
 }) {
+  if (!Array.isArray(questions)) {
+    return null;
+  }
+
   return (
     <div className="space-y-5">
-      {questions.map(
-        (question, index) => (
+      {questions.map((question, index) => {
+        const questionId =
+          question?.id ?? startIndex + index + 1;
+
+        const selectedAnswer =
+          normalizeOptionAnswer(
+            answers?.[questionId]
+          );
+
+        const isAnswered =
+          isValidOptionAnswer(
+            question,
+            selectedAnswer
+          );
+
+        return (
           <div
-            key={question.id}
-            id={`exam-question-${question.id}`}
+            key={questionId}
+            id={`exam-question-${questionId}`}
             className="
               rounded-[24px]
               border
@@ -30,6 +55,8 @@ export default function ExamQuestions({
               sm:p-4
             "
           >
+            {/* QUESTION HEADER */}
+
             <div
               className="
                 mb-3
@@ -72,7 +99,9 @@ export default function ExamQuestions({
                 </span>
               </div>
 
-              {answers[question.id] != null && (
+              {/* ANSWERED STATUS */}
+
+              {isAnswered && (
                 <span
                   className="
                     inline-flex
@@ -93,18 +122,18 @@ export default function ExamQuestions({
               )}
             </div>
 
+            {/* QUESTION CARD */}
+
             <QuestionCard
               question={question}
-              selectedAnswer={
-                answers[question.id]
-              }
+              selectedAnswer={selectedAnswer}
               onAnswer={onAnswer}
               submitted={submitted}
               imagePath={imagePath}
             />
           </div>
-        )
-      )}
+        );
+      })}
     </div>
   );
 }

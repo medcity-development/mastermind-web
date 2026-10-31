@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 
 import {
@@ -11,40 +12,25 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
 function positiveId(value) {
-  if (
-    value === null ||
-    value === undefined ||
-    String(value).trim() === ""
-  ) {
+  if (value == null || String(value).trim() === "") {
     return null;
   }
 
   const number = Number(value);
 
-  return Number.isSafeInteger(number) &&
-    number > 0
+  return Number.isSafeInteger(number) && number > 0
     ? number
     : null;
 }
 
-function reply(
-  body,
-  status = 200,
-  retryAfter = null
-) {
+function reply(body, status = 200, retryAfter = null) {
   return NextResponse.json(body, {
     status,
     headers: {
       "Cache-Control": "no-store",
-      ...(retryAfter
-        ? {
-            "Retry-After": String(retryAfter),
-          }
+      ...(retryAfter != null
+        ? { "Retry-After": String(retryAfter) }
         : {}),
     },
   });
@@ -66,20 +52,18 @@ function fail(
       courseFilterVerified: false,
       partialVerification: false,
       unresolvedCount: 0,
+      unresolvedAttempts: [],
+      rateLimited: status === 429,
+      retryAfter,
     },
     status,
     retryAfter
   );
 }
 
-/* =========================================================
-   POST
-========================================================= */
-
 export async function POST(request) {
   try {
     const session = await getStudentSession();
-
     const uid = positiveId(session?.uid);
 
     if (!uid) {
@@ -103,10 +87,7 @@ export async function POST(request) {
     const cid = positiveId(body?.cid);
 
     if (!cid) {
-      return fail(
-        "Invalid course ID.",
-        400
-      );
+      return fail("Invalid course ID.", 400);
     }
 
     const result = await getStudyPlanHistory({
@@ -134,45 +115,28 @@ export async function POST(request) {
         result?.message ||
           "Study Plan history is unavailable.",
         status,
-        result?.retryAfter
-      );
-    }
-
-    if (result.partialVerification) {
-      console.warn(
-        "[Study Plan History] Unresolved attempts:",
-        {
-          uid,
-          cid,
-          unresolvedCount:
-            result.unresolvedCount,
-        }
+        result?.retryAfter ?? null
       );
     }
 
     return reply({
       status: true,
       exam_type: "studyplan",
-
       details: result.details,
       data: result.data,
       total: result.total,
-
       courseFilterVerified:
         result.courseFilterVerified,
-
       partialVerification:
         result.partialVerification,
-
       unresolvedCount:
         result.unresolvedCount,
-
+      unresolvedAttempts:
+        result.unresolvedAttempts,
       excludedCourseCount:
         result.excludedCourseCount,
-
       excludedUserCount:
         result.excludedUserCount,
-
       excludedTypeCount:
         result.excludedTypeCount,
     });

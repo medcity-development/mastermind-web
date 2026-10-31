@@ -61,10 +61,7 @@ export default function ExamResultModal({
   if (!open || !result || !isFinishedExamAttempt(result)) return null;
 
   const calculated = calculateExamScore(result);
-  const score =
-    numberOrNull(result.user_score) ??
-    numberOrNull(result.score) ??
-    calculated.score;
+  const score = calculated.score;
   const totalMark =
     numberOrNull(result.total_mark) ??
     numberOrNull(result.totalMark) ??
@@ -76,10 +73,7 @@ export default function ExamResultModal({
     numberOrNull(result.total_questions) ??
     numberOrNull(result.totalQuestions) ??
     calculated.totalQuestions;
-  const minusMark =
-    numberOrNull(result.minus_mark) ??
-    numberOrNull(result.minusMark) ??
-    calculated.minusMark;
+  const minusMark = calculated.minusMark;
   const percentage = score !== null && totalMark > 0
     ? Math.round((score / totalMark) * 100)
     : null;

@@ -27,7 +27,6 @@ import {
   saveGuestExamHandoff,
   readGuestExamHandoff,
   clearGuestExamHandoff,
-  guestExamLoginRedirectPath,
 } from "@/lib/guestExamHandoff";
 
 import ExamHero from "./ExamHero";
@@ -144,6 +143,7 @@ export default function ExamClient({
     "submit",
   ].includes(guestAction);
 
+  const cardsPath = `/dashboard/${governmentExamsSlug}/topic-wise-exams/test/${slug}`;
   const draftKey =
     `exam_draft_${uid}_${cid}_${type}_${id}`;
 
@@ -168,6 +168,7 @@ export default function ExamClient({
   const [submitted, setSubmitted] = useState(false);
   const [paused, setPaused] = useState(false);
   const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
 
   const [
     resultModalOpen,
@@ -237,6 +238,11 @@ export default function ExamClient({
     } catch {
       // Guest login uses checked storage below.
     }
+  }
+
+  function loginRedirect(action) {
+    const target = `/dashboard/${governmentExamsSlug}/topic-wise-exams/test/${slug}/${id}/start?guestAction=${action}`;
+    window.location.assign(`/login?redirect=${encodeURIComponent(target)}`);
   }
 
   function checkpoint(action) {
@@ -564,17 +570,12 @@ export default function ExamClient({
       if (!positiveId(uid)) {
         checkpoint(action);
 
-        window.location.assign(
-          `/login?redirect=${encodeURIComponent(
-            guestExamLoginRedirectPath(action)
-          )}`
-        );
+        loginRedirect(action);
 
         return false;
       }
 
       const current = snapshot.current;
-      let localFinalResult = null;
 
       const payload = {
         cid,
@@ -631,14 +632,6 @@ export default function ExamClient({
           minus_mark: resultStats.negativeMark,
         });
 
-        localFinalResult = {
-          ...payload,
-          exam_status: "finish",
-          exam_name:
-            exam?.exam_name ??
-            exam?.title ??
-            "",
-        };
       }
 
       const isResuming = Boolean(current.pauseId);
@@ -678,7 +671,7 @@ export default function ExamClient({
       if (action === "submit") {
         const finalResult = {
           ...result.savedResult,
-          ...localFinalResult,
+          ...payload,
           exam_status: "finish",
           id: current.pauseId,
           pauseid: current.pauseId,
@@ -702,9 +695,7 @@ export default function ExamClient({
         } catch { }
 
         if (isHandoff) {
-          try {
-            checkpoint(action);
-          } catch { }
+          try { clearGuestExamHandoff(); } catch { }
         }
       } else {
         setPaused(true);
@@ -727,6 +718,8 @@ export default function ExamClient({
           "",
           url.pathname + url.search + url.hash
         );
+        router.replace(cardsPath);
+        router.refresh();
       }
 
       return true;
@@ -735,36 +728,12 @@ export default function ExamClient({
         try {
           checkpoint(action);
 
-          window.location.assign(
-            `/login?redirect=${encodeURIComponent(
-              guestExamLoginRedirectPath(action)
-            )}`
-          );
+          loginRedirect(action);
         } catch (failure) {
           setSaveError(failure.message);
         }
       } else {
-        if (action === "submit" && localFinalResult) {
-          const finalResult = {
-            ...localFinalResult,
-            id: current.pauseId,
-            pauseid: current.pauseId,
-            exam_id: id,
-            exam_type: type,
-          };
-
-          current.submittedResult = finalResult;
-          setSubmittedResult(finalResult);
-          setSubmitted(true);
-          setResultModalOpen(true);
-
-          try {
-            checkpoint(action);
-          } catch {
-            // Keep the in-memory result available if browser storage is unavailable.
-          }
-        }
-
+        snapshot.current.frozen = Boolean(showTimeoutModal);
         setSaveError(
           error.message ||
           "Unable to save. Your answers are retained; retry Finish."
@@ -773,6 +742,9 @@ export default function ExamClient({
 
       return false;
     } finally {
+      if (!snapshot.current.submittedResult && !snapshot.current.frozen) {
+        snapshot.current.frozen = false;
+      }
       lock.current = false;
       setSaving(false);
     }
@@ -793,7 +765,12 @@ export default function ExamClient({
     autoHandled.current = true;
 
     if (!snapshot.current.submittedResult) {
-      void save(guestAction);
+      if (guestAction === "pause") {
+        snapshot.current.frozen = false;
+        setShowPauseConfirmation(true);
+      } else {
+        void save("submit");
+      }
     }
   }, [
     ready,
@@ -869,13 +846,15 @@ export default function ExamClient({
       submitted ||
       paused ||
       remainingSeconds !== 0 ||
-      timeoutHandled.current
+      timeoutHandled.current ||
+      showTimeoutModal
     ) {
       return;
     }
 
     timeoutHandled.current = true;
-    void save("submit");
+    snapshot.current.frozen = true;
+    setShowTimeoutModal(true);
   }, [
     ready,
     restoreError,
@@ -959,16 +938,18 @@ export default function ExamClient({
     void save("pause");
   }
 
-  function viewAttempted() {
+  function viewAttempted(result) {
     try {
       clearGuestExamHandoff();
     } catch { }
 
-    router.push(
-      `/dashboard/${encodeURIComponent(
-        governmentExamsSlug
-      )}/exam-attempted`
-    );
+    const attemptId = positiveId(getAttemptId(result ?? submittedResult));
+    if (!attemptId) {
+      setSaveError("The saved attempt ID is unavailable. Please open Exam Attempted from your dashboard.");
+      return;
+    }
+    const title = exam?.exam_name ?? exam?.title ?? "Topic Wise Exam";
+    router.push(`/dashboard/${governmentExamsSlug}/exam-analysis?attemptId=${attemptId}&examType=twe&title=${encodeURIComponent(title)}`);
   }
 
   if (restoreError) {
@@ -1126,6 +1107,21 @@ export default function ExamClient({
         onClose={() => setResultModalOpen(false)}
         onViewAnalysis={viewAttempted}
       />
+      {showTimeoutModal && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/70 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="timeout-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="timeout-title" className="text-xl font-black text-[#071f55]">Time is up</h2>
+            <p className="mt-3 text-sm text-slate-600">Your exam time has ended. Submit to save your answers and see your result.</p>
+            {saveError && <p role="alert" className="mt-3 text-sm text-red-700">{saveError}</p>}
+            <button type="button" disabled={saving} onClick={async () => {
+              const saved = await save("submit");
+              if (saved) setShowTimeoutModal(false);
+            }} className="mt-5 w-full rounded-xl bg-blue-700 px-5 py-3 font-bold text-white disabled:opacity-50">
+              {saving ? "Saving..." : "Finish and Save Exam"}
+            </button>
+          </div>
+        </div>
+      )}
       <ExamPauseConfirmModal
         open={showPauseConfirmation}
         saving={saving}

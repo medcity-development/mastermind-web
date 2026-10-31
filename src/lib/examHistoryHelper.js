@@ -1,4 +1,5 @@
 import "server-only";
+import { executePscRequest, isPscRateLimited, setPscRateLimit } from "@/lib/pscRequestManager";
 
 import {
   normalizeHistoryType,
@@ -10,8 +11,6 @@ import {
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 const MAX_CACHE_SIZE = 300;
-
-let cooldownUntil = 0;
 
 const NAME_FIELDS = [
   "_resolvedExamName",
@@ -198,24 +197,6 @@ function extractRows(response) {
   return rows;
 }
 
-function retryMs(value) {
-  const seconds = Number(value);
-
-  if (
-    value != null &&
-    value !== "" &&
-    Number.isFinite(seconds)
-  ) {
-    return Math.max(1000, seconds * 1000);
-  }
-
-  const date = Date.parse(value);
-
-  return Number.isFinite(date)
-    ? Math.max(1000, date - Date.now())
-    : 60000;
-}
-
 async function requestApi(endpoint, payload) {
   const base = String(
     process.env.PSC_API_BASE_URL || ""
@@ -247,7 +228,7 @@ async function requestApi(endpoint, payload) {
     return existing.promise;
   }
 
-  if (Date.now() < cooldownUntil) {
+  if (isPscRateLimited()) {
     return null;
   }
 
@@ -269,7 +250,7 @@ async function requestApi(endpoint, payload) {
         }
       }
 
-      const response = await fetch(
+      const response = await executePscRequest({ key, task: () => fetch(
         `${base}/${endpoint}`,
         {
           method: "POST",
@@ -280,23 +261,18 @@ async function requestApi(endpoint, payload) {
           },
           signal: AbortSignal.timeout(15000),
         }
-      );
-
-      if (response.status === 429) {
-        cooldownUntil = Math.max(
-          cooldownUntil,
-          Date.now() +
-            retryMs(
-              response.headers.get("retry-after")
-            )
-        );
-
-        return null;
-      }
+      ) });
 
       if (!response.ok) return null;
 
       const result = await response.json();
+
+      if (result?.rateLimited === true || Number(result?.status) === 429 ||
+          Number(result?.httpStatus) === 429 || Number(result?.code) === 429 ||
+          /too many attempts|too many requests|rate[\s-]?limit/i.test(String(result?.message ?? result?.msg ?? ""))) {
+        setPscRateLimit(response.headers.get("Retry-After") ?? result?.retryAfter ?? result?.retry_after);
+        return null;
+      }
 
       if (
         !result ||
@@ -329,7 +305,7 @@ async function requestApi(endpoint, payload) {
   const result = await entry.promise;
 
   if (!result && cache.get(key) === entry) {
-    cache.delete(key);
+    entry.expiresAt = Date.now() + 20_000;
   }
 
   return result;
@@ -464,23 +440,23 @@ export async function resolveExamHistoryName({
     return "";
   }
 
-  const analyticsName = await getAnalyticsExamName({
+  // Details work for both paused and completed attempts; analytics may only
+  // exist after submission. Reuse details already cached by course verification.
+  const detailsName = extractName(await loadDetails({
     cid,
     uid,
     examId: resolvedId,
     examType: type,
-  });
+  }));
 
-  if (analyticsName) return analyticsName;
+  if (detailsName) return detailsName;
 
-  return extractName(
-    await loadDetails({
+  return getAnalyticsExamName({
       cid,
       uid,
       examId: resolvedId,
       examType: type,
-    })
-  );
+  });
 }
 
 function getMatchingExam(

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getUserExamAttempts } from "@/lib/examAttemptHelper";
+import { selectMockPausedAttempt } from "@/lib/mockPausedAttempt";
 
 import {
     getStudentSession,
@@ -11,6 +13,25 @@ import {
 } from "@/lib/examAttemptData";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(request) {
+    const session = await getStudentSession();
+    const uid = positiveId(session?.uid);
+    if (!uid) return reply({ status: false, message: "Please sign in to continue." }, 401);
+    const { searchParams } = new URL(request.url);
+    const cid = positiveId(searchParams.get("cid"));
+    const examId = positiveId(searchParams.get("exam_id"));
+    if (!cid || !examId) return reply({ status: false, message: "Course and exam IDs are required." }, 400);
+    try {
+        const result = await getUserExamAttempts({ uid, cid, examId, examType: "pqp" });
+        if (failed(result?.status) && (result?.message || result?.msg)) {
+            throw new Error(result.message || result.msg);
+        }
+        return reply({ status: true, paused: selectMockPausedAttempt(result, { uid, cid, examId, examType: "pqp" }) });
+    } catch (error) {
+        return reply({ status: false, message: error?.message || "Unable to load saved progress." }, 502);
+    }
+}
 
 function positiveId(value) {
     const number = Number(value);

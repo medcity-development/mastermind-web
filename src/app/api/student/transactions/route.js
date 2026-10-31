@@ -10,6 +10,11 @@ import {
   getUserTransactions,
 } from "@/lib/pscApi";
 
+import {
+  getPscCooldownSeconds,
+  setPscRateLimit,
+} from "@/lib/pscRequestManager";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -18,13 +23,25 @@ export const revalidate = 0;
    RESPONSE
 ========================================================= */
 
-function reply(body, status = 200) {
+function reply(
+  body,
+  status = 200,
+  retryAfter = null
+) {
+  const headers = {
+    "Cache-Control":
+      "private, no-store, no-cache, must-revalidate",
+  };
+
+  if (status === 429) {
+    headers["Retry-After"] = String(
+      retryAfter ?? 60
+    );
+  }
+
   return NextResponse.json(body, {
     status,
-    headers: {
-      "Cache-Control":
-        "private, no-store, no-cache, must-revalidate",
-    },
+    headers,
   });
 }
 
@@ -72,23 +89,14 @@ function getMessage(result, fallback) {
 }
 
 function getTransactionsArray(result) {
-  if (Array.isArray(result?.transactions)) {
-    return result.transactions;
-  }
+  const candidates = [
+    result?.transactions,
+    result?.data,
+    result?.raw?.data,
+    result?.raw?.transactions,
+  ];
 
-  if (Array.isArray(result?.data)) {
-    return result.data;
-  }
-
-  if (Array.isArray(result?.raw?.data)) {
-    return result.raw.data;
-  }
-
-  if (Array.isArray(result?.raw?.transactions)) {
-    return result.raw.transactions;
-  }
-
-  return null;
+  return candidates.find(Array.isArray) ?? null;
 }
 
 function getTransactionObject(result) {
@@ -124,30 +132,105 @@ function getTransactionObject(result) {
   return null;
 }
 
-function matchesTransactionId(transaction, tid) {
+function matchesTransactionId(
+  transaction,
+  tid
+) {
   const transactionId =
     transaction?.id ??
     transaction?.tid ??
     transaction?.transaction_record_id;
 
-  if (transactionId === undefined || transactionId === null) {
+  if (
+    transactionId === undefined ||
+    transactionId === null
+  ) {
     return true;
   }
 
   return String(transactionId) === String(tid);
 }
 
-function matchesAuthenticatedUser(transaction, uid) {
+function matchesAuthenticatedUser(
+  transaction,
+  uid
+) {
   const transactionUid =
     transaction?.uid ??
     transaction?.user_id ??
     transaction?.userId;
 
-  if (transactionUid === undefined || transactionUid === null) {
+  if (
+    transactionUid === undefined ||
+    transactionUid === null
+  ) {
     return true;
   }
 
   return String(transactionUid) === String(uid);
+}
+
+/* =========================================================
+   RATE LIMIT HELPERS
+========================================================= */
+
+function isRateLimited(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const status = Number(
+    value.httpStatus ??
+    value.statusCode ??
+    value.code
+  );
+
+  if (
+    status === 429 ||
+    value.rateLimited === true
+  ) {
+    return true;
+  }
+
+  const message = getMessage(
+    value,
+    value?.message ?? ""
+  );
+
+  return /too many attempts|too many requests|rate[\s-]?limit/i.test(
+    String(message)
+  );
+}
+
+function rateLimitResponse(
+  source,
+  tid = null
+) {
+  const providedRetry =
+    source?.retryAfter ??
+    source?.retry_after ??
+    null;
+
+  const retryAfter =
+    providedRetry !== null
+      ? setPscRateLimit(providedRetry)
+      : getPscCooldownSeconds() ||
+        setPscRateLimit();
+
+  return reply(
+    {
+      status: false,
+      message:
+        "Purchase history is temporarily rate-limited. Please try again later.",
+      rateLimited: true,
+      retryAfter,
+      ...(tid
+        ? { transaction: null }
+        : { data: [] }),
+    },
+    429,
+    retryAfter
+  );
 }
 
 /* =========================================================
@@ -168,7 +251,8 @@ export async function GET(request) {
     return reply(
       {
         status: false,
-        message: "Unable to verify your session.",
+        message:
+          "Unable to verify your session.",
         data: [],
       },
       503
@@ -193,7 +277,8 @@ export async function GET(request) {
     request.url
   ).searchParams;
 
-  const requestedTid = searchParams.get("tid");
+  const requestedTid =
+    searchParams.get("tid");
 
   const tid =
     requestedTid === null
@@ -228,6 +313,10 @@ export async function GET(request) {
           uid,
         });
   } catch (error) {
+    if (isRateLimited(error)) {
+      return rateLimitResponse(error, tid);
+    }
+
     console.error(
       "Student transaction backend request failed:",
       {
@@ -270,6 +359,18 @@ export async function GET(request) {
           : { data: [] }),
       },
       502
+    );
+  }
+
+  if (
+    isRateLimited(result) ||
+    isRateLimited(result.raw)
+  ) {
+    return rateLimitResponse(
+      isRateLimited(result)
+        ? result
+        : result.raw,
+      tid
     );
   }
 
@@ -328,8 +429,14 @@ export async function GET(request) {
     }
 
     if (
-      !matchesTransactionId(transaction, tid) ||
-      !matchesAuthenticatedUser(transaction, uid)
+      !matchesTransactionId(
+        transaction,
+        tid
+      ) ||
+      !matchesAuthenticatedUser(
+        transaction,
+        uid
+      )
     ) {
       return reply(
         {
@@ -357,15 +464,7 @@ export async function GET(request) {
 
   if (!transactions) {
     console.error(
-      "Purchase history response has no valid transaction array.",
-      {
-        hasTransactions:
-          Array.isArray(result.transactions),
-        hasData:
-          Array.isArray(result.data),
-        hasRawData:
-          Array.isArray(result.raw?.data),
-      }
+      "Purchase history response has no valid transaction array."
     );
 
     return reply(
@@ -379,16 +478,16 @@ export async function GET(request) {
     );
   }
 
-  // Validate the ownership of returned records.
-  // Do not allow records explicitly belonging
-  // to a different student into the response.
   const ownedTransactions =
     transactions.filter((transaction) => {
       return (
         transaction &&
         typeof transaction === "object" &&
         !Array.isArray(transaction) &&
-        matchesAuthenticatedUser(transaction, uid)
+        matchesAuthenticatedUser(
+          transaction,
+          uid
+        )
       );
     });
 

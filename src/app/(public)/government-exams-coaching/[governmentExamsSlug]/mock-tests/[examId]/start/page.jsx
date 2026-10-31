@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 
 import {
@@ -5,74 +6,52 @@ import {
   redirect,
 } from "next/navigation";
 
-import {
-  ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import {
   getGovernmentExamConfig,
 } from "@/lib/governmentExamConfig";
-import { getStudentSession } from "@/lib/auth/getStudentSession";
-import { checkPremiumExamAccess } from "@/lib/premiumExamAccess";
+
+import {
+  getStudentSession,
+} from "@/lib/auth/getStudentSession";
+
+import {
+  checkPremiumExamAccess,
+} from "@/lib/premiumExamAccess";
 
 import MockTestQuestions from "../components/MockTestQuestions";
 
-function getNumberParam(
-  value,
-  fallback = 0
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return fallback;
+function positiveId(value) {
+  if (value == null || String(value).trim() === "") {
+    return null;
   }
 
-  const parsed =
-    Number(value);
+  const number = Number(value);
 
-  return Number.isFinite(
-    parsed
-  )
-    ? parsed
-    : fallback;
+  return Number.isSafeInteger(number) && number > 0
+    ? number
+    : null;
 }
 
-/* =========================================================
-   SEO
-========================================================= */
+export async function generateMetadata({ params }) {
+  const { governmentExamsSlug } = await params;
 
-export async function generateMetadata({
-  params,
-}) {
-  const {
-    governmentExamsSlug,
-  } = await params;
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
-
-  if (!config) {
-    return {};
-  }
+  if (!config) return {};
 
   return {
     title:
       `${config.name} Mock Test Exam | MasterMind Academy`,
-
     robots: {
       index: false,
       follow: false,
     },
   };
 }
-
-/* =========================================================
-   PAGE
-========================================================= */
 
 export default async function MockExamStartPage({
   params,
@@ -83,13 +62,11 @@ export default async function MockExamStartPage({
     examId,
   } = await params;
 
-  const query =
-    await searchParams;
+  const query = await searchParams;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const config = getGovernmentExamConfig(
+    governmentExamsSlug
+  );
 
   if (!config) {
     notFound();
@@ -102,27 +79,33 @@ export default async function MockExamStartPage({
   } = config;
 
   const session = await getStudentSession();
-  const uid = getNumberParam(session?.uid, 0);
+  const uid = positiveId(session?.uid) ?? 0;
 
-  const title =
-    String(
-      query?.title ??
-        ""
-    );
-  const selectedExamId =
-    String(query?.examId ?? (/^\d+$/.test(examId) ? examId : ""));
+  const title = String(query?.title ?? "");
+
+  const selectedExamId = positiveId(
+    query?.examId ?? examId
+  );
 
   const detailsPath =
-    `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${examId}`;
+    `/government-exams-coaching/` +
+    `${governmentExamsSlug}/mock-tests/${examId}`;
 
   if (!selectedExamId) {
     redirect(detailsPath);
   }
 
   const examType =
-    String(query?.type || "mock").toLowerCase() === "studyplan"
+    String(query?.type || "mock").toLowerCase() ===
+    "studyplan"
       ? "studyplan"
       : "mock";
+
+  const guestAction =
+    ["pause", "submit"].includes(query?.guestAction)
+      ? query.guestAction
+      : "";
+
   const access = await checkPremiumExamAccess({
     uid,
     cid,
@@ -132,7 +115,8 @@ export default async function MockExamStartPage({
 
   if (access.isPremium && !access.hasAccess) {
     const packagesPath =
-      `/dashboard/${governmentExamsSlug}?showPackages=1`;
+      `/dashboard/${governmentExamsSlug}` +
+      `?showPackages=1`;
 
     if (uid <= 0) {
       redirect(
@@ -143,13 +127,19 @@ export default async function MockExamStartPage({
     redirect(packagesPath);
   }
 
+  // Use the shared signed-in flow, including guest actions returning from login.
+  if (uid > 0) {
+    const destinationQuery = new URLSearchParams({
+      examId: String(selectedExamId),
+      type: examType,
+      ...(title ? { title } : {}),
+      ...(guestAction ? { guestAction } : {}),
+    });
+    redirect(`/dashboard/${governmentExamsSlug}/mock-tests/${examId}/start?${destinationQuery}`);
+  }
+
   return (
-    <main
-      className="
-        min-h-screen
-        bg-[#f5f9ff]
-      "
-    >
+    <main className="min-h-screen bg-[#f5f9ff]">
       <div
         className="
           mx-auto
@@ -164,8 +154,7 @@ export default async function MockExamStartPage({
       >
         <div
           className="
-            mb-6
-            mt-20
+            mb-6 mt-10
             flex
             flex-col
             gap-3
@@ -177,17 +166,11 @@ export default async function MockExamStartPage({
           <div>
             <Link
               href={{
-                pathname:
-                  detailsPath,
-
+                pathname: detailsPath,
                 query: {
-                  uid:
-                    String(
-                      uid
-                    ),
-
+                  uid: String(uid),
                   title,
-                  examId: selectedExamId,
+                  examId: String(selectedExamId),
                 },
               }}
               className="
@@ -203,54 +186,29 @@ export default async function MockExamStartPage({
                 text-[11px]
                 font-bold
                 text-[#164fa5]
-                transition
-                hover:border-blue-300
                 hover:bg-blue-100
               "
             >
-              <ArrowLeft
-                size={14}
-              />
-
+              <ArrowLeft size={14} />
               Back to Instructions
             </Link>
 
-            <p
-              className="
-                mt-3
-                text-[11px]
-                text-slate-500
-              "
-            >
-              Answer the {name}
-              questions before the
+            <p className="mt-3 text-[11px] text-slate-500">
+              Answer the {name} questions before the
               timer expires.
             </p>
           </div>
         </div>
 
         <MockTestQuestions
-          examId={
-            selectedExamId
-          }
-          uid={
-            uid
-          }
-          cid={
-            cid
-          }
-          examTitle={
-            title
-          }
-          examName={
-            name
-          }
-          shortName={
-            shortName
-          }
-          governmentExamsSlug={
-            governmentExamsSlug
-          }
+          examId={selectedExamId}
+          uid={uid}
+          cid={cid}
+          examTitle={title}
+          examName={name}
+          shortName={shortName}
+          governmentExamsSlug={governmentExamsSlug}
+          guestAction={guestAction}
         />
       </div>
     </main>

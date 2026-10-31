@@ -151,7 +151,7 @@ export default function TestimonialFAQ() {
               sm:leading-7
             "
           >
-            Find answers to common questions about Medcity's coaching,
+            Find answers to common questions about Medcity&apos;s coaching,
             student testimonials and competitive exam preparation.
           </p>
         </div>

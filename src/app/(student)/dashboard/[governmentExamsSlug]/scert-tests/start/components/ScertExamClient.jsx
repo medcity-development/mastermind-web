@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -11,7 +12,6 @@ import { useRouter } from "next/navigation";
 
 import {
   getAttemptId,
-  getResultArray,
   parseAnswers,
   savedPausedTimeToSeconds,
   timestampToMilliseconds,
@@ -28,10 +28,12 @@ import ScertExamHeader from "./ScertExamHeader";
 import ScertQuestionList from "./ScertQuestionList";
 import ScertPagination from "./ScertPagination";
 import ScertExamActions from "./ScertExamActions";
-import ScertFinishModal from "./ScertFinishModal";
+
 
 import ExamResultModal from "@/components/ExamResultModal";
-import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
+import ExamPauseConfirmationModal from "@/app/(student)/dashboard/common-components/exam/ExamPauseConfirmationModal";
+import ExamTimeFinishedModal from "@/components/exam-timer/ExamTimeFinishedModal";
+import LoginRequiredModal from "@/app/(public)/government-exams-coaching/[governmentExamsSlug]/previous-questions/[examId]/components/LoginRequiredModal";
 
 function positiveId(value) {
   const number = Number(value);
@@ -159,10 +161,18 @@ export default function ScertExamClient({
     setShowPauseModal,
   ] = useState(false);
 
-  const [
-    showFinishModal,
-    setShowFinishModal,
-  ] = useState(false);
+  const [loginAction, setLoginAction] = useState("");
+  const [interactionFrozen, setInteractionFrozen] = useState(isHandoff);
+  const authenticated = Boolean(positiveId(uid));
+  const cardsPath = `${authenticated ? "/dashboard" : "/government-exams-coaching"}/${encodeURIComponent(governmentExamsSlug)}/scert-tests/classes/${encodeURIComponent(classId)}`;
+  const guestTimedOut = ready && !restoreError && !authenticated && remainingSeconds === 0 && !loginAction;
+
+  useEffect(() => {
+    if (!guestTimedOut) return;
+    try { localStorage.removeItem(draftKey); } catch { /* Storage may be unavailable. */ }
+    const timer = window.setTimeout(() => router.replace(cardsPath), 5000);
+    return () => window.clearTimeout(timer);
+  }, [guestTimedOut, cardsPath, router, draftKey]);
 
   const [
     resultModalOpen,
@@ -174,6 +184,7 @@ export default function ScertExamClient({
     setSubmittedResult,
   ] = useState(null);
 
+  const [initialStartTime] = useState(Date.now);
   const lock = useRef(false);
   const autoHandled = useRef(false);
   const timeoutHandled = useRef(false);
@@ -182,7 +193,7 @@ export default function ScertExamClient({
     answers: {},
     remainingSeconds: fullDuration,
     currentPage: 1,
-    startTime: Date.now(),
+    startTime: initialStartTime,
     endTime: null,
     pauseId: initialPauseId,
     boundUid: null,
@@ -219,7 +230,7 @@ export default function ScertExamClient({
 
   /* LOCAL DRAFT */
 
-  function storeDraft() {
+  const storeDraft = useCallback(() => {
     try {
       localStorage.setItem(
         draftKey,
@@ -232,9 +243,9 @@ export default function ScertExamClient({
     } catch {
       // Guest login uses checked storage below.
     }
-  }
+  }, [draftKey, questionIds]);
 
-  function checkpoint(action) {
+  const checkpoint = useCallback((action) => {
     return saveGuestExamHandoff({
       ...snapshot.current,
       examId: id,
@@ -246,19 +257,19 @@ export default function ScertExamClient({
       questionIds,
       action,
     });
-  }
+  }, [id, cid, classId, testSlug, governmentExamsSlug, questionIds]);
 
   /* RESTORE DRAFT / GUEST / PAUSED ATTEMPT */
 
   useEffect(() => {
     let cancelled = false;
 
-    setReady(false);
-    setRestoreError("");
 
     async function restore() {
       try {
         let saved = null;
+        let row = null;
+        let resolvedPauseId = null;
 
         if (isHandoff) {
           saved = readGuestExamHandoff({
@@ -313,54 +324,23 @@ export default function ScertExamClient({
           }
         }
 
-        if (
-          !isHandoff &&
-          mode === "resume"
-        ) {
-          if (
-            !positiveId(uid) ||
-            !positiveId(initialPauseId)
-          ) {
-            throw new Error(
-              "Sign in and reopen the paused exam."
-            );
+        if (!isHandoff && authenticated) {
+          const query = new URLSearchParams({ cid: String(cid), exam_id: String(id) });
+          const response = await fetch(`/api/scert-attempt?${query}`, { cache: "no-store" });
+          const result = await response.json();
+          if (!response.ok || failed(result?.status)) {
+            throw new Error(result?.message || "Unable to load paused SCERT progress.");
           }
-
-          const result = await post(
-            "/api/exam-attempt/analytics-details",
-            {
-              cid,
-              id: initialPauseId,
-              exam_type: type,
-            }
-          );
-
-          const row = getResultArray(result)[0];
-
-          if (!row) {
-            throw new Error(
-              "Saved exam answers were not returned."
-            );
+          row = result.paused ?? null;
+          resolvedPauseId = positiveId(getAttemptId(row));
+          if (mode === "resume" && (!resolvedPauseId || (initialPauseId && String(initialPauseId) !== String(resolvedPauseId)))) {
+            throw new Error("This paused attempt is no longer available. Reopen the exam from its cards.");
           }
+          // Only reuse a local draft after its saved attempt is verified by the server.
+          if (!resolvedPauseId || String(saved?.pauseId) !== String(resolvedPauseId)) saved = null;
+        }
 
-          if (
-            row.exam_id != null &&
-            String(row.exam_id) !== String(id)
-          ) {
-            throw new Error(
-              "The paused attempt belongs to another exam."
-            );
-          }
-
-          if (
-            row.cid != null &&
-            Number(row.cid) !== Number(cid)
-          ) {
-            throw new Error(
-              "The paused attempt belongs to another course."
-            );
-          }
-
+        if (row) {
           const values = parseAnswers(
             row.user_answers
           );
@@ -397,11 +377,11 @@ export default function ScertExamClient({
 
             currentPage:
               String(saved?.pauseId) ===
-                String(initialPauseId)
+                String(resolvedPauseId)
                 ? saved.currentPage
                 : 1,
 
-            pauseId: initialPauseId,
+            pauseId: resolvedPauseId,
             boundUid: Number(uid),
           };
         }
@@ -462,7 +442,7 @@ export default function ScertExamClient({
               ) ?? Date.now(),
 
             endTime: saved.endTime ?? null,
-            pauseId: saved.pauseId ?? initialPauseId,
+            pauseId: saved.pauseId ?? resolvedPauseId,
             boundUid: saved.boundUid ?? null,
 
             submittedResult:
@@ -479,12 +459,14 @@ export default function ScertExamClient({
             currentPage: 1,
             startTime: Date.now(),
             endTime: null,
-            pauseId: initialPauseId,
+            pauseId: resolvedPauseId,
             boundUid: null,
             submittedResult: null,
             frozen: false,
           };
 
+        setInteractionFrozen(snapshot.current.frozen);
+        setShowPauseModal(isHandoff && guestAction === "pause" && !snapshot.current.submittedResult);
         setAnswers(snapshot.current.answers);
 
         setRemainingSeconds(
@@ -536,15 +518,18 @@ export default function ScertExamClient({
     guestAction,
     isHandoff,
     governmentExamsSlug,
+    authenticated,
   ]);
 
   /* SAVE PAUSE / FINISH */
 
-  async function save(action) {
+  const save = useCallback(async (action) => {
     if (
       !ready ||
       restoreError ||
-      lock.current
+      lock.current ||
+      paused ||
+      ((action === "pause" || !authenticated) && snapshot.current.remainingSeconds <= 0)
     ) {
       return false;
     }
@@ -555,12 +540,15 @@ export default function ScertExamClient({
     }
 
     lock.current = true;
+    const wasFrozen = snapshot.current.frozen;
+    let success = false;
+    let redirecting = false;
     snapshot.current.frozen = true;
+    setInteractionFrozen(true);
 
     setSaving(true);
     setSaveError("");
-    setShowFinishModal(false);
-    setShowPauseModal(false);
+
 
     if (action === "submit") {
       snapshot.current.endTime ??= Date.now();
@@ -574,7 +562,8 @@ export default function ScertExamClient({
       if (!positiveId(uid)) {
         checkpoint(action);
 
-        window.location.assign(
+        redirecting = true;
+        router.push(
           `/login?redirect=${encodeURIComponent(
             guestExamLoginRedirectPath(action)
           )}`
@@ -651,9 +640,14 @@ export default function ScertExamClient({
         current.boundUid = Number(uid);
 
         if (action !== "submit") storeDraft();
-        if (isHandoff) checkpoint(action);
+        if (isHandoff) {
+          try { checkpoint(action); } catch { /* The backend already saved this attempt. */ }
+        }
       }
 
+      success = true;
+      setShowPauseModal(false);
+      setLoginAction("");
       if (action === "submit") {
         const finalResult = {
           ...result.savedResult,
@@ -694,13 +688,7 @@ export default function ScertExamClient({
           } catch { }
         }
 
-        router.push(
-          `/dashboard/${encodeURIComponent(
-            governmentExamsSlug
-          )}/scert-tests/classes/${encodeURIComponent(
-            classId
-          )}`
-        );
+        router.replace(cardsPath);
       }
 
       return true;
@@ -709,7 +697,8 @@ export default function ScertExamClient({
         try {
           checkpoint(action);
 
-          window.location.assign(
+          redirecting = true;
+          router.push(
             `/login?redirect=${encodeURIComponent(
               guestExamLoginRedirectPath(action)
             )}`
@@ -728,8 +717,13 @@ export default function ScertExamClient({
     } finally {
       lock.current = false;
       setSaving(false);
+      if (!success && !redirecting) {
+        snapshot.current.frozen = wasFrozen;
+        if (!wasFrozen) snapshot.current.endTime = null;
+        setInteractionFrozen(wasFrozen);
+      }
     }
-  }
+  }, [ready, restoreError, paused, authenticated, uid, checkpoint, router, cid, id, lastPosition, totalQuestions, exam, questions, answerKeys, storeDraft, isHandoff, draftKey, cardsPath]);
 
   /* CONTINUE THE GUEST ACTION AFTER LOGIN */
 
@@ -745,14 +739,15 @@ export default function ScertExamClient({
 
     autoHandled.current = true;
 
-    if (!snapshot.current.submittedResult) {
-      void save(guestAction);
+    if (guestAction === "submit" && !snapshot.current.submittedResult) {
+      void save("submit");
     }
   }, [
     ready,
     restoreError,
     isHandoff,
     guestAction,
+    save,
   ]);
 
   /* TIMER */
@@ -765,8 +760,8 @@ export default function ScertExamClient({
       paused ||
       saving ||
       showPauseModal ||
-      showFinishModal ||
-      snapshot.current.frozen ||
+      loginAction ||
+      interactionFrozen ||
       remainingSeconds <= 0
     ) {
       return;
@@ -810,9 +805,11 @@ export default function ScertExamClient({
     paused,
     saving,
     showPauseModal,
-    showFinishModal,
+    loginAction,
+    interactionFrozen,
     remainingSeconds,
     draftKey,
+    storeDraft,
   ]);
 
   /* TIMEOUT */
@@ -821,7 +818,8 @@ export default function ScertExamClient({
     if (
       !ready ||
       restoreError ||
-      isHandoff ||
+      !authenticated ||
+      interactionFrozen ||
       saving ||
       submitted ||
       paused ||
@@ -836,11 +834,13 @@ export default function ScertExamClient({
   }, [
     ready,
     restoreError,
-    isHandoff,
+    authenticated,
+    interactionFrozen,
     saving,
     submitted,
     paused,
     remainingSeconds,
+    save,
   ]);
 
   function handleAnswer(questionId, value) {
@@ -865,7 +865,7 @@ export default function ScertExamClient({
   }
 
   function handlePageChange(page) {
-    if (!ready || saving) return;
+    if (!ready || saving || paused || submitted || interactionFrozen || remainingSeconds <= 0) return;
 
     const next = Math.max(
       1,
@@ -886,16 +886,36 @@ export default function ScertExamClient({
     });
   }
 
-  function viewAttempted() {
-    try {
-      clearGuestExamHandoff();
-    } catch { }
+  function continueExam() {
+    if (saving) return;
+    snapshot.current.frozen = false;
+    snapshot.current.endTime = null;
+    setInteractionFrozen(false);
+    setShowPauseModal(false);
+    setLoginAction("");
+    clearGuestExamHandoff();
+  }
 
-    router.push(
-      `/dashboard/${encodeURIComponent(
-        governmentExamsSlug
-      )}/exam-attempted`
-    );
+  function requestAction(action) {
+    if (!ready || saving || paused || submitted) return;
+    if (!authenticated) {
+      if (remainingSeconds <= 0) return;
+      snapshot.current.frozen = true;
+      setInteractionFrozen(true);
+      setLoginAction(action);
+    } else if (action === "pause") {
+      if (remainingSeconds > 0) setShowPauseModal(true);
+    } else {
+      void save("submit");
+    }
+  }
+
+  function viewAnalysis() {
+    const attemptId = submittedResult?.pauseid ?? submittedResult?.id;
+    if (!attemptId) return;
+    clearGuestExamHandoff();
+    const query = new URLSearchParams({ attemptId: String(attemptId), examType: "scert", title: exam?.exam_name ?? exam?.title ?? "SCERT Exam" });
+    router.push(`/dashboard/${encodeURIComponent(governmentExamsSlug)}/exam-analysis?${query}`);
   }
 
   if (restoreError) {
@@ -979,8 +999,8 @@ export default function ScertExamClient({
               saving ||
               submitted ||
               paused ||
-              isHandoff ||
-              snapshot.current.frozen ||
+              showPauseModal ||
+              interactionFrozen ||
               remainingSeconds <= 0
             }
             startIndex={startIndex}
@@ -997,16 +1017,8 @@ export default function ScertExamClient({
             <ScertExamActions
               saving={saving}
               submitted={submitted}
-              onPause={() => {
-                if (!saving && !paused) {
-                  setShowPauseModal(true);
-                }
-              }}
-              onFinish={() => {
-                if (!saving) {
-                  setShowFinishModal(true);
-                }
-              }}
+              onPause={() => requestAction("pause")}
+              onFinish={() => requestAction("submit")}
             />
           )}
 
@@ -1022,28 +1034,24 @@ export default function ScertExamClient({
         </section>
       </div>
 
-      <ExamPauseConfirmModal
-        open={showPauseModal}
+      <ExamPauseConfirmationModal
+        open={showPauseModal && remainingSeconds > 0}
         saving={saving}
-        onClose={() => {
-          if (!saving) {
-            setShowPauseModal(false);
-          }
-        }}
+        error={saveError}
+        onContinue={continueExam}
         onConfirm={() => save("pause")}
       />
 
-      <ScertFinishModal
-        open={showFinishModal}
-        saving={saving}
-        attempted={answeredCount}
-        totalQuestions={totalQuestions}
-        onClose={() => {
-          if (!saving) {
-            setShowFinishModal(false);
-          }
-        }}
-        onConfirm={() => save("submit")}
+      <LoginRequiredModal
+        open={Boolean(loginAction)}
+        onClose={continueExam}
+        onLogin={() => save(loginAction)}
+      />
+
+      <ExamTimeFinishedModal
+        open={guestTimedOut}
+        message="Your exam time has expired. Returning to the exam cards in 5 seconds."
+        onBackToExams={() => router.replace(cardsPath)}
       />
 
       <ExamResultModal
@@ -1054,8 +1062,8 @@ export default function ScertExamClient({
           exam?.title ??
           "SCERT Exam"
         }
-        onClose={() => setResultModalOpen(false)}
-        onViewAnalysis={viewAttempted}
+        onClose={viewAnalysis}
+        onViewAnalysis={viewAnalysis}
       />
     </main>
   );

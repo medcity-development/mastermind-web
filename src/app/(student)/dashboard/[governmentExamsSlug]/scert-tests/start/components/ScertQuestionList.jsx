@@ -1,3 +1,4 @@
+
 import ScertQuestionCard from "./ScertQuestionCard";
 
 export default function ScertQuestionList({
@@ -8,22 +9,20 @@ export default function ScertQuestionList({
   disabled = false,
   startIndex = 0,
 }) {
-  if (
-    !questions.length
-  ) {
+  const safeQuestions = Array.isArray(questions)
+    ? questions
+    : [];
+
+  if (safeQuestions.length === 0) {
     return (
       <div
         className="
           rounded-xl
-          border
-          border-dashed
-          border-slate-300
+          border border-dashed border-slate-300
           bg-slate-50
-          px-6
-          py-12
+          px-6 py-12
           text-center
-          text-sm
-          text-slate-500
+          text-sm text-slate-500
         "
       >
         No questions available.
@@ -33,41 +32,27 @@ export default function ScertQuestionList({
 
   return (
     <div className="space-y-5">
-      {questions.map(
-        (
-          question,
-          index
-        ) => (
+      {safeQuestions.map((question, index) => {
+        const selectedAnswer =
+          typeof getSelectedAnswer === "function"
+            ? getSelectedAnswer(question)
+            : "";
+
+        return (
           <ScertQuestionCard
             key={
-              question?.id ||
-              index
+              question?.id ??
+              `question-${startIndex + index}`
             }
-            question={
-              question
-            }
-            questionNumber={
-              startIndex +
-              index +
-              1
-            }
-            selectedAnswer={
-              getSelectedAnswer(
-                question
-              )
-            }
-            onAnswer={
-              onAnswer
-            }
-            imagePath={
-              imagePath
-            }
-            disabled={
-              disabled
-            }
+            question={question}
+            questionNumber={startIndex + index + 1}
+            selectedAnswer={selectedAnswer}
+            onAnswer={onAnswer}
+            imagePath={imagePath}
+            disabled={disabled}
           />
-        )
-      )}
+        );
+      })}
     </div>
   );
 }

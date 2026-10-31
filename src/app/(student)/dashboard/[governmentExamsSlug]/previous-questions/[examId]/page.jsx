@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   notFound,
   redirect,
@@ -20,49 +21,18 @@ import {
 
 import ExamHero from "./components/ExamHero";
 import ExamInstructions from "./components/ExamInstructions";
+import ExamLoadError from "./components/ExamLoadError";
 
 /* =========================================================
    PARAM HELPERS
 ========================================================= */
 
-function getNumberParam(
-  value,
-  fallback
-) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return fallback;
-  }
+const loadDetails = cache((uid, cid, examId) =>
+  getPyqExamDetails({ uid, cid, examId, type: "pqp" })
+);
 
-  const number =
-    Number(value);
-
-  return Number.isNaN(
-    number
-  )
-    ? fallback
-    : number;
-}
-
-function getQueryValues(
-  query,
-  {
-    uid,
-    cid,
-  }
-) {
-  return {
-    uid,
-
-    cid,
-
-    type:
-      query?.type ??
-      "pqp",
-  };
+function getQueryValues(_query, { uid, cid }) {
+  return { uid: Number(uid) || 0, cid: Number(cid), type: "pqp" };
 }
 
 /* =========================================================
@@ -84,7 +54,7 @@ export async function generateMetadata({
       governmentExamsSlug
     );
 
-  if (!config) {
+  if (!config || !Number.isSafeInteger(Number(examId)) || Number(examId) <= 0) {
     return {};
   }
 
@@ -109,12 +79,7 @@ export async function generateMetadata({
   );
 
   const result =
-    await getPyqExamDetails({
-      uid,
-      cid,
-      examId,
-      type,
-    });
+    await loadDetails(uid, cid, examId);
 
   if (!result?.exam) {
     return {
@@ -156,7 +121,7 @@ export default async function PyqDetailsPage({
       governmentExamsSlug
     );
 
-  if (!config) {
+  if (!config || !Number.isSafeInteger(Number(examId)) || Number(examId) <= 0) {
     notFound();
   }
 
@@ -181,28 +146,26 @@ export default async function PyqDetailsPage({
   );
 
   const result =
-    await getPyqExamDetails({
-      uid,
-      cid,
-      examId,
-      type,
-    });
+    await loadDetails(uid, cid, examId);
 
   if (!result?.exam) {
-    notFound();
+    if (result?.httpStatus === 404) notFound();
+    return <ExamLoadError retryAfter={result?.retryAfter} />;
   }
 
-  if (
-    String(result.exam.access ?? "").trim().toLowerCase() ===
-    "paid"
-  ) {
-    const access = await checkPremiumExamAccess({
-      uid,
-      cid,
-      examId,
-      type,
-      exam: result.exam,
-    });
+  {
+    let access;
+    try {
+      access = await checkPremiumExamAccess({
+        uid,
+        cid,
+        examId,
+        type,
+        exam: result.exam,
+      });
+    } catch (error) {
+      return <ExamLoadError retryAfter={error?.retryAfter} />;
+    }
 
     if (!access.hasAccess) {
       redirect(

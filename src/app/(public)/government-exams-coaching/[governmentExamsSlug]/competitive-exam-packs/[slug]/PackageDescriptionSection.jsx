@@ -254,7 +254,7 @@ import {
                   text-[#0b216c]
                 "
               >
-                What You'll Get
+                What You&apos;ll Get
               </h2>
   
               <p

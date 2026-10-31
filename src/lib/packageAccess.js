@@ -1,5 +1,6 @@
 
 import "server-only";
+import { executePscRequest, setPscRateLimit } from "@/lib/pscRequestManager";
 
 import { getStudentSession } from "@/lib/auth/getStudentSession";
 import { getActivePlans, getPackageDetails } from "@/lib/packagesHelper";
@@ -163,12 +164,12 @@ function cachedAccess(key, load) {
   const now = Date.now();
   const existing = accessCache.get(key);
 
-  if (existing && existing.until > now) {
+  if (existing && (!existing.settled || existing.until > now)) {
     return existing.promise;
   }
 
   for (const [entryKey, entry] of accessCache) {
-    if (entry.until <= now) {
+    if (entry.settled && entry.until <= now) {
       accessCache.delete(entryKey);
     }
   }
@@ -177,12 +178,18 @@ function cachedAccess(key, load) {
     accessCache.delete(accessCache.keys().next().value);
   }
 
-  const entry = { until: now + 5_000 };
+  const entry = { until: 0, settled: false };
 
   entry.promise = Promise.resolve()
     .then(load)
+    .then((value) => {
+      entry.settled = true;
+      entry.until = Date.now() + 30_000;
+      return value;
+    })
     .catch((error) => {
-      entry.until = Date.now() + 3_000;
+      entry.settled = true;
+      entry.until = Date.now() + Math.max(3_000, (Number(error?.retryAfter) || 0) * 1000);
       throw error;
     });
 
@@ -289,7 +296,9 @@ async function readAccessData(endpoint, fields) {
     form.set(key, String(value));
   }
 
-  const response = await fetch(
+  const response = await executePscRequest({
+    key: JSON.stringify({ baseUrl, endpoint, fields }),
+    task: () => fetch(
     `${baseUrl.replace(/\/+$/, "")}/${endpoint}`,
     {
       method: "POST",
@@ -297,7 +306,7 @@ async function readAccessData(endpoint, fields) {
       cache: "no-store",
       signal: AbortSignal.timeout(20000),
     }
-  );
+  ) });
 
   if (!response.ok) {
     throw new Error(
@@ -307,7 +316,13 @@ async function readAccessData(endpoint, fields) {
 
   const result = await response.json();
 
-  if (result?.status !== true) {
+  if (Number(result?.status) === 429 || Number(result?.code) === 429 || result?.rateLimited === true ||
+      /too many requests|too many attempts|rate[\s-]?limit/i.test(String(result?.message ?? result?.msg ?? ""))) {
+    const retryAfter = setPscRateLimit(response.headers.get("Retry-After") ?? result?.retryAfter ?? result?.retry_after);
+    throw Object.assign(new Error("Course access verification is temporarily unavailable."), { httpStatus: 429, retryAfter });
+  }
+
+  if (![true, 1, "1", "true"].includes(result?.status)) {
     throw new Error("Unable to verify course content.");
   }
 

@@ -193,6 +193,8 @@ export default async function ScertStartPage({
 
   return (
     <ScertExamClient
+      key={`${examId}-${uid}-${mode}-${query?.guestAction || "new"}`}
+      examId={examId}
       exam={exam}
       questions={
         questions

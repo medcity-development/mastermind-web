@@ -1,12 +1,13 @@
+
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 
 import {
+  isValidQuestionAnswer,
   normalizeAnswer,
 } from "../utils/mockTestUtils";
 
@@ -14,81 +15,86 @@ export default function useMockExamAnswers({
   questions = [],
   disabled = false,
 }) {
-  const [
-    answers,
-    setAnswers,
-  ] = useState({});
+  const [answers, setAnswers] = useState({});
+  const answersRef = useRef({});
 
-  const answersRef =
-    useRef({});
+  const questionMap = useMemo(
+    () =>
+      new Map(
+        questions.map((question, index) => [
+          String(question?.id ?? index + 1),
+          question,
+        ])
+      ),
+    [questions]
+  );
 
-  useEffect(() => {
-    answersRef.current =
-      answers;
-  }, [
-    answers,
-  ]);
+  const handleAnswer = useCallback(
+    (questionId, answer) => {
+      if (disabled) return;
 
-  const handleAnswer =
-    useCallback(
-      (
-        questionId,
-        answer
-      ) => {
-        if (disabled) {
-          return;
-        }
+      const question = questionMap.get(
+        String(questionId)
+      );
 
-        setAnswers(
-          (previous) => {
-            const updated = {
-              ...previous,
+      const selected = normalizeAnswer(answer);
 
-              [questionId]:
-                answer,
-            };
+      if (
+        !question ||
+        !selected ||
+        !isValidQuestionAnswer(question, selected)
+      ) {
+        return;
+      }
 
-            answersRef.current =
-              updated;
+      setAnswers((previous) => {
+        const updated = {
+          ...previous,
+          [questionId]: selected,
+        };
 
-            return updated;
-          }
-        );
-      },
-      [
-        disabled,
-      ]
-    );
+        answersRef.current = updated;
 
-  const answeredCount =
-    useMemo(
-      () =>
-        Object.values(
-          answers
-        ).filter(
-          (answer) =>
-            Boolean(
-              normalizeAnswer(
-                answer
-              )
+        return updated;
+      });
+    },
+    [disabled, questionMap]
+  );
+
+  const answeredCount = useMemo(
+    () =>
+      questions.reduce((count, question, index) => {
+        const id = question?.id ?? index + 1;
+
+        return (
+          count +
+          Number(
+            isValidQuestionAnswer(
+              question,
+              answers[id]
             )
-        ).length,
-      [
-        answers,
-      ]
-    );
+          )
+        );
+      }, 0),
+    [questions, answers]
+  );
 
-  const unansweredCount =
-    Math.max(
-      0,
-      questions.length -
-        answeredCount
-    );
+  const unansweredCount = Math.max(
+    0,
+    questions.length - answeredCount
+  );
 
   const restoreAnswers = useCallback(
     (restored = {}) => {
-      answersRef.current = restored;
-      setAnswers(restored);
+      const next =
+        restored &&
+        typeof restored === "object" &&
+        !Array.isArray(restored)
+          ? { ...restored }
+          : {};
+
+      answersRef.current = next;
+      setAnswers(next);
     },
     []
   );
@@ -101,12 +107,9 @@ export default function useMockExamAnswers({
   return {
     answers,
     answersRef,
-
     answeredCount,
     unansweredCount,
-
     handleAnswer,
-
     restoreAnswers,
     resetAnswers,
   };

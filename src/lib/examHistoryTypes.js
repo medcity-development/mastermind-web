@@ -14,6 +14,12 @@ const TYPE_ALIASES = {
   "topic wise": "topicwise",
   topic_wise: "topicwise",
 
+  tst: "tst",
+  statement: "tst",
+  statementtype: "tst",
+  "statement-type": "tst",
+  "statement type": "tst",
+
   studyplan: "studyplan",
   "study-plan": "studyplan",
   "study plan": "studyplan",
@@ -25,6 +31,7 @@ const TYPE_LABELS = {
   pqp: "PYQ",
   scert: "SCERT",
   topicwise: "Topic Wise",
+  tst: "Statement Type",
   studyplan: "Study Plan",
 };
 
@@ -33,6 +40,7 @@ export const ENABLED_TYPES = [
   "pqp",
   "scert",
   "topicwise",
+  "tst",
   "studyplan",
 ];
 

@@ -7,6 +7,11 @@ import {
   normalizeCourseSlug,
 } from "@/lib/pscSlug";
 
+import {
+  executePscRequest,
+  setPscRateLimit,
+  getPscCooldownSeconds,
+} from "@/lib/pscRequestManager";
 /* =========================================================
    API CONFIGURATION
 ========================================================= */
@@ -24,9 +29,7 @@ function getApiConfig() {
   }
 
   return {
-    apiBaseUrl: String(apiBaseUrl)
-      .trim()
-      .replace(/\/+$/, ""),
+    apiBaseUrl: String(apiBaseUrl).trim().replace(/\/+$/, ""),
     apiKey: String(apiKey).trim(),
   };
 }
@@ -56,6 +59,7 @@ function isPscSuccessStatus(status) {
 /* =========================================================
    SHARED API REQUEST
 ========================================================= */
+
 
 async function postRequest({
   endpoint,
@@ -105,35 +109,48 @@ async function postRequest({
     fetchOptions.next = { revalidate };
   }
 
+  const requestKey = JSON.stringify({
+    endpoint: cleanEndpoint,
+    fields: Object.entries(fields)
+      .filter(([, value]) => value != null && value !== "")
+      .sort(([a], [b]) => a.localeCompare(b)),
+    cache: cache ?? null,
+    revalidate,
+  });
+
   let response;
 
   try {
-    response = await fetch(url, fetchOptions);
+    response = await executePscRequest({
+      key: requestKey,
+      task: () => fetch(url, fetchOptions),
+    });
   } catch (error) {
+    if (
+      error?.httpStatus === 429 ||
+      error?.status === 429
+    ) {
+      throw error;
+    }
+
     console.error("PSC API FETCH ERROR:", {
       endpoint: cleanEndpoint,
-      url,
-      error,
+      message: error?.message,
     });
 
-    throw new Error(
+    const failure = new Error(
       `${cleanEndpoint} request failed.`
     );
+
+    failure.httpStatus = 503;
+    failure.status = 503;
+
+    throw failure;
   }
 
   const text = await response.text();
-  const contentType =
-    response.headers.get("content-type") || "";
 
   if (!text.trim()) {
-    console.error("PSC API EMPTY RESPONSE:", {
-      endpoint: cleanEndpoint,
-      requestUrl: url,
-      responseUrl: response.url,
-      status: response.status,
-      contentType,
-    });
-
     throw new Error(
       `${cleanEndpoint} returned an empty response.`
     );
@@ -143,65 +160,53 @@ async function postRequest({
 
   try {
     result = JSON.parse(text);
-  } catch (error) {
-    console.error("PSC API INVALID JSON:", {
-      endpoint: cleanEndpoint,
-      requestUrl: url,
-      responseUrl: response.url,
-      status: response.status,
-      statusText: response.statusText,
-      contentType,
-      responseText: text.slice(0, 1500),
-    });
-
-    const normalized = text.trim().toLowerCase();
-
-    if (
-      normalized.startsWith("<!doctype") ||
-      normalized.startsWith("<html")
-    ) {
-      throw new Error(
-        `${cleanEndpoint} returned HTML instead of JSON.`
-      );
-    }
-
+  } catch {
     throw new Error(
       `${cleanEndpoint} returned invalid JSON.`
     );
   }
 
+  const message = String(
+    result?.message ??
+    result?.msg ??
+    ""
+  );
+
+  const bodyRateLimited =
+    Number(result?.status) === 429 ||
+    Number(result?.code) === 429 ||
+    result?.rateLimited === true ||
+    /too many attempts|too many requests|rate.limit/i.test(
+      message
+    );
+
+  if (bodyRateLimited) {
+    const retryAfter = setPscRateLimit(
+      response.headers.get("Retry-After") ??
+      result?.retryAfter ??
+      result?.retry_after
+    );
+
+    const error = new Error(
+      "PSC backend is temporarily rate-limited."
+    );
+
+    error.httpStatus = 429;
+    error.status = 429;
+    error.retryAfter =
+      retryAfter || getPscCooldownSeconds();
+
+    throw error;
+  }
+
   if (!response.ok) {
     const error = new Error(
-      result?.message ||
+      message ||
         `${cleanEndpoint} failed with status ${response.status}.`
     );
 
     error.httpStatus = response.status;
     error.status = response.status;
-
-    if (response.status === 429) {
-      const header =
-        response.headers.get("retry-after");
-
-      const seconds = Number(header);
-      const retryDate = header
-        ? Date.parse(header)
-        : NaN;
-
-      error.retryAfter =
-        header &&
-        Number.isFinite(seconds) &&
-        seconds >= 0
-          ? Math.max(1, Math.ceil(seconds))
-          : Number.isFinite(retryDate)
-            ? Math.max(
-                1,
-                Math.ceil(
-                  (retryDate - Date.now()) / 1000
-                )
-              )
-            : 60;
-    }
 
     throw error;
   }
@@ -216,6 +221,7 @@ async function postRequest({
         : undefined,
   });
 }
+
 
 /* =========================================================
    MOCK TEST DETAILS

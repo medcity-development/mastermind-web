@@ -165,7 +165,7 @@ test(
 ========================================================= */
 
 test(
-  "first submission includes counts, weighted score, session identity and finish status",
+  "first submission uses Android scoring, session identity and finish status",
   () => {
     const payload =
       buildAttemptPayload(
@@ -252,21 +252,11 @@ test(
       ["A", "D", 0, "D"]
     );
 
-    /*
-     * 4 questions
-     * total mark = 8
-     *
-     * mark/question = 2
-     *
-     * 2 correct = 4
-     * 1 wrong * .5 = .5
-     *
-     * score = 3.5
-     */
+    // Two correct answers minus round(1 * 0.333, 2), regardless of total marks.
 
     assert.equal(
       payload.user_score,
-      3.5
+      1.67
     );
 
     assert.equal(

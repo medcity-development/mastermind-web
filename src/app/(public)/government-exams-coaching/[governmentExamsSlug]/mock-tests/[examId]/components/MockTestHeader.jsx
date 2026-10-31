@@ -60,7 +60,6 @@ export default function MockTestHeader({
     <header
       className="
         relative
-        mt-20
         overflow-hidden
         bg-gradient-to-r
         from-[#071f55]

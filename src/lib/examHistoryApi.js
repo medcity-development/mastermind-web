@@ -1,6 +1,18 @@
+
 import "server-only";
 
+import {
+  executePscRequest,
+  setPscRateLimit,
+  getPscCooldownSeconds,
+  isPscRateLimited,
+} from "@/lib/pscRequestManager";
+
 export const ENABLE_STUDY_PLAN_HISTORY = true;
+
+/* =========================================================
+   EXAM TYPES
+========================================================= */
 
 const TYPE_MAP = {
   mock: "mock",
@@ -18,7 +30,7 @@ const TYPE_MAP = {
   "topic wise": "topicwise",
   topic_wise: "topicwise",
 
-   tst: "tst",
+  tst: "tst",
   statement: "tst",
   statementtype: "tst",
   "statement-type": "tst",
@@ -47,12 +59,23 @@ const SUPPORTED_TYPES = [
   "tst",
   "studyplan",
 ];
-const cache = new Map();
 
-const TTL = 30_000;
+/* =========================================================
+   CACHE CONFIGURATION
+========================================================= */
+
+const SUCCESS_TTL = 120_000;
+const ERROR_TTL = 20_000;
 const MAX_CACHE = 200;
 
-let cooldownUntil = 0;
+const DEFAULT_RETRY_SECONDS = 60;
+const REQUEST_TIMEOUT = 15000;
+
+const cache = new Map();
+
+/* =========================================================
+   EXAM TYPE HELPERS
+========================================================= */
 
 export function normalizeHistoryType(value) {
   const key = String(value ?? "")
@@ -69,14 +92,47 @@ export function backendHistoryType(value) {
 }
 
 export function getSupportedHistoryTypes() {
-  return [...SUPPORTED_TYPES];
+  return SUPPORTED_TYPES.filter(
+    isHistoryTypeEnabled
+  );
 }
 
 export function isHistoryTypeEnabled(value) {
-  return SUPPORTED_TYPES.includes(
-    normalizeHistoryType(value)
-  );
+  const type = normalizeHistoryType(value);
+
+  if (
+    type === "studyplan" &&
+    !ENABLE_STUDY_PLAN_HISTORY
+  ) {
+    return false;
+  }
+
+  return SUPPORTED_TYPES.includes(type);
 }
+
+/* =========================================================
+   VALIDATION
+========================================================= */
+
+function positiveId(value) {
+  if (
+    value == null ||
+    String(value).trim() === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isSafeInteger(number) &&
+    number > 0
+    ? number
+    : null;
+}
+
+/* =========================================================
+   COURSE ID HELPERS
+========================================================= */
 
 export function getHistoryCourseId(row) {
   if (
@@ -95,6 +151,7 @@ export function getHistoryCourseId(row) {
     row.courseid ??
     row.course?.c_id ??
     row.course?.cid ??
+    row.course?.course_id ??
     row.course?.id ??
     row.course_details?.c_id ??
     row.course_details?.cid ??
@@ -107,28 +164,28 @@ export function filterExamHistoryByCourse(
   rows,
   cid
 ) {
-  if (!Array.isArray(rows)) return [];
+  if (!Array.isArray(rows)) {
+    return [];
+  }
 
-  const expectedCid = Number(cid);
+  const expectedCid = positiveId(cid);
 
-  if (
-    !Number.isSafeInteger(expectedCid) ||
-    expectedCid <= 0
-  ) {
+  if (!expectedCid) {
     return [];
   }
 
   return rows.filter((row) => {
-    const found = getHistoryCourseId(row);
-
-    return (
-      found !== null &&
-      found !== undefined &&
-      String(found).trim() !== "" &&
-      Number(found) === expectedCid
+    const foundCid = positiveId(
+      getHistoryCourseId(row)
     );
+
+    return foundCid === expectedCid;
   });
 }
+
+/* =========================================================
+   RESPONSE HELPERS
+========================================================= */
 
 function fail(
   message,
@@ -147,23 +204,18 @@ function fail(
   };
 }
 
-function retryMs(value) {
-  if (value !== null && value !== undefined) {
-    const seconds = Number(value);
-
-    if (Number.isFinite(seconds)) {
-      return Math.max(1000, seconds * 1000);
-    }
-
-    const date = Date.parse(value);
-
-    if (Number.isFinite(date)) {
-      return Math.max(1000, date - Date.now());
-    }
-  }
-
-  return 60_000;
+function rateLimitFailure() {
+  return fail(
+    "History backend is temporarily rate-limited.",
+    429,
+    getPscCooldownSeconds() ||
+      DEFAULT_RETRY_SECONDS
+  );
 }
+
+/* =========================================================
+   RECORD EXTRACTION
+========================================================= */
 
 function extractRecords(value) {
   if (Array.isArray(value)) {
@@ -174,44 +226,137 @@ function extractRecords(value) {
     value?.details,
     value?.data,
     value?.result,
+    value?.results,
     value?.data?.details,
     value?.data?.data,
+    value?.data?.result,
     value?.result?.details,
     value?.result?.data,
   ];
 
-  return candidates.find(Array.isArray) ?? null;
+  return candidates.find(
+    Array.isArray
+  ) ?? null;
 }
 
-async function requestHistory(uid, cid, type) {
-  if (!isHistoryTypeEnabled(type)) {
-    return fail(
-      "Unsupported exam history type.",
-      400
-    );
+/* =========================================================
+   RATE LIMIT DETECTION
+========================================================= */
+
+function isRateLimitedBody(result) {
+  if (
+    !result ||
+    typeof result !== "object"
+  ) {
+    return false;
   }
 
-  if (Date.now() < cooldownUntil) {
-    return fail(
-      "History backend is temporarily rate-limited.",
-      429,
-      Math.ceil(
-        (cooldownUntil - Date.now()) / 1000
-      )
-    );
+  if (
+    result.rateLimited === true ||
+    Number(result.httpStatus) === 429 ||
+    Number(result.status) === 429 ||
+    Number(result.code) === 429
+  ) {
+    return true;
   }
 
-  const base = String(
+  const message = String(
+    result.message ??
+    result.msg ??
+    ""
+  );
+
+  return /too many attempts|too many requests|rate[\s-]?limit/i.test(
+    message
+  );
+}
+
+/* =========================================================
+   BACKEND SUCCESS
+========================================================= */
+
+function isBackendSuccess(result) {
+  if (
+    !result ||
+    typeof result !== "object"
+  ) {
+    return false;
+  }
+
+  const status = result.status;
+
+  if (
+    status === false ||
+    status === 0
+  ) {
+    return false;
+  }
+
+  if (typeof status === "string") {
+    const normalized = status
+      .trim()
+      .toLowerCase();
+
+    if (
+      [
+        "false",
+        "0",
+        "failed",
+        "failure",
+        "error",
+      ].includes(normalized)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/* =========================================================
+   API CONFIG
+========================================================= */
+
+function getApiConfig() {
+  const baseUrl = String(
     process.env.PSC_API_BASE_URL || ""
   )
     .trim()
     .replace(/\/+$/, "");
 
-  const api = String(
+  const apiKey = String(
     process.env.PSC_API_KEY || ""
   ).trim();
 
-  if (!base || !api) {
+  if (!baseUrl || !apiKey) {
+    return null;
+  }
+
+  return {
+    baseUrl,
+    apiKey,
+  };
+}
+
+/* =========================================================
+   REQUEST HISTORY
+
+   Uses the shared PSC request manager.
+   No independent request queue or cooldown.
+========================================================= */
+
+async function requestHistory(
+  uid,
+  cid,
+  type
+) {
+  if (isPscRateLimited()) {
+    return rateLimitFailure();
+  }
+
+  const config = getApiConfig();
+
+  if (!config) {
     return fail(
       "PSC API configuration is missing.",
       500
@@ -220,59 +365,74 @@ async function requestHistory(uid, cid, type) {
 
   const form = new FormData();
 
-  form.append("api", api);
+  form.append("api", config.apiKey);
   form.append("uid", String(uid));
   form.append("cid", String(cid));
-
   form.append(
     "exam_type",
     backendHistoryType(type)
   );
 
+  const requestKey = JSON.stringify({
+    endpoint: "getUserExamsList",
+    uid,
+    cid,
+    examType: backendHistoryType(type),
+  });
+
   try {
-    const response = await fetch(
-      `${base}/getUserExamsList`,
-      {
-        method: "POST",
-        body: form,
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(15000),
-      }
-    );
+    const response = await executePscRequest({
+      key: requestKey,
 
-    if (response.status === 429) {
-      cooldownUntil = Math.max(
-        cooldownUntil,
-        Date.now() +
-          retryMs(
-            response.headers.get("retry-after")
-          )
-      );
-
-      return fail(
-        "History backend rate limit reached.",
-        429,
-        Math.ceil(
-          (cooldownUntil - Date.now()) / 1000
-        )
-      );
-    }
+      task: () =>
+        fetch(
+          `${config.baseUrl}/getUserExamsList`,
+          {
+            method: "POST",
+            body: form,
+            cache: "no-store",
+            headers: {
+              Accept: "application/json",
+            },
+            signal: AbortSignal.timeout(
+              REQUEST_TIMEOUT
+            ),
+          }
+        ),
+    });
 
     const raw = await response.text();
 
     let result;
 
     try {
-      result = raw ? JSON.parse(raw) : null;
+      result = raw
+        ? JSON.parse(raw)
+        : null;
     } catch {
       return fail(
         "History backend returned invalid JSON.",
         502
       );
     }
+
+    /* -----------------------------------------------------
+       JSON BODY RATE LIMIT
+    ----------------------------------------------------- */
+
+    if (isRateLimitedBody(result)) {
+      setPscRateLimit(
+        response.headers.get("Retry-After") ??
+        result?.retryAfter ??
+        result?.retry_after
+      );
+
+      return rateLimitFailure();
+    }
+
+    /* -----------------------------------------------------
+       HTTP ERROR
+    ----------------------------------------------------- */
 
     if (!response.ok) {
       return fail(
@@ -283,24 +443,29 @@ async function requestHistory(uid, cid, type) {
       );
     }
 
-    if (
-      !result ||
-      [false, "false", 0, "0"].includes(
-        result.status
-      )
-    ) {
+    /* -----------------------------------------------------
+       BACKEND ERROR
+    ----------------------------------------------------- */
+
+    if (!isBackendSuccess(result)) {
       return fail(
         result?.message ||
           result?.msg ||
-          "History backend rejected the request."
+          "History backend rejected the request.",
+        502
       );
     }
+
+    /* -----------------------------------------------------
+       EXTRACT ATTEMPTS
+    ----------------------------------------------------- */
 
     const records = extractRecords(result);
 
     if (!records) {
       return fail(
-        "History backend did not return a records array."
+        "History backend did not return a records array.",
+        502
       );
     }
 
@@ -311,18 +476,44 @@ async function requestHistory(uid, cid, type) {
       data: records,
       total: records.length,
       httpStatus: response.status,
+      retryAfter: null,
+      rateLimited: false,
     };
   } catch (error) {
+    /* -----------------------------------------------------
+       SHARED RATE LIMIT
+    ----------------------------------------------------- */
+
+    if (
+      error?.httpStatus === 429 ||
+      error?.status === 429
+    ) {
+      return fail(
+        "History backend is temporarily rate-limited.",
+        429,
+        error?.retryAfter ??
+          getPscCooldownSeconds() ??
+          DEFAULT_RETRY_SECONDS
+      );
+    }
+
+    /* -----------------------------------------------------
+       NETWORK / TIMEOUT
+    ----------------------------------------------------- */
+
     const timedOut = [
       "TimeoutError",
       "AbortError",
     ].includes(error?.name);
 
-    console.error("[Exam History] Network error:", {
-      type,
-      cid,
-      message: error?.message,
-    });
+    console.error(
+      "[Exam History] Request failed:",
+      {
+        type,
+        cid,
+        message: error?.message,
+      }
+    );
 
     return fail(
       timedOut
@@ -333,15 +524,49 @@ async function requestHistory(uid, cid, type) {
   }
 }
 
+/* =========================================================
+   CACHE MANAGEMENT
+========================================================= */
+
+function trimCache() {
+  const now = Date.now();
+
+  for (const [key, entry] of cache) {
+    if (
+      entry.settled &&
+      entry.expiresAt <= now
+    ) {
+      cache.delete(key);
+    }
+  }
+
+  while (cache.size > MAX_CACHE) {
+    const oldestKey =
+      cache.keys().next().value;
+
+    if (oldestKey === undefined) {
+      break;
+    }
+
+    cache.delete(oldestKey);
+  }
+}
+
+/* =========================================================
+   PUBLIC HISTORY API
+========================================================= */
+
 export async function getCourseExamHistory({
   uid,
   cid,
   examType,
 } = {}) {
-  const type = normalizeHistoryType(examType);
+  const type = normalizeHistoryType(
+    examType
+  );
 
-  const safeUid = Number(uid);
-  const safeCid = Number(cid);
+  const safeUid = positiveId(uid);
+  const safeCid = positiveId(cid);
 
   if (!isHistoryTypeEnabled(type)) {
     return fail(
@@ -350,40 +575,55 @@ export async function getCourseExamHistory({
     );
   }
 
-  if (
-    !Number.isSafeInteger(safeUid) ||
-    safeUid <= 0
-  ) {
+  if (!safeUid) {
     return fail(
       "Invalid student session.",
       401
     );
   }
 
-  if (
-    !Number.isSafeInteger(safeCid) ||
-    safeCid <= 0
-  ) {
+  if (!safeCid) {
     return fail(
       "Invalid course ID.",
       400
     );
   }
 
-  const key = `${safeUid}:${safeCid}:${type}`;
+  const key = [
+    safeUid,
+    safeCid,
+    type,
+  ].join(":");
 
   const now = Date.now();
   const previous = cache.get(key);
 
-  if (
-    previous &&
-    previous.expiresAt > now
-  ) {
-    return previous.promise;
+  /* -------------------------------------------------------
+     SHARE PENDING REQUESTS AND CACHED RESULTS
+  ------------------------------------------------------- */
+
+  if (previous) {
+    if (
+      !previous.settled ||
+      previous.expiresAt > now
+    ) {
+      return previous.promise;
+    }
+
+    cache.delete(key);
+  }
+
+  /* -------------------------------------------------------
+     SHARED COOLDOWN
+  ------------------------------------------------------- */
+
+  if (isPscRateLimited()) {
+    return rateLimitFailure();
   }
 
   const entry = {
-    expiresAt: now + TTL,
+    expiresAt: now + SUCCESS_TTL,
+    settled: false,
     promise: null,
   };
 
@@ -391,24 +631,52 @@ export async function getCourseExamHistory({
     safeUid,
     safeCid,
     type
-  ).then((result) => {
-    if (
-      !result.status &&
-      cache.get(key) === entry
-    ) {
-      cache.delete(key);
-    }
+  )
+    .then((result) => {
+      entry.settled = true;
 
-    return result;
-  });
+      if (cache.get(key) === entry) {
+        let ttl = ERROR_TTL;
+
+        if (result.status) {
+          ttl = SUCCESS_TTL;
+        } else if (result.rateLimited) {
+          ttl = Math.max(
+            1000,
+            Number(
+              result.retryAfter ??
+              DEFAULT_RETRY_SECONDS
+            ) * 1000
+          );
+        }
+
+        entry.expiresAt =
+          Date.now() + ttl;
+      }
+
+      return result;
+    })
+    .catch((error) => {
+      entry.settled = true;
+
+      console.error(
+        "[Exam History] Unexpected error:",
+        error
+      );
+
+      if (cache.get(key) === entry) {
+        entry.expiresAt =
+          Date.now() + ERROR_TTL;
+      }
+
+      return fail(
+        "Unable to retrieve exam history.",
+        503
+      );
+    });
 
   cache.set(key, entry);
-
-  if (cache.size > MAX_CACHE) {
-    cache.delete(
-      cache.keys().next().value
-    );
-  }
+  trimCache();
 
   return entry.promise;
 }

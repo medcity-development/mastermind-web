@@ -18,6 +18,7 @@ export default function useMockExamLoader({
   uid,
   cid,
   examType = "mock",
+  skipRestore = false,
 }) {
   const loadMockExam =
     useCallback(
@@ -44,6 +45,7 @@ export default function useMockExamLoader({
 
             offset:
               "0",
+            resume: skipRestore ? "0" : "1",
           });
 
         const detailsResponse =
@@ -157,7 +159,7 @@ export default function useMockExamLoader({
         =============================================== */
 
         const savedAttempt =
-          Array.isArray(
+          skipRestore ? null : Array.isArray(
             detailsResult?.paused
           )
             ? detailsResult.paused[0] ??
@@ -272,7 +274,9 @@ export default function useMockExamLoader({
         }
 
         const savedRemaining =
-          savedPausedTimeToSeconds(
+          draftMatchesAttempt && Number.isFinite(savedDraft?.remainingSeconds)
+            ? savedDraft.remainingSeconds
+            : savedPausedTimeToSeconds(
             pausedAttempt?.paused_time,
             fullDuration
           );
@@ -281,10 +285,11 @@ export default function useMockExamLoader({
           Boolean(
             pausedAttempt
           ) &&
+          (draftMatchesAttempt || (pausedAttempt.paused_time != null && pausedAttempt.paused_time !== "")) &&
           Number.isFinite(
             savedRemaining
           ) &&
-          savedRemaining > 0 &&
+          savedRemaining >= 0 &&
           savedRemaining <=
             fullDuration;
 
@@ -339,6 +344,7 @@ export default function useMockExamLoader({
         uid,
         cid,
         examType,
+        skipRestore,
       ]
     );
 

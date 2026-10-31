@@ -597,7 +597,7 @@ export default function AboutFAQ() {
                   className="text-[#7ce4ff]"
                 />
 
-                We're here to help you prepare better.
+                We&apos;re here to help you prepare better.
               </div>
             </div>
           </aside>

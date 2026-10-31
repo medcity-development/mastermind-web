@@ -1,4 +1,3 @@
-
 // src/lib/examAttemptHelper.js
 
 import {
@@ -132,15 +131,9 @@ async function sendExamRequest(
     )
   );
 
-  if (
-    requestPayload.paused_time != null &&
-    Number(requestPayload.paused_time) > 0 &&
-    Number(requestPayload.paused_time) <= 86400
-  ) {
-    requestPayload.paused_time = Math.round(
-      Number(requestPayload.paused_time) * 1000
-    );
-  }
+  // paused_time is already in milliseconds.
+  // Do not infer units from the numeric value: a short exam can
+  // legitimately have a millisecond value below 86400.
 
   Object.entries(requestPayload).forEach(
     ([key, value]) =>
@@ -315,6 +308,20 @@ export async function createUserExamAttempt(
       details: [],
     };
   }
+}
+
+export async function getUserExamAttempts({
+  uid,
+  cid,
+  examId,
+  examType = "mock",
+}) {
+  return sendExamRequest("getUserExams", {
+    uid,
+    cid,
+    exam_id: examId,
+    exam_type: examType,
+  });
 }
 
 /* =========================================================

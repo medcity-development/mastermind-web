@@ -85,8 +85,7 @@ export default async function StudyMaterialsPage({
         min-h-screen
         bg-[#f4f9ff]
         pb-12
-        pt-[95px]
-        lg:pt-[110px]
+        pt-10
       "
     >
       <div

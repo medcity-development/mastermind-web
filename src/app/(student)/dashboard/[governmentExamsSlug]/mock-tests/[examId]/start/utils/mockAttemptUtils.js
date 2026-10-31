@@ -1,123 +1,144 @@
+
 import {
-    getCorrectAnswer,
-    getExamTotalMark,
+  getCorrectAnswer,
+  getExamTotalMark,
 } from "./mockTestUtils";
-import { secondsToMilliseconds } from "@/lib/examAttemptData";
 
 export function buildMockAttemptPayload({
-    cid,
-    examId,
-    examType,
-    exam,
-    questions = [],
-    answers = {},
-    remainingSeconds = 0,
-    startTime,
-    completedAt,
-    examStatus,
-    result,
+  cid,
+  examId,
+  examType,
+  exam,
+  questions = [],
+  answers = {},
+  remainingSeconds = 0,
+  startTime,
+  completedAt,
+  examStatus,
+  result,
 }) {
-    const totalMark =
-        getExamTotalMark(
-            exam,
-            questions.length
-        );
+  const finishing = [
+    "finish",
+    "complete",
+    "finished",
+    "completed",
+  ].includes(
+    String(examStatus).toLowerCase()
+  );
 
-    const payload = {
-        cid:
-            String(cid),
+  if (
+    finishing &&
+    (!result || result.scoreVerified !== true)
+  ) {
+    throw new Error(
+      "Cannot submit an exam with an unverified score."
+    );
+  }
 
-        exam_id:
-            String(examId),
+  const totalMark = getExamTotalMark(
+    exam,
+    questions.length
+  );
 
-        exam_type:
-            examType,
+  const payload = {
+    cid: String(cid),
 
-        exam_status:
-            examStatus,
+    exam_id: String(examId),
 
-        start_time:
-            String(startTime ?? Date.now()),
+    exam_type: examType,
 
-        ...(String(examStatus).toLowerCase() === "finish" ||
-            String(examStatus).toLowerCase() === "complete"
-            ? {
-                // Store when the student actually submits, not the timer's
-                // scheduled deadline (which can be many hours later).
-                end_time:
-                    String(completedAt ?? Date.now()),
-            }
-            : {}),
+    exam_status: examStatus,
 
-        lastposition:
-            exam?.lastposition ??
-            examType,
+    start_time: String(
+      startTime ?? Date.now()
+    ),
 
-        paused_time:
-            String(
-                secondsToMilliseconds(
-                    remainingSeconds
-                )
-            ),
+    ...(finishing
+      ? {
+          end_time: String(
+            completedAt ?? Date.now()
+          ),
+        }
+      : {}),
 
-        total_questions:
-            String(
-                questions.length
-            ),
+    lastposition:
+      exam?.lastposition ?? examType,
 
-        total_mark:
-            String(
-                totalMark
-            ),
+    paused_time: String(
+      Math.max(
+        0,
+        Math.round(remainingSeconds)
+      )
+    ),
 
-        answer_array:
-            result?.answerArray ?? questions.map(
-                (question) => getCorrectAnswer(question) || 0
-            ),
+    total_questions: String(
+      questions.length
+    ),
 
-        user_answers:
-            result?.userAnswers ?? questions.map(
-                (question, index) =>
-                    answers[question?.id ?? index + 1] ?? 0
-            ),
-    };
+    total_mark: String(totalMark),
 
-    if (result) {
-        Object.assign(payload, {
-            user_score: String(result.userScore),
-            minus_mark: String(result.minusMark),
-            total_wrong: String(result.totalWrong),
-            total_correct: String(result.totalCorrect),
-            total_attempted: String(result.totalAttempted),
-        });
-    }
+    answer_array:
+      result?.answerArray ??
+      questions.map(
+        (question) =>
+          getCorrectAnswer(question) || 0
+      ),
 
-    return payload;
+    user_answers:
+      result?.userAnswers ??
+      questions.map(
+        (question, index) =>
+          answers[
+            question?.id ?? index + 1
+          ] ?? 0
+      ),
+  };
+
+  if (result) {
+    Object.assign(payload, {
+      user_score: String(
+        result.userScore
+      ),
+
+      minus_mark: String(
+        result.minusMark
+      ),
+
+      total_wrong: String(
+        result.totalWrong
+      ),
+
+      total_correct: String(
+        result.totalCorrect
+      ),
+
+      total_attempted: String(
+        result.totalAttempted
+      ),
+    });
+  }
+
+  return payload;
 }
 
 export function getMockExamTitle({
-    exam,
-    submittedResult,
-    fallback = "",
+  exam,
+  submittedResult,
+  fallback = "",
 }) {
-    return String(
-        submittedResult
-            ?.exam_name ??
-        submittedResult
-            ?.examName ??
-        submittedResult
-            ?.exam_title ??
-        submittedResult
-            ?.examTitle ??
-        submittedResult
-            ?.title ??
-        exam?.exam_name ??
-        exam?.examName ??
-        exam?.exam_title ??
-        exam?.examTitle ??
-        exam?.title ??
-        exam?.name ??
-        fallback ??
-        ""
-    ).trim();
+  return String(
+    submittedResult?.exam_name ??
+    submittedResult?.examName ??
+    submittedResult?.exam_title ??
+    submittedResult?.examTitle ??
+    submittedResult?.title ??
+    exam?.exam_name ??
+    exam?.examName ??
+    exam?.exam_title ??
+    exam?.examTitle ??
+    exam?.title ??
+    exam?.name ??
+    fallback ??
+    ""
+  ).trim();
 }

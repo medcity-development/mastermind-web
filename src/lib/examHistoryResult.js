@@ -159,9 +159,13 @@ export function prepareExamHistoryResult(
       )
     : null;
 
+  const androidScore = finished && ["mock", "pqp", "pyq", "scert"].includes(
+    String(item.exam_type ?? item.examType ?? "").trim().toLowerCase()
+  ) ? calculateExamScore({ ...item, total_correct: correct, total_wrong: wrong }) : null;
+
   const score = finished
     ? (
-        firstNumber(
+        androidScore?.score ?? firstNumber(
           item.user_score,
           item.score,
           item.marks_obtained
@@ -182,7 +186,7 @@ export function prepareExamHistoryResult(
 
   const minusMark = finished
     ? (
-        firstNumber(
+        androidScore?.minusMark ?? firstNumber(
           item.minus_mark,
           item.negative_mark
         ) ??

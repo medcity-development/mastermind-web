@@ -88,3 +88,10 @@ test("preserves valid dashboard returns and rejects external or unknown destinat
     ""
   );
 });
+
+test("preserves the exact guest handoff start route after login", () => {
+  assert.equal(getPostLoginRedirectPath('/government-exams-coaching/kerala-psc/mock-tests/42/start?guestAction=pause'),
+    '/dashboard/kerala-psc/mock-tests/42/start?guestAction=pause');
+  assert.equal(getPostLoginRedirectPath('/dashboard/kerala-psc/previous-questions/42/start?guestAction=submit'),
+    '/dashboard/kerala-psc/previous-questions/42/start?guestAction=submit');
+});

@@ -11,11 +11,13 @@ const {
   clearGuestExamHandoff,
   readGuestExamHandoff,
   saveGuestExamHandoff,
+  guestExamLoginRedirectPath,
 } = await import(moduleUrl);
 
 function installStorage() {
   const values = new Map();
   globalThis.window = {
+    location: { origin: "https://example.test", pathname: "/government-exams-coaching/kerala-psc/topic-wise-exams/731/start", search: "" },
     localStorage: {
       getItem: (key) => values.get(key) ?? null,
       setItem: (key, value) => values.set(key, value),
@@ -67,6 +69,7 @@ test("clearing guest handoff removes the saved attempt", () => {
   saveGuestExamHandoff({
     examId: 10,
     examType: "pqp",
+    governmentExamsSlug: "kerala-psc",
     action: "submit",
     answers: {},
   });
@@ -75,3 +78,15 @@ test("clearing guest handoff removes the saved attempt", () => {
 
   assert.equal(values.size, 0);
 });
+
+for (const action of ["pause", "submit"]) {
+  test(`mock guest ${action} preserves answers and exact login destination`, () => {
+    installStorage();
+    const returnPath = "/government-exams-coaching/kerala-psc/mock-tests/40/start";
+    saveGuestExamHandoff({ examId: 40, examType: "mock", governmentExamsSlug: "kerala-psc", action, answers: { 1: "A" }, remainingSeconds: 45, returnPath });
+    const destination = new URL(guestExamLoginRedirectPath(action), window.location.origin);
+    assert.equal(destination.pathname, returnPath);
+    assert.equal(destination.searchParams.get("guestAction"), action);
+    assert.deepEqual(readGuestExamHandoff({ examId: 40, examType: "mock", governmentExamsSlug: "kerala-psc" }).answers, { 1: "A" });
+  });
+}

@@ -1,28 +1,38 @@
+
 "use client";
 
-import { getAttemptId, getResultArray, secondsToMilliseconds, timestampToMilliseconds } from "@/lib/examAttemptData";
-import { prepareExamHistoryResult } from "@/lib/examHistoryResult";
 import {
-  clearGuestExamHandoff,
-  readGuestExamHandoff,
-} from "@/lib/guestExamHandoff";
-
-import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 
+import { useRouter } from "next/navigation";
+
 import {
-  useRouter,
-} from "next/navigation";
+  getAttemptId,
+  getResultArray,
+  secondsToMilliseconds,
+  timestampToMilliseconds,
+} from "@/lib/examAttemptData";
+
+import {
+  prepareExamHistoryResult,
+} from "@/lib/examHistoryResult";
+
+import {
+  clearGuestExamHandoff,
+  readGuestExamHandoff,
+} from "@/lib/guestExamHandoff";
 
 import ExamHero from "./ExamHero";
 import ExamProgress from "./ExamProgress";
 import ExamQuestions from "./ExamQuestions";
 import ExamPagination from "./ExamPagination";
 import ExamControls from "./ExamControls";
+
 import ExamResultModal from "@/components/ExamResultModal";
 import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 
@@ -31,94 +41,117 @@ import {
 } from "../utils/examUtils";
 
 /* =========================================================
-   API REQUEST
+   HELPERS
 ========================================================= */
+
+function normalizeAnswerValue(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  if (typeof value === "object") {
+    return normalizeAnswerValue(
+      value.id ??
+      value.option ??
+      value.answer ??
+      value.value ??
+      ""
+    );
+  }
+
+  const normalized = String(value).trim().toUpperCase();
+
+  if (
+    !normalized ||
+    ["0", "NULL", "UNDEFINED"].includes(normalized)
+  ) {
+    return "";
+  }
+
+  return normalized;
+}
+
+function getCorrectAnswer(question) {
+  return normalizeAnswerValue(
+    question?.correct_answer ??
+    question?.correctAnswer ??
+    question?.answer ??
+    question?.right_answer ??
+    question?.rightAnswer ??
+    ""
+  );
+}
+
+function normalizeSavedPage(page, totalPages) {
+  const number = Number(page);
+
+  return Math.min(
+    totalPages,
+    Math.max(
+      1,
+      Number.isFinite(number) ? Math.floor(number) : 1
+    )
+  );
+}
+
+function normalizeRemainingSeconds(value, duration) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return duration;
+  }
+
+  return Math.max(
+    0,
+    Math.min(duration, Math.floor(number))
+  );
+}
+
+function isSuccessfulResponse(result) {
+  const status = String(
+    result?.status ?? "true"
+  ).toLowerCase();
+
+  return ![
+    "false",
+    "0",
+    "failed",
+    "error",
+  ].includes(status);
+}
 
 async function sendAttemptRequest({
   endpoint,
   payload,
 }) {
-  const response =
-    await fetch(
-      endpoint,
-      {
-        method: "POST",
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+  let result;
 
-        body:
-          JSON.stringify(
-            payload
-          ),
-      }
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(
+      "The exam server returned an invalid response."
     );
+  }
 
-  const result =
-    await response.json();
-
-  if (
-    !response.ok ||
-    result?.status === false
-  ) {
+  if (!response.ok || !isSuccessfulResponse(result)) {
     throw new Error(
       result?.message ||
-        "Unable to save exam attempt."
+      result?.msg ||
+      "Unable to save exam attempt."
     );
   }
 
   return result;
-}
-
-/* =========================================================
-   NORMALIZE ANSWER VALUE
-========================================================= */
-
-function normalizeAnswerValue(
-  value
-) {
-  if (
-    value === undefined ||
-    value === null
-  ) {
-    return "";
-  }
-
-  if (
-    typeof value ===
-    "object"
-  ) {
-    return String(
-      value?.id ??
-        value?.option ??
-        value?.answer ??
-        value?.value ??
-        ""
-    );
-  }
-
-  return String(value);
-}
-
-/* =========================================================
-   GET CORRECT ANSWER FROM QUESTION
-
-   Supports common backend field names.
-========================================================= */
-
-function getCorrectAnswer(
-  question
-) {
-  return normalizeAnswerValue(
-    question?.correct_answer ??
-      question?.correctAnswer ??
-      question?.answer ??
-      question?.right_answer ??
-      question?.rightAnswer ??
-      ""
-  );
 }
 
 /* =========================================================
@@ -127,767 +160,867 @@ function getCorrectAnswer(
 
 export default function ExamClient({
   exam,
-
   questions = [],
-
   imagePath = "",
-
   statementTypeSlug,
-
   examSlug,
-
   governmentExamsSlug,
-
   uid,
-
   cid,
-
   examType = "tst",
-
   guestAction = "",
 }) {
-  const router =
-    useRouter();
+  const router = useRouter();
+
+  const examId = exam?.id;
+
+  const durationMinutes =
+    Number(exam?.total_minutes) || 0;
+
+  const durationSeconds = Math.max(
+    0,
+    Math.floor(durationMinutes * 60)
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(questions.length / QUESTIONS_PER_PAGE)
+  );
+
+  const draftKey =
+    `exam_draft_${uid}_${cid}_${examType}_${examId}`;
+
+  const dashboardHome =
+    `/dashboard/${encodeURIComponent(governmentExamsSlug)}`;
 
   /* =======================================================
      STATE
   ======================================================= */
 
-  const [
-    currentPage,
-    setCurrentPage,
-  ] = useState(1);
+  const [answers, setAnswers] = useState({});
 
-  const [
-    answers,
-    setAnswers,
-  ] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const [
-    saving,
-    setSaving,
-  ] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [
-    saveError,
-    setSaveError,
-  ] = useState("");
+  const [saveError, setSaveError] = useState("");
 
-  const [
-    pauseId,
-    setPauseId,
-  ] = useState(null);
+  const [pauseId, setPauseId] = useState(null);
+
   const [restoring, setRestoring] = useState(true);
-  const [guestRestoreError, setGuestRestoreError] = useState("");
-  const [resultModalOpen, setResultModalOpen] = useState(false);
-  const [submittedResult, setSubmittedResult] = useState(null);
-  const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
-  const [attemptStartTime, setAttemptStartTime] = useState(() => Date.now());
-  const [attemptEndTime, setAttemptEndTime] = useState(null);
+
+  const [guestRestoreError, setGuestRestoreError] =
+    useState("");
+
+  const [showPauseConfirmation, setShowPauseConfirmation] =
+    useState(false);
+
+  const [pauseSuccessOpen, setPauseSuccessOpen] =
+    useState(false);
+
+  const [resultModalOpen, setResultModalOpen] =
+    useState(false);
+
+  const [submittedResult, setSubmittedResult] =
+    useState(null);
+
+  const [attemptStartTime, setAttemptStartTime] =
+    useState(() => Date.now());
+
+  const [attemptEndTime, setAttemptEndTime] =
+    useState(null);
+
+  const [endTime, setEndTime] = useState(null);
+
+  const [timeLeft, setTimeLeft] =
+    useState(durationSeconds);
+
+  const [attemptFinished, setAttemptFinished] =
+    useState(false);
+
+  const [attemptPaused, setAttemptPaused] =
+    useState(false);
 
   const requestRef = useRef(false);
+
   const guestActionHandledRef = useRef(false);
-  const draftKey = `exam_draft_${uid}_${cid}_${examType}_${exam?.id}`;
 
-  const timeOverHandled =
-    useRef(false);
+  const timeOverHandledRef = useRef(false);
 
-  /* =======================================================
-     EXAM VALUES
-  ======================================================= */
+  const restoredActionRef = useRef("");
 
-  const examId =
-    exam?.id;
-
-  const durationMinutes =
-    Number(
-      exam?.total_minutes
-    ) || 0;
-
-  const durationSeconds =
-    Math.max(
-      0,
-      Math.floor(
-        durationMinutes *
-          60
-      )
-    );
+  const latestTimeRef = useRef(durationSeconds);
 
   /* =======================================================
-     TIMER
+     RESTORE SAVED EXAM
   ======================================================= */
-
-  const [
-    endTime,
-    setEndTime,
-  ] = useState(() =>
-    durationSeconds > 0
-      ? Date.now() +
-        durationSeconds *
-          1000
-      : null
-  );
-
-  const [
-    timeLeft,
-    setTimeLeft,
-  ] = useState(
-    durationSeconds
-  );
 
   useEffect(() => {
     let cancelled = false;
+
     async function restoreDraft() {
+      setRestoring(true);
+
       try {
-        await Promise.resolve();
-        let draft = JSON.parse(localStorage.getItem(draftKey) || "null");
-        if (["pause", "submit"].includes(guestAction)) {
+        const hasGuestAction =
+          ["pause", "submit"].includes(guestAction);
+
+        let draft = null;
+
+        if (hasGuestAction) {
           draft = readGuestExamHandoff({
             examId,
             examType,
             governmentExamsSlug,
           });
-          if (!draft || draft.action !== guestAction) {
-            throw new Error("Saved exam progress could not be found.");
+
+          if (
+            !draft ||
+            draft.action !== guestAction
+          ) {
+            throw new Error(
+              "Saved guest exam progress could not be found. Please reopen the exam."
+            );
           }
+        } else {
+          const raw = localStorage.getItem(draftKey);
+
+          draft = raw ? JSON.parse(raw) : null;
         }
 
-        if (draft && !cancelled) {
-          const restoredTime = Math.max(
-            0,
-            Math.min(
-              durationSeconds,
-              Number(draft.timeLeft ?? draft.remainingSeconds) || 0
+        if (cancelled) return;
+
+        if (draft) {
+          const restoredTime =
+            normalizeRemainingSeconds(
+              draft.remainingSeconds ??
+              draft.timeLeft,
+              durationSeconds
+            );
+
+          const restoredStart =
+            timestampToMilliseconds(
+              draft.startTime
+            ) ?? Date.now();
+
+          setAnswers(
+            draft.answers &&
+            typeof draft.answers === "object"
+              ? draft.answers
+              : {}
+          );
+
+          setPauseId(
+            draft.pauseId ?? null
+          );
+
+          setCurrentPage(
+            normalizeSavedPage(
+              draft.currentPage,
+              totalPages
             )
           );
-          setAnswers(draft.answers || {});
-          setPauseId(draft.pauseId || null);
-          setAttemptStartTime(
-            timestampToMilliseconds(draft.startTime) ?? Date.now()
-          );
+
+          setAttemptStartTime(restoredStart);
+
           setAttemptEndTime(
             guestAction === "submit"
-              ? timestampToMilliseconds(draft.endTime)
+              ? timestampToMilliseconds(
+                  draft.endTime
+                ) ?? Date.now()
               : null
           );
+
+          latestTimeRef.current = restoredTime;
+
           setTimeLeft(restoredTime);
-          setEndTime(Date.now() + restoredTime * 1000);
-          setCurrentPage(draft.currentPage || 1);
+
+          setEndTime(
+            Date.now() + restoredTime * 1000
+          );
+        } else {
+          latestTimeRef.current =
+            durationSeconds;
+
+          setTimeLeft(durationSeconds);
+
+          setEndTime(
+            durationSeconds > 0
+              ? Date.now() +
+                  durationSeconds * 1000
+              : null
+          );
         }
+
+        restoredActionRef.current =
+          hasGuestAction ? guestAction : "";
+
+        setGuestRestoreError("");
       } catch (error) {
-        if (!cancelled) {
-          setGuestRestoreError(error?.message || "Unable to restore saved exam.");
-          setSaveError(error?.message || "Unable to restore saved exam.");
-        }
+        if (cancelled) return;
+
+        const message =
+          error?.message ||
+          "Unable to restore saved exam.";
+
+        setGuestRestoreError(message);
+        setSaveError(message);
       } finally {
-        if (!cancelled) setRestoring(false);
+        if (!cancelled) {
+          setRestoring(false);
+        }
       }
     }
+
     void restoreDraft();
+
     return () => {
       cancelled = true;
     };
-  }, [draftKey, guestAction, examId, examType, governmentExamsSlug, durationSeconds]);
+  }, [
+    draftKey,
+    guestAction,
+    examId,
+    examType,
+    governmentExamsSlug,
+    durationSeconds,
+    totalPages,
+  ]);
+
+  /* =======================================================
+     TIMER
+  ======================================================= */
 
   useEffect(() => {
-    if (!endTime || restoring) {
+    if (
+      restoring ||
+      !endTime ||
+      attemptFinished ||
+      attemptPaused ||
+      pauseSuccessOpen
+    ) {
       return;
     }
 
     function updateTimer() {
-      const remaining =
-        Math.max(
-          0,
-          Math.ceil(
-            (endTime -
-              Date.now()) /
-              1000
-          )
-        );
-
-      setTimeLeft(
-        remaining
+      const remaining = Math.max(
+        0,
+        Math.ceil(
+          (endTime - Date.now()) / 1000
+        )
       );
+
+      latestTimeRef.current = remaining;
+
+      setTimeLeft(remaining);
     }
 
     updateTimer();
 
-    const timer =
-      window.setInterval(
-        updateTimer,
-        1000
-      );
+    const timer = window.setInterval(
+      updateTimer,
+      1000
+    );
 
     return () => {
-      window.clearInterval(
-        timer
-      );
+      window.clearInterval(timer);
     };
-  }, [endTime, restoring]);
+  }, [
+    endTime,
+    restoring,
+    attemptFinished,
+    attemptPaused,
+    pauseSuccessOpen,
+  ]);
 
   /* =======================================================
      PAGINATION
   ======================================================= */
 
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        questions.length /
-          QUESTIONS_PER_PAGE
-      )
+  const currentQuestions = useMemo(() => {
+    const start =
+      (currentPage - 1) *
+      QUESTIONS_PER_PAGE;
+
+    return questions.slice(
+      start,
+      start + QUESTIONS_PER_PAGE
     );
+  }, [questions, currentPage]);
 
-  const currentQuestions =
-    useMemo(() => {
-      const start =
-        (currentPage -
-          1) *
-        QUESTIONS_PER_PAGE;
-
-      return questions.slice(
-        start,
-        start +
-          QUESTIONS_PER_PAGE
+  const answeredCount = useMemo(() => {
+    return questions.filter((question, index) => {
+      const id = String(
+        question?.id ?? index + 1
       );
-    }, [
-      questions,
-      currentPage,
-    ]);
 
-  /* =======================================================
-     COUNTS
-  ======================================================= */
-
-  const answeredCount =
-    Object.keys(
-      answers
-    ).filter(
-      (questionId) =>
-        normalizeAnswerValue(
-          answers[
-            questionId
-          ]
-        ) !== ""
-    ).length;
+      return Boolean(
+        normalizeAnswerValue(answers[id])
+      );
+    }).length;
+  }, [questions, answers]);
 
   const isTimeOver =
     durationSeconds > 0 &&
     timeLeft <= 0;
 
+  const interactionLocked =
+    restoring ||
+    saving ||
+    attemptFinished ||
+    attemptPaused ||
+    pauseSuccessOpen ||
+    resultModalOpen;
+
   /* =======================================================
-     ANSWER
+     ANSWER SELECTION
   ======================================================= */
 
-  function handleAnswer(
-    questionId,
-    answer
-  ) {
+  function handleAnswer(questionId, answer) {
     if (
+      interactionLocked ||
       isTimeOver ||
-      saving
+      requestRef.current
     ) {
       return;
     }
 
-    setAnswers(
-      (previous) => ({
-        ...previous,
-
-        [questionId]:
-          answer,
-      })
-    );
+    setAnswers((previous) => ({
+      ...previous,
+      [String(questionId)]: answer,
+    }));
   }
 
-  /* =======================================================
-     PAGE CHANGE
-  ======================================================= */
+  function handlePage(page) {
+    if (
+      interactionLocked ||
+      requestRef.current
+    ) {
+      return;
+    }
 
-  function scrollTop() {
+    setCurrentPage(
+      normalizeSavedPage(page, totalPages)
+    );
+
     window.scrollTo({
       top: 0,
       behavior: "smooth",
     });
   }
 
-  function handlePage(
-    page
-  ) {
-    if (requestRef.current) {
-      return;
-    }
-
-    const safePage =
-      Math.min(
-        Math.max(
-          Number(page) ||
-            1,
-          1
-        ),
-        totalPages
-      );
-
-    setCurrentPage(
-      safePage
-    );
-
-    scrollTop();
-  }
-
   /* =======================================================
-     BUILD ANSWER ARRAYS
+     BUILD ANSWER DATA
   ======================================================= */
 
-  function buildAnswerData() {
-    const answerArray = [];
+  const buildAnswerData = useCallback(() => {
+    const correctAnswerArray = [];
+    const wrongAnswerArray = [];
 
-    const correctAnswerArray =
-      [];
-
-    const wrongAnswerArray =
-      [];
-
-    questions.forEach(
-      (
-        question,
-        index
-      ) => {
-        const questionId =
-          String(
-            question?.id ??
-              index +
-                1
-          );
+    const answerArray = questions.map(
+      (question, index) => {
+        const questionId = String(
+          question?.id ?? index + 1
+        );
 
         const selectedAnswer =
           normalizeAnswerValue(
-            answers[
-              questionId
-            ] ??
-              answers[
-                question?.id
-              ]
+            answers[questionId]
           );
 
         const correctAnswer =
-          getCorrectAnswer(
-            question
-          );
+          getCorrectAnswer(question);
 
-        const answerItem = {
-          question_id:
-            question?.id,
-
-          answer:
-            selectedAnswer,
+        const item = {
+          question_id: question?.id,
+          answer: selectedAnswer,
         };
 
-        answerArray.push(
-          answerItem
-        );
-
-        if (
-          !selectedAnswer
-        ) {
-          return;
+        if (selectedAnswer) {
+          if (
+            correctAnswer &&
+            selectedAnswer === correctAnswer
+          ) {
+            correctAnswerArray.push(item);
+          } else {
+            wrongAnswerArray.push(item);
+          }
         }
 
-        if (
-          correctAnswer &&
-          selectedAnswer ===
-            correctAnswer
-        ) {
-          correctAnswerArray.push(
-            answerItem
-          );
-
-          return;
-        }
-
-        wrongAnswerArray.push(
-          answerItem
-        );
+        return item;
       }
     );
 
     return {
       answerArray,
-
       correctAnswerArray,
-
       wrongAnswerArray,
     };
-  }
-
-  /* =======================================================
-     SCORE
-  ======================================================= */
-
-  function calculateScore(
-    correctCount
-  ) {
-    const totalMark =
-      Number(
-        exam?.total_mark
-      ) || 0;
-
-    const totalQuestions =
-      Number(
-        exam?.total_questions
-      ) ||
-      questions.length;
-
-    if (
-      totalQuestions <= 0
-    ) {
-      return 0;
-    }
-
-    const markPerQuestion =
-      totalMark /
-      totalQuestions;
-
-    return Number(
-      (
-        correctCount *
-        markPerQuestion
-      ).toFixed(2)
-    );
-  }
+  }, [questions, answers]);
 
   /* =======================================================
      SAVE ATTEMPT
   ======================================================= */
 
-  async function saveExamAttempt(
-    examStatus
-  ) {
-    if (saving || requestRef.current) {
-      return;
-    }
+  const saveExamAttempt = useCallback(
+    async (examStatus) => {
+      if (requestRef.current) {
+        return;
+      }
 
-    if (
-      !uid ||
-      Number(uid) === 0
-    ) {
-      setSaveError(
-        "Your session is unavailable. Please refresh the dashboard."
+      if (!Number(uid)) {
+        setSaveError(
+          "Your login session is unavailable. Please sign in again."
+        );
+        return;
+      }
+
+      if (!examId) {
+        setSaveError("Exam ID is missing.");
+        return;
+      }
+
+      const isFinished = [
+        "complete",
+        "completed",
+        "finish",
+        "finished",
+      ].includes(
+        String(examStatus).toLowerCase()
       );
 
-      return;
-    }
-
-    if (!examId) {
-      setSaveError(
-        "Exam ID is missing."
-      );
-
-      return;
-    }
-
-    try {
       requestRef.current = true;
       setSaving(true);
       setSaveError("");
 
-      const isFinished =
-        ["complete", "completed", "finish", "finished"].includes(
-          String(examStatus).toLowerCase()
-        );
-
-      const resultData = isFinished
-        ? buildAnswerData()
-        : null;
-      const answerArray = resultData
-        ? resultData.answerArray
-        : questions.map((question, index) => ({
-            question_id: question?.id,
-            answer: normalizeAnswerValue(
-              answers[String(question?.id ?? index + 1)] ??
-              answers[question?.id]
-            ),
-          }));
-      const userScore = resultData
-        ? calculateScore(resultData.correctAnswerArray.length)
-        : null;
-
-      const payload = {
-        uid:
-          Number(uid),
-
-        cid:
-          Number(cid),
-
-        exam_status:
-          examStatus,
-
-        lastposition:
-          currentPage,
-
-        exam_id:
-          examId,
-
-        exam_type:
-          examType,
-
-        total_questions:
-          Number(
-            exam?.total_questions
-          ) ||
-          questions.length,
-
-        paused_time:
-          secondsToMilliseconds(timeLeft),
-
-        start_time:
-          attemptStartTime,
-
-        ...(["complete", "completed", "finish", "finished"].includes(String(examStatus).toLowerCase())
-          ? { end_time: attemptEndTime ?? Date.now() }
-          : {}),
-
-        total_mark:
-          Number(
-            exam?.total_mark
-          ) || 0,
-
-        answer_array: questions.map(getCorrectAnswer),
-        user_answers: answerArray.map((item) => item.answer || 0),
-        ...(pauseId ? { pauseid: pauseId } : {}),
-      };
-
-      if (resultData) {
-        Object.assign(payload, {
-          user_score: userScore,
-          minus_mark: 0,
-          total_correct: resultData.correctAnswerArray.length,
-          total_wrong: resultData.wrongAnswerArray.length,
-          total_attempted:
-            resultData.correctAnswerArray.length +
-            resultData.wrongAnswerArray.length,
-          correct_answer_array: resultData.correctAnswerArray,
-          wrong_answer_array: resultData.wrongAnswerArray,
-        });
-      }
-
-      console.log(
-        "STATEMENT EXAM PAYLOAD:",
-        payload
-      );
-
-      let result;
-
-      /* -----------------------------------------------------
-         CREATE FIRST ATTEMPT
-      ----------------------------------------------------- */
-
-      if (
-        !pauseId
-      ) {
-        result =
-          await sendAttemptRequest({
-            endpoint:
-              "/api/exam-attempt/create",
-
-            payload,
-          });
-
-        const id = getAttemptId(result);
-        if (!id && examStatus === "pause") throw new Error("Missing saved attempt ID. Please retry.");
-        setPauseId(id);
-      }
-
-      /* -----------------------------------------------------
-         UPDATE EXISTING ATTEMPT
-      ----------------------------------------------------- */
-
-      else {
-        result =
-          await sendAttemptRequest({
-            endpoint:
-              "/api/exam-attempt/update",
-
-            payload,
-          });
-      }
-
-      const savedAttemptId = pauseId || getAttemptId(result);
-      if (
-        !savedAttemptId &&
-        (examStatus === "pause" ||
-          (examStatus === "complete" && guestAction === "submit"))
-      ) {
-        throw new Error("The saved attempt ID was not returned. Please retry.");
-      }
-      if (savedAttemptId) setPauseId(savedAttemptId);
-      if (["pause", "submit"].includes(guestAction)) {
-        clearGuestExamHandoff();
-      }
-
-      console.log(
-        "STATEMENT EXAM SAVE RESULT:",
-        result
-      );
-
       try {
-        if (examStatus === "pause") localStorage.setItem(draftKey, JSON.stringify({ answers, pauseId: savedAttemptId, timeLeft, currentPage, startTime: attemptStartTime }));
-        else localStorage.removeItem(draftKey);
-      } catch {}
+        const resultData =
+          buildAnswerData();
 
-      /* -----------------------------------------------------
-         AFTER PAUSE
-      ----------------------------------------------------- */
+        const correctCount =
+          resultData.correctAnswerArray.length;
 
-      if (
-        examStatus ===
-        "pause"
-      ) {
-        router.push(
-          `/dashboard/${governmentExamsSlug}/statement-type-exams/${statementTypeSlug}/${examSlug}`
+        const wrongCount =
+          resultData.wrongAnswerArray.length;
+
+        const attemptedCount =
+          correctCount + wrongCount;
+
+        const negativeMark = Number(
+          (wrongCount * 0.333).toFixed(2)
         );
 
-        return;
-      }
+        const score = Number(
+          (
+            correctCount - wrongCount * 0.333
+          ).toFixed(2)
+        );
 
-      /* -----------------------------------------------------
-         AFTER FINISH
-      ----------------------------------------------------- */
+        const remainingSeconds =
+          latestTimeRef.current;
 
-      if (
-        examStatus ===
-        "complete"
-      ) {
-        if (guestAction === "submit") {
-          let savedResult = result?.data?.[0] || result?.data || result || {};
-          if (savedAttemptId) {
-            try {
-              const details = await sendAttemptRequest({
-                endpoint: "/api/exam-attempt/analytics-details",
-                payload: {
-                  cid: Number(cid),
-                  uid: Number(uid),
-                  id: savedAttemptId,
-                  exam_type: examType,
-                },
-              });
-              savedResult = getResultArray(details)[0] || savedResult;
-            } catch (error) {
-              console.error("STATEMENT RESULT LOAD ERROR:", error);
-            }
+        const payload = {
+          uid: Number(uid),
+          cid: Number(cid),
+
+          exam_status: isFinished
+            ? "finish"
+            : "pause",
+
+          lastposition: currentPage,
+
+          exam_id: examId,
+
+          exam_type: "tst",
+
+          total_questions:
+            Number(exam?.total_questions) ||
+            questions.length,
+
+          // Backend requires milliseconds.
+          paused_time:
+            secondsToMilliseconds(
+              remainingSeconds
+            ),
+
+          start_time: attemptStartTime,
+
+          ...(isFinished
+            ? {
+                end_time:
+                  attemptEndTime ??
+                  Date.now(),
+              }
+            : {}),
+
+          total_mark:
+            Number(exam?.total_mark) ||
+            questions.length,
+
+          answer_array:
+            questions.map(getCorrectAnswer),
+
+          user_answers:
+            resultData.answerArray.map(
+              (item) => item.answer || 0
+            ),
+
+          ...(pauseId
+            ? { pauseid: pauseId }
+            : {}),
+        };
+
+        if (isFinished) {
+          Object.assign(payload, {
+            user_score: score,
+            minus_mark: negativeMark,
+            total_correct: correctCount,
+            total_wrong: wrongCount,
+            total_attempted: attemptedCount,
+            correct_answer_array:
+              resultData.correctAnswerArray,
+            wrong_answer_array:
+              resultData.wrongAnswerArray,
+          });
+        }
+
+        const endpoint = pauseId
+          ? "/api/exam-attempt/update"
+          : "/api/exam-attempt/create";
+
+        const result =
+          await sendAttemptRequest({
+            endpoint,
+            payload,
+          });
+
+        const savedAttemptId =
+          pauseId ||
+          getAttemptId(result);
+
+        if (!savedAttemptId) {
+          throw new Error(
+            "The backend did not return the saved attempt ID. Check whether the attempt was saved before retrying."
+          );
+        }
+
+        setPauseId(savedAttemptId);
+
+        // Only clear guest handoff after confirmed save.
+        if (
+          ["pause", "submit"].includes(
+            guestAction
+          )
+        ) {
+          clearGuestExamHandoff();
+        }
+
+        try {
+          if (!isFinished) {
+            localStorage.setItem(
+              draftKey,
+              JSON.stringify({
+                answers,
+                pauseId: savedAttemptId,
+                timeLeft: remainingSeconds,
+                remainingSeconds,
+                currentPage,
+                startTime: attemptStartTime,
+              })
+            );
+          } else {
+            localStorage.removeItem(
+              draftKey
+            );
           }
-          setSubmittedResult(prepareExamHistoryResult({
-            ...payload,
-            ...savedResult,
-            id: savedAttemptId,
-            exam_type: examType,
-            exam_name: exam?.exam_name || exam?.title || "",
-          }));
-          setResultModalOpen(true);
+        } catch (storageError) {
+          console.warn(
+            "Unable to update local exam draft:",
+            storageError
+          );
+        }
+
+        /* -------------------------------------
+           PAUSE SUCCESS
+        ------------------------------------- */
+
+        if (!isFinished) {
+          setAttemptPaused(true);
+
+          setShowPauseConfirmation(false);
+
+          setPauseSuccessOpen(true);
+
           return;
         }
 
-        router.push(
-          `/dashboard/${governmentExamsSlug}/statement-type-exams/${statementTypeSlug}/${examSlug}`
-        );
-      }
-    } catch (error) {
-      console.error(
-        "STATEMENT EXAM SAVE ERROR:",
-        error
-      );
+        /* -------------------------------------
+           FINISH SUCCESS
+        ------------------------------------- */
 
-      setSaveError(
-        error?.message ||
-          "Unable to save exam."
-      );
-    } finally {
-      requestRef.current = false;
-      setSaving(false);
-    }
-  }
+        setAttemptFinished(true);
+
+        let savedResult =
+          result?.data?.[0] ||
+          result?.data ||
+          result ||
+          {};
+
+        try {
+          const details =
+            await sendAttemptRequest({
+              endpoint:
+                "/api/exam-attempt/analytics-details",
+
+              payload: {
+                cid: Number(cid),
+                uid: Number(uid),
+                id: savedAttemptId,
+                exam_type: "tst",
+              },
+            });
+
+          savedResult =
+            getResultArray(details)[0] ||
+            savedResult;
+        } catch (error) {
+          // Saving succeeded. Analytics failure
+          // must not cause a second submission.
+          console.warn(
+            "Exam saved, but analytics could not be loaded:",
+            error
+          );
+        }
+
+        setSubmittedResult(
+          prepareExamHistoryResult({
+            ...payload,
+            ...savedResult,
+
+            id: savedAttemptId,
+            pauseid: savedAttemptId,
+
+            exam_type: "tst",
+
+            exam_name:
+              exam?.exam_name ||
+              exam?.title ||
+              "",
+          })
+        );
+
+        setResultModalOpen(true);
+      } catch (error) {
+        console.error(
+          "STATEMENT EXAM SAVE ERROR:",
+          error
+        );
+
+        setSaveError(
+          error?.message ||
+          "Unable to save exam attempt."
+        );
+      } finally {
+        requestRef.current = false;
+        setSaving(false);
+      }
+    },
+    [
+      uid,
+      cid,
+      examId,
+      exam,
+      questions,
+      currentPage,
+      attemptStartTime,
+      attemptEndTime,
+      pauseId,
+      guestAction,
+      draftKey,
+      answers,
+      buildAnswerData,
+    ]
+  );
 
   /* =======================================================
-     CONTROLS
+     GUEST ACTION AFTER LOGIN
+
+     PAUSE:
+       Restore -> Show confirmation.
+       Do NOT automatically save.
+
+     SUBMIT:
+       Restore -> Complete once.
   ======================================================= */
-
-  function handlePause() {
-    setShowPauseConfirmation(true);
-  }
-
-  function confirmPause() {
-    setShowPauseConfirmation(false);
-    saveExamAttempt("pause");
-  }
-
-  function handleFinish() {
-    saveExamAttempt(
-      "complete"
-    );
-  }
-
-  function handleViewAnalysis(result) {
-    const attemptId = result?.id ?? result?.attempt_id ?? result?.pauseid;
-    if (!attemptId || !governmentExamsSlug) return;
-    const params = new URLSearchParams({
-      attemptId: String(attemptId),
-      examType: String(result?.exam_type ?? examType),
-      ...(result?.exam_name ? { title: result.exam_name } : {}),
-    });
-    router.push(`/dashboard/${encodeURIComponent(governmentExamsSlug)}/exam-analysis?${params.toString()}`);
-  }
 
   useEffect(() => {
     if (
       restoring ||
       guestRestoreError ||
-      guestActionHandledRef.current ||
-      !["pause", "submit"].includes(guestAction)
+      guestActionHandledRef.current
+    ) {
+      return;
+    }
+
+    const action =
+      restoredActionRef.current;
+
+    if (
+      action !== "pause" &&
+      action !== "submit"
     ) {
       return;
     }
 
     guestActionHandledRef.current = true;
-    const timer = window.setTimeout(() => {
-      void saveExamAttempt(guestAction === "pause" ? "pause" : "complete");
-    }, 0);
-    return () => window.clearTimeout(timer);
-    // One handoff is replayed once after restoration; the ref prevents repeats.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoring, guestRestoreError, guestAction]);
+
+    if (action === "pause") {
+      setShowPauseConfirmation(true);
+      return;
+    }
+
+    if (action === "submit") {
+      void saveExamAttempt("finish");
+    }
+  }, [
+    restoring,
+    guestRestoreError,
+    saveExamAttempt,
+  ]);
 
   /* =======================================================
-     TIME OVER
+     PAUSE CONTROLS
+  ======================================================= */
 
-     For logged-in user:
-     complete automatically.
+  function handlePause() {
+    if (
+      restoring ||
+      saving ||
+      attemptFinished ||
+      attemptPaused ||
+      requestRef.current
+    ) {
+      return;
+    }
 
-     For uid 0:
-     show login modal.
+    setSaveError("");
+    setShowPauseConfirmation(true);
+  }
+
+  function confirmPause() {
+    if (
+      saving ||
+      requestRef.current ||
+      attemptPaused
+    ) {
+      return;
+    }
+
+    // Keep the confirmation visible while saving.
+    // On success, saveExamAttempt closes it.
+    void saveExamAttempt("pause");
+  }
+
+  function closePauseConfirmation() {
+    if (saving) return;
+
+    setShowPauseConfirmation(false);
+  }
+
+  function handlePauseSuccess() {
+    setPauseSuccessOpen(false);
+
+    router.replace(dashboardHome);
+    router.refresh();
+  }
+
+  /* =======================================================
+     FINISH
+  ======================================================= */
+
+  function handleFinish() {
+    if (
+      restoring ||
+      saving ||
+      attemptFinished ||
+      attemptPaused ||
+      requestRef.current
+    ) {
+      return;
+    }
+
+    setShowPauseConfirmation(false);
+
+    void saveExamAttempt("finish");
+  }
+
+  /* =======================================================
+     TIMER EXPIRY
   ======================================================= */
 
   useEffect(() => {
     if (
       restoring ||
-      guestAction ||
+      guestRestoreError ||
       !isTimeOver ||
-      timeOverHandled.current
+      timeOverHandledRef.current ||
+      attemptFinished ||
+      attemptPaused ||
+      saving ||
+      showPauseConfirmation ||
+      ["pause", "submit"].includes(guestAction)
     ) {
       return;
     }
 
-    timeOverHandled.current =
-      true;
+    timeOverHandledRef.current = true;
 
-    saveExamAttempt(
-      "complete"
-    );
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void saveExamAttempt("finish");
   }, [
     restoring,
+    guestRestoreError,
     isTimeOver,
+    attemptFinished,
+    attemptPaused,
+    saving,
+    showPauseConfirmation,
+    guestAction,
+    saveExamAttempt,
   ]);
+
+  /* =======================================================
+     RESULT ANALYSIS
+  ======================================================= */
+
+  function handleViewAnalysis(result) {
+    const attemptId =
+      result?.id ??
+      result?.attempt_id ??
+      result?.pauseid ??
+      pauseId;
+
+    if (!attemptId) {
+      setSaveError(
+        "Saved attempt ID is unavailable."
+      );
+      return;
+    }
+
+    const params = new URLSearchParams({
+      attemptId: String(attemptId),
+      examType: "tst",
+
+      title:
+        result?.exam_name ||
+        exam?.exam_name ||
+        exam?.title ||
+        "",
+    });
+
+    router.push(
+      `${dashboardHome}/exam-analysis?${params.toString()}`
+    );
+  }
 
   /* =======================================================
      UI
@@ -898,31 +1031,116 @@ export default function ExamClient({
       <ExamResultModal
         open={resultModalOpen}
         result={submittedResult}
-        examTitle={exam?.exam_name || exam?.title || ""}
-        onClose={() => setResultModalOpen(false)}
-        onViewAnalysis={handleViewAnalysis}
+        examTitle={
+          exam?.exam_name ||
+          exam?.title ||
+          ""
+        }
+        onClose={() => {
+          setResultModalOpen(false);
+          router.replace(
+            `${dashboardHome}/exam-attempted`
+          );
+        }}
+        onViewAnalysis={
+          handleViewAnalysis
+        }
       />
+
       <ExamPauseConfirmModal
         open={showPauseConfirmation}
         saving={saving}
-        onClose={() => setShowPauseConfirmation(false)}
-        onConfirm={confirmPause}
+        onClose={
+          closePauseConfirmation
+        }
+        onConfirm={
+          confirmPause
+        }
       />
-      <main
-        className="
-          min-h-screen
-          bg-[#f5f9ff]
-        "
-      >
+
+      {/* PAUSED SUCCESS MODAL */}
+      {pauseSuccessOpen && (
         <div
           className="
-            mx-auto
-            w-full
+            fixed inset-0 z-[9999]
+            flex items-center justify-center
+            bg-black/60 p-4
+          "
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pause-success-title"
+        >
+          <div
+            className="
+              w-full max-w-md
+              rounded-[24px]
+              bg-white p-7
+              text-center shadow-2xl
+            "
+          >
+            <div
+              className="
+                mx-auto mb-5
+                flex h-16 w-16
+                items-center justify-center
+                rounded-full
+                bg-green-100
+                text-3xl
+                text-green-700
+              "
+            >
+              ✓
+            </div>
+
+            <h2
+              id="pause-success-title"
+              className="
+                text-2xl font-black
+                text-slate-900
+              "
+            >
+              Exam Paused Successfully
+            </h2>
+
+            <p
+              className="
+                mt-3 text-sm
+                leading-6 text-slate-600
+              "
+            >
+              Your answers and remaining time
+              have been saved. You can resume
+              this exam later from your dashboard.
+            </p>
+
+            <button
+              type="button"
+              onClick={
+                handlePauseSuccess
+              }
+              className="
+                mt-7 w-full
+                rounded-xl
+                bg-blue-700
+                px-5 py-3
+                font-bold text-white
+                transition
+                hover:bg-blue-800
+              "
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="min-h-screen bg-[#f5f9ff]">
+        <div
+          className="
+            mx-auto w-full
             max-w-[1300px]
-            px-4
-            py-8
-            sm:px-6
-            lg:px-8
+            px-4 py-8
+            sm:px-6 lg:px-8
           "
         >
           <ExamHero
@@ -930,18 +1148,14 @@ export default function ExamClient({
             questionsCount={
               questions.length
             }
-            timeLeft={
-              timeLeft
-            }
+            timeLeft={timeLeft}
             durationMinutes={
               durationMinutes
             }
             statementTypeSlug={
               statementTypeSlug
             }
-            examSlug={
-              examSlug
-            }
+            examSlug={examSlug}
             governmentExamsSlug={
               governmentExamsSlug
             }
@@ -962,72 +1176,62 @@ export default function ExamClient({
             }
           />
 
-          {/* ==============================================
-              SAVE ERROR
-          ============================================== */}
-
-          {saveError ? (
+          {guestRestoreError && (
             <div
               className="
-                mt-5
-                rounded-[16px]
-                border
-                border-red-200
-                bg-red-50
-                p-4
+                mt-5 rounded-2xl
+                border border-red-200
+                bg-red-50 p-4
+                font-semibold text-red-700
               "
             >
-              <p
-                className="
-                  font-bold
-                  text-red-700
-                "
-              >
-                {saveError}
-              </p>
+              {guestRestoreError}
             </div>
-          ) : null}
+          )}
 
-          {/* ==============================================
-              TIME OVER
-          ============================================== */}
-
-          {isTimeOver ? (
+          {saveError && (
             <div
               className="
-                mt-5
-                rounded-[16px]
-                border
-                border-red-200
-                bg-red-50
-                p-4
+                mt-5 rounded-2xl
+                border border-red-200
+                bg-red-50 p-4
+                font-semibold text-red-700
               "
             >
-              <p
-                className="
-                  font-black
-                  text-red-700
-                "
-              >
+              {saveError}
+            </div>
+          )}
+
+          {restoring && (
+            <div
+              className="
+                mt-5 rounded-xl
+                bg-blue-50 p-4
+                text-sm font-medium
+                text-blue-800
+              "
+            >
+              Restoring your exam progress...
+            </div>
+          )}
+
+          {isTimeOver && !attemptFinished && (
+            <div
+              className="
+                mt-5 rounded-2xl
+                border border-amber-200
+                bg-amber-50 p-4
+                text-amber-800
+              "
+            >
+              <p className="font-bold">
                 Time is over
               </p>
-
-              <p
-                className="
-                  mt-1
-                  text-sm
-                  text-red-600
-                "
-              >
-                You can no longer
-                change your answers.
+              <p className="mt-1 text-sm">
+                You can no longer change your answers.
               </p>
             </div>
-          ) : null}
-
-          {/* ==============================================
-              QUESTIONS
-          ============================================== */}
+          )}
 
           <ExamQuestions
             questions={
@@ -1043,17 +1247,13 @@ export default function ExamClient({
               handleAnswer
             }
             disabled={
-              isTimeOver ||
-              saving
+              interactionLocked ||
+              isTimeOver
             }
             imagePath={
               imagePath
             }
           />
-
-          {/* ==============================================
-              PAGINATION
-          ============================================== */}
 
           <ExamPagination
             currentPage={
@@ -1067,10 +1267,6 @@ export default function ExamClient({
             }
           />
 
-          {/* ==============================================
-              CONTROLS
-          ============================================== */}
-
           <ExamControls
             onPause={
               handlePause
@@ -1082,12 +1278,12 @@ export default function ExamClient({
               saving
             }
             disabled={
-              saving
+              interactionLocked ||
+              Boolean(guestRestoreError)
             }
           />
         </div>
       </main>
-
     </>
   );
 }

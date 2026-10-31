@@ -31,7 +31,7 @@ function AttemptTimes({ attempt }) {
   return (
     <div className="space-y-1 text-xs">
       <AttemptTime attempt={attempt} kind="start" />
-      <AttemptTime attempt={attempt} kind="end" />
+      {isFinishedExamAttempt(attempt) && <AttemptTime attempt={attempt} kind="end" />}
     </div>
   );
 }

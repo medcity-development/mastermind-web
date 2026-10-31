@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -23,8 +24,10 @@ import ExamEmpty from "./ExamEmpty";
 
 import useExamController from "./hooks/useExamController";
 
-import PyqResultModal from "@/components/PyqResultModal";
-import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
+import ExamResultModal from "@/components/ExamResultModal";
+import ExamTimeFinishedModal from "@/components/exam-timer/ExamTimeFinishedModal";
+import LoginRequiredModal from "@/app/(public)/government-exams-coaching/[governmentExamsSlug]/previous-questions/[examId]/components/LoginRequiredModal";
+import ExamPauseConfirmationModal from "@/app/(student)/dashboard/common-components/exam/ExamPauseConfirmationModal";
 
 import {
   clearGuestExamHandoff,
@@ -66,7 +69,11 @@ export default function ExamClient({
   const appliedOnce = useRef(false);
   const autoSubmitted = useRef(false);
   const resumedQuestionScrolled = useRef(false);
-  const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
+
+  const [
+    showPauseConfirmation,
+    setShowPauseConfirmation,
+  ] = useState(false);
 
   const controller = useExamController({
     exam,
@@ -81,23 +88,57 @@ export default function ExamClient({
     guestAction,
   });
 
+  const authenticated = Number(uid) > 0;
+  const [loginAction, setLoginAction] = useState("");
+  const [pauseSaved, setPauseSaved] = useState(false);
+  const [autoSaveFailed, setAutoSaveFailed] = useState(false);
+  const cardsPath = `${authenticated ? "/dashboard" : "/government-exams-coaching"}/${encodeURIComponent(governmentExamsSlug)}/previous-questions`;
+  const guestTimedOut = !authenticated && controller.timerFinished && !loginAction;
+  const pauseModalOpen = !controller.timerFinished && (
+    showPauseConfirmation || (handoff && guestAction === "pause" && restored && controller.interactionFrozen && !controller.paused)
+  );
+
+  useEffect(() => {
+    if (!guestTimedOut) return;
+    const timer = window.setTimeout(() => router.replace(cardsPath), 5000);
+    return () => window.clearTimeout(timer);
+  }, [guestTimedOut, router, cardsPath]);
+
+  function requestAction(action) {
+    if (controller.saving || controller.paused || controller.submitted) return;
+    if (!authenticated) {
+      if (controller.timerFinished) return;
+      controller.freezeInteraction();
+      setLoginAction(action);
+    } else if (action === "pause") {
+      if (!controller.timerFinished) setShowPauseConfirmation(true);
+    } else {
+      void controller.handleSubmit();
+    }
+  }
+
   function handlePauseAndReturn() {
-    setShowPauseConfirmation(true);
+    requestAction("pause");
   }
 
   async function savePauseAndReturn() {
     const saved = await controller.handlePause();
 
     if (saved) {
-      router.replace(
-        `/dashboard/${governmentExamsSlug}/previous-questions`
-      );
+      clearGuestExamHandoff();
+
+      setPauseSaved(true);
     }
+
+    return Boolean(saved);
   }
 
   async function confirmPauseAndReturn() {
-    await savePauseAndReturn();
-    setShowPauseConfirmation(false);
+    const saved = await savePauseAndReturn();
+
+    if (saved) {
+      setShowPauseConfirmation(false);
+    }
   }
 
   useEffect(() => {
@@ -110,6 +151,8 @@ export default function ExamClient({
     guestAction,
     handoff,
   ]);
+
+  /* SCROLL TO RESTORED QUESTION */
 
   useEffect(() => {
     if (
@@ -131,6 +174,7 @@ export default function ExamClient({
           behavior: "smooth",
           block: "center",
         });
+
         resumedQuestionScrolled.current = true;
       }
     }, 0);
@@ -142,7 +186,7 @@ export default function ExamClient({
     controller.lastAnsweredQuestionId,
   ]);
 
-  /* RESTORE BEFORE SAVING */
+  /* RESTORE GUEST ATTEMPT */
 
   useEffect(() => {
     if (
@@ -190,10 +234,10 @@ export default function ExamClient({
     examType,
     governmentExamsSlug,
     guestAction,
-    controller.restoreGuestAttempt,
+    controller,
   ]);
 
-  /* SAVE AFTER LOGIN / PROFILE SETUP */
+  /* SHOW PAUSE CONFIRMATION AFTER LOGIN */
 
   useEffect(() => {
     if (
@@ -208,13 +252,10 @@ export default function ExamClient({
 
     appliedOnce.current = true;
 
-    // Already saved before refresh.
     if (controller.submitted) return;
 
     if (guestAction === "submit") {
-      controller.handleSubmit();
-    } else {
-      void savePauseAndReturn();
+      void controller.handleSubmit();
     }
   }, [
     handoff,
@@ -223,8 +264,7 @@ export default function ExamClient({
     guestAction,
     controller.restoreReady,
     controller.submitted,
-    controller.handleSubmit,
-    savePauseAndReturn,
+    controller,
   ]);
 
   /* AUTOMATIC FINISH */
@@ -233,7 +273,8 @@ export default function ExamClient({
     if (
       !restored ||
       restoreError ||
-      handoff ||
+      !authenticated ||
+      controller.interactionFrozen ||
       !controller.timerFinished ||
       controller.submitted ||
       controller.saving ||
@@ -243,31 +284,30 @@ export default function ExamClient({
     }
 
     autoSubmitted.current = true;
-    controller.handleSubmit();
+    void controller.handleSubmit().then((saved) => {
+      if (!saved) setAutoSaveFailed(true);
+    });
   }, [
     restored,
     restoreError,
-    handoff,
+    authenticated,
+    controller.interactionFrozen,
     controller.timerFinished,
     controller.submitted,
     controller.saving,
-    controller.handleSubmit,
+    controller,
   ]);
 
-  function viewAttempted() {
-    if (!governmentExamsSlug) return;
-
-    try {
-      clearGuestExamHandoff();
-    } catch {
-      // Attempt is already saved to the backend.
-    }
-
-    router.push(
-      `/dashboard/${encodeURIComponent(
-        governmentExamsSlug
-      )}/exam-attempted`
-    );
+  function viewAnalysis() {
+    const attemptId = controller.submittedResult?.pauseid ?? controller.submittedResult?.id;
+    if (!attemptId || !governmentExamsSlug) return;
+    clearGuestExamHandoff();
+    const query = new URLSearchParams({
+      attemptId: String(attemptId),
+      examType: "pqp",
+      title: exam?.exam_name ?? exam?.title ?? "Previous Questions",
+    });
+    router.push(`/dashboard/${encodeURIComponent(governmentExamsSlug)}/exam-analysis?${query}`);
   }
 
   if (restoreError) {
@@ -295,6 +335,7 @@ export default function ExamClient({
             <p className="text-red-700">
               {controller.saveError}
             </p>
+
             <button
               type="button"
               className="mt-3 font-semibold text-blue-700 underline"
@@ -382,7 +423,9 @@ export default function ExamClient({
           className={
             c.saving ||
               c.paused ||
-              handoff ||
+              pauseModalOpen ||
+              guestTimedOut ||
+              c.interactionFrozen ||
               c.submitted
               ? "pointer-events-none"
               : ""
@@ -424,20 +467,20 @@ export default function ExamClient({
             <ExamSubmit
               answeredCount={c.answeredCount}
               totalQuestions={c.totalQuestions}
-              onSubmit={c.handleSubmit}
+              onSubmit={() => requestAction("submit")}
               saving={c.saving}
             />
           </div>
         )}
 
-        {c.timerFinished && !c.submitted && (
+        {authenticated && c.timerFinished && !c.submitted && (
           <p
             role="status"
             className="rounded-xl bg-red-50 p-4 text-red-700"
           >
             Exam time has ended.{" "}
-            {c.saveError
-              ? "Use Submit & Finish to retry."
+            {c.saveError || autoSaveFailed
+              ? "Automatic saving failed. Use Submit & Finish to retry."
               : "Saving your exam…"}
           </p>
         )}
@@ -453,7 +496,19 @@ export default function ExamClient({
         )}
       </section>
 
-      <PyqResultModal
+      {pauseSaved && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-7 text-center shadow-xl">
+            <h2 className="text-xl font-bold text-slate-900">You have paused the exam</h2>
+            <p className="mt-3 text-sm text-slate-600">Your answers and remaining time have been saved.</p>
+            <button type="button" className="mt-5 rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white" onClick={() => router.replace(`/dashboard/${encodeURIComponent(governmentExamsSlug)}`)}>
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ExamResultModal
         open={c.resultModalOpen}
         result={c.submittedResult}
         examTitle={
@@ -461,13 +516,36 @@ export default function ExamClient({
           exam?.title ??
           "Previous Questions"
         }
-        onClose={c.closeResultModal}
-        onViewAnalysis={viewAttempted}
+        onClose={viewAnalysis}
+        onViewAnalysis={viewAnalysis}
       />
-      <ExamPauseConfirmModal
-        open={showPauseConfirmation}
+
+      <LoginRequiredModal
+        open={Boolean(loginAction)}
+        onClose={() => {
+          setLoginAction("");
+          controller.continueRestoredExam();
+        }}
+        onLogin={() => {
+          const action = loginAction;
+          if (controller.beginGuestLogin(action)) setLoginAction("");
+        }}
+      />
+
+      <ExamTimeFinishedModal
+        open={guestTimedOut}
+        message="Your exam time has expired. Returning to the exam cards in 5 seconds."
+        onBackToExams={() => router.replace(cardsPath)}
+      />
+
+      <ExamPauseConfirmationModal
+        open={pauseModalOpen}
+        error={c.saveError}
         saving={controller.saving}
-        onClose={() => setShowPauseConfirmation(false)}
+        onContinue={() => {
+          setShowPauseConfirmation(false);
+          controller.continueRestoredExam();
+        }}
         onConfirm={confirmPauseAndReturn}
       />
     </>

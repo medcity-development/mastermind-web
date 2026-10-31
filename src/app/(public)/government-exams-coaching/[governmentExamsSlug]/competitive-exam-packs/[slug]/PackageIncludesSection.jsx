@@ -111,7 +111,7 @@ export default function PackageIncludesSection({
                 text-[#0b216c]
               "
             >
-              What's Included
+              What&apos;s Included
             </h2>
 
             <p

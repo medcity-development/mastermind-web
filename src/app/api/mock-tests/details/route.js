@@ -3,6 +3,8 @@ import {
   NextResponse,
 } from "next/server";
 import { getStudentSession } from "@/lib/auth/getStudentSession";
+import { getUserExamAttempts } from "@/lib/examAttemptHelper";
+import { selectMockPausedAttempt } from "@/lib/mockPausedAttempt";
 
 export async function GET(
   request
@@ -203,6 +205,15 @@ export async function GET(
     }
 
     result = await applyPackageAccess(result, { cid, contentType: examType });
+
+    if (Number(uid) > 0 && searchParams.get("resume") === "1") {
+      const attempts = await getUserExamAttempts({ uid, cid, examId, examType });
+      if (attempts?.status === false && (attempts.message || attempts.msg)) {
+        throw new Error(attempts.message || attempts.msg);
+      }
+      const paused = selectMockPausedAttempt(attempts, { uid, cid, examId, examType });
+      result = { ...result, paused: paused ? [paused] : [] };
+    }
 
     return NextResponse.json(
       {

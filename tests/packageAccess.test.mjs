@@ -6,11 +6,14 @@ import test from "node:test";
 const source = readFileSync(new URL("../src/lib/packageAccess.js", import.meta.url), "utf8")
   .replace(/^import .*;$/gm, "")
   .replace(/export /g, "");
-function setup({ uid = 7, plans = [], courses = [{ id: 42, exam: "General Science" }], fetch, getActivePlans } = {}) {
+function setup({ uid = 7, plans = [], courses = [{ id: 42, exam: "General Science" }], fetch, getActivePlans, now = Date.now } = {}) {
   const context = vm.createContext({
     FormData,
+    Date: class extends Date { static now() { return now(); } },
     AbortSignal,
     fetch,
+    executePscRequest: ({ task }) => task(),
+    setPscRateLimit: () => 60,
     process: { env: { PSC_API_KEY: "test", PSC_API_BASE_URL: "https://backend.test" } },
     getStudentSession: async () => ({ uid }),
     getActivePlans: getActivePlans || (async () => plans),
@@ -182,4 +185,28 @@ test("study-plan membership is still checked when chapter subject metadata is ab
   const api = setup({ plans: [active], fetch: studyPlanBackend });
   const result = await api.applyPackageAccess({ data: [{ type: "paid" }] }, { cid: 1, topicid: 184 });
   assert.equal(result.data[0].packageAccess, true);
+});
+test("slow ownership requests remain deduplicated past the old cache TTL", async () => {
+  let time = Date.now();
+  let calls = 0;
+  let finish;
+  const api = setup({ now: () => time, getActivePlans: async () => {
+    calls++;
+    return new Promise(resolve => { finish = resolve; });
+  } });
+  const first = api.getOwnedPackages(7, 1);
+  await Promise.resolve();
+  time += 10000;
+  const second = api.getOwnedPackages(7, 1);
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  finish([]);
+  await Promise.all([first, second]);
+});
+
+test("JSON rate limits preserve retry metadata and never grant access", async () => {
+  const api = setup({ plans: [active], fetch: async () => Response.json({
+    status: false, message: "Too many requests", retryAfter: 60,
+  }) });
+  await assert.rejects(api.getOwnedExamIds(7, 1, "pqp"), error => error.httpStatus === 429 && error.retryAfter === 60);
 });

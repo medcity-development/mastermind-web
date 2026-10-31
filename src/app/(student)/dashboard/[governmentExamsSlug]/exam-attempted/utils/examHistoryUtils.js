@@ -354,24 +354,11 @@ function getTimestamp(value, source) {
 }
 
 export function getAttemptStartTimestamp(attempt) {
-  return getTimestamp(
-    attempt?.start_time ??
-      attempt?.startTime ??
-      attempt?.started_at ??
-      attempt?.startedAt ??
-      attempt?.starttime ??
-      attempt?.created_at ??
-      attempt?.createdAt ??
-      attempt?.created_date ??
-      attempt?.createdDate ??
-      attempt?.created ??
-      attempt?.date ??
-      attempt?.exam_date ??
-      attempt?.examDate ??
-      attempt?.datetime ??
-      attempt?.date_time,
-    "start"
-  );
+  const explicit = attempt?.start_time ?? attempt?.startTime ?? attempt?.started_at ?? attempt?.startedAt ?? attempt?.starttime;
+  if (explicit) return getTimestamp(explicit, "start");
+  return getTimestamp(attempt?.created_at ?? attempt?.createdAt ?? attempt?.created_date ?? attempt?.createdDate ??
+    attempt?.created ?? attempt?.date ?? attempt?.exam_date ?? attempt?.examDate ?? attempt?.datetime ?? attempt?.date_time,
+    "record-created");
 }
 
 export function getAttemptEndTimestamp(attempt) {
@@ -403,39 +390,8 @@ export function getAttemptEndTimestamp(attempt) {
     value = null;
   }
 
-  // Fallback: If modified_at is omitted by backend, derive completed time from start time + paused_time
-  if (!value) {
-    const startVal = getAttemptStartTimestamp(attempt).value;
-    const rawPaused = attempt?.paused_time ?? attempt?.time_taken;
-    const rawDuration = rawPaused !== undefined && rawPaused !== null && rawPaused !== ""
-      ? Number(rawPaused)
-      : null;
-
-    if (startVal && Number.isFinite(rawDuration) && rawDuration > 0) {
-      const startDate = parseExamDate(startVal);
-      if (startDate) {
-        let durationMs = 0;
-        if (rawDuration >= 1_000_000_000) {
-          // Absolute Unix timestamp
-          const absDate = new Date(rawDuration < 1e12 ? rawDuration * 1000 : rawDuration);
-          if (!Number.isNaN(absDate.getTime())) {
-            return getTimestamp(absDate.toISOString(), "completed");
-          }
-        } else if (rawDuration > 86_400) {
-          // Milliseconds (e.g. 4,229,040 ms = ~70 min)
-          durationMs = rawDuration;
-        } else {
-          // Seconds (e.g. 4,294 s = ~71.5 min, or 473 s = ~7.8 min)
-          durationMs = rawDuration * 1000;
-        }
-
-        const endDate = new Date(startDate.getTime() + durationMs);
-        value = endDate.toISOString();
-      }
-    }
-  }
-
-  return getTimestamp(value, "completed");
+  // paused_time is remaining time, not elapsed time; it cannot establish completion.
+  return getTimestamp(value, attempt?.modified_at || attempt?.updated_at ? "record-updated" : "completed");
 }
 
 export function getAttemptStartTime(attempt) {
