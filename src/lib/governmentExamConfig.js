@@ -11,9 +11,21 @@ export const GOVERNMENT_EXAM_CONFIG = {
     shortName: "KPSC",
 
     examLevels: {
+      "10th-level-exams": {
+        subId: 3,
+        name: "10th level exams",
+      },
+      "12th-level-exams": {
+        subId: 2,
+        name: "12th level exams",
+      },
       "degree-level-exams": {
         subId: 1,
-        name: "Degree Level Exams",
+        name: "Degree level exams",
+      },
+      "kerala-psc-nursing": {
+        subId: 7,
+        name: "Kerala PSC Nursing",
       },
     },
 
@@ -133,7 +145,16 @@ export const GOVERNMENT_EXAM_CONFIG = {
 
     shortName: "RRB & SSC",
 
-    examLevels: {},
+    examLevels: {
+      "rrb-exams": {
+        subId: 4,
+        name: "RRB exams",
+      },
+      "ssc-exams": {
+        subId: 5,
+        name: "SSC exams",
+      },
+    },
 
     faq: {
       eyebrow:

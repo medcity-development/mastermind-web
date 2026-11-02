@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ArrowRight,
 } from "lucide-react";
+import CompetitivePackageSubscribeButton from "./CompetitivePackageSubscribeButton";
 
 export default function CompetitiveExamPackCard({
   item,
@@ -141,13 +142,13 @@ export default function CompetitiveExamPackCard({
             </p>
           )}
 
-          <Link
-            href={
-              href
-            }
-            className="
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Link
+              href={
+                href
+              }
+              className="
               group/link
-              mt-5
               inline-flex
               w-fit
               items-center
@@ -166,19 +167,23 @@ export default function CompetitiveExamPackCard({
               hover:bg-[#f13873]
               hover:text-white
             "
-          >
-            View Details
+            >
+              View Details
 
-            <ArrowRight
-              className="
+              <ArrowRight
+                className="
                 h-4
                 w-4
                 transition-transform
                 duration-300
                 group-hover/link:translate-x-1
               "
+              />
+            </Link>
+            <CompetitivePackageSubscribeButton
+              examName={examName}
             />
-          </Link>
+          </div>
         </div>
       </div>
     </article>

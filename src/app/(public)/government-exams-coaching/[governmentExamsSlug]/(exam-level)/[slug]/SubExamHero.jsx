@@ -11,6 +11,8 @@ import {
 
 export default function SubExamHero({
   title,
+  governmentExamsSlug,
+  governmentExamName,
 }) {
   return (
     <section
@@ -83,7 +85,7 @@ export default function SubExamHero({
         "
       >
         <Link
-          href="/government-exams-coaching/kerala-psc"
+          href={`/government-exams-coaching/${governmentExamsSlug}`}
           className="
             inline-flex
             items-center
@@ -109,7 +111,7 @@ export default function SubExamHero({
             size={14}
           />
 
-          Kerala PSC
+          {governmentExamName}
         </Link>
 
         <div
@@ -170,7 +172,7 @@ export default function SubExamHero({
                   size={12}
                 />
 
-                Kerala PSC Exam Level
+                {governmentExamName} Exam Level
               </p>
 
               <h1

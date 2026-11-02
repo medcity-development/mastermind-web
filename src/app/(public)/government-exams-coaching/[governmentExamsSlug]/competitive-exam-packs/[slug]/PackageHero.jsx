@@ -5,6 +5,7 @@ import {
   GraduationCap,
   Sparkles,
 } from "lucide-react";
+import CompetitivePackageSubscribeButton from "../CompetitivePackageSubscribeButton";
 
 /* =========================================================
    GET ONLY INTRO / ABOUT TEXT
@@ -42,6 +43,7 @@ function getAboutDescription(
 
 export default function PackageHero({
   packageData,
+  examName,
 }) {
   if (!packageData) {
     return null;
@@ -309,6 +311,12 @@ export default function PackageHero({
                 />
               }
               text="Latest Updates"
+            />
+          </div>
+
+          <div className="mt-6">
+            <CompetitivePackageSubscribeButton
+              examName={examName}
             />
           </div>
         </div>

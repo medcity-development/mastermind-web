@@ -75,6 +75,16 @@ async function resolveExamLevel({
     return null;
   }
 
+  const normalizedLevelSlug =
+    String(levelSlug)
+      .trim()
+      .toLowerCase();
+
+  const configuredLevel =
+    governmentConfig.examLevels?.[
+      normalizedLevelSlug
+    ] ?? null;
+
   const cid =
     String(
       governmentConfig.cid
@@ -90,18 +100,6 @@ async function resolveExamLevel({
       uid: 0,
     });
 
-  if (
-    !result?.status &&
-    !result?.categories?.length
-  ) {
-    console.error(
-      "Unable to resolve exam level:",
-      result?.message
-    );
-
-    return null;
-  }
-
   const categories =
     Array.isArray(
       result?.categories
@@ -112,13 +110,6 @@ async function resolveExamLevel({
   /* =======================================================
      MATCH SEO SLUG
   ======================================================= */
-
-  const normalizedLevelSlug =
-    String(
-      levelSlug
-    )
-      .trim()
-      .toLowerCase();
 
   const category =
     categories.find(
@@ -141,7 +132,7 @@ async function resolveExamLevel({
       }
     ) || null;
 
-  if (!category) {
+  if (!category && !configuredLevel) {
     console.error(
       "Exam level slug not found:",
       {
@@ -177,7 +168,8 @@ async function resolveExamLevel({
   const subId =
     getCategoryId(
       category
-    );
+    ) ??
+    configuredLevel?.subId;
 
   if (
     subId === null ||
@@ -202,7 +194,8 @@ async function resolveExamLevel({
     title:
       getCategoryName(
         category
-      ),
+      ) ||
+      configuredLevel.name,
   };
 }
 
@@ -317,6 +310,12 @@ export default async function ExamLevelPage({
         <SubExamHero
           title={
             title
+          }
+          governmentExamsSlug={
+            governmentConfig.slug
+          }
+          governmentExamName={
+            governmentConfig.name
           }
         />
 
