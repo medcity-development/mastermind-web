@@ -5,7 +5,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-export default function RecommendedCoursesHeader() {
+export default function RecommendedCoursesHeader({
+  onPrevious,
+  onNext,
+  viewAllHref,
+}) {
   return (
     <div
       className="
@@ -68,6 +72,7 @@ export default function RecommendedCoursesHeader() {
         <button
           type="button"
           aria-label="Previous courses"
+          onClick={onPrevious}
           className="
             flex
             h-10
@@ -93,6 +98,7 @@ export default function RecommendedCoursesHeader() {
         <button
           type="button"
           aria-label="Next courses"
+          onClick={onNext}
           className="
             flex
             h-10
@@ -116,7 +122,7 @@ export default function RecommendedCoursesHeader() {
         </button>
 
         <Link
-          href="/government-exams-coaching/kerala-psc/recommended-courses"
+          href={viewAllHref}
           className="
             group
             inline-flex

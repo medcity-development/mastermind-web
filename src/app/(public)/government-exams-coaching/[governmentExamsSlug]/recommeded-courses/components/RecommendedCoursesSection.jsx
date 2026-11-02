@@ -2,9 +2,7 @@ import {
   getHomeResponses,
 } from "@/lib/homeResponsesHelper";
 
-import RecommendedCoursesHeader from "./RecommendedCoursesHeader";
-
-import RecommendedCourseCard from "./RecommendedCourseCard";
+import RecommendedCoursesCarousel from "./RecommendedCoursesCarousel";
 
 import ReferAndEarnCard from "./ReferAndEarnCard";
 
@@ -67,54 +65,14 @@ export default async function RecommendedCoursesSection({
       />
 
       <div className="relative z-10">
-        <RecommendedCoursesHeader
-          examName={
-            examName
-          }
-          shortName={
-            shortName
-          }
-          totalCourses={
-            courses.length
-          }
+        <RecommendedCoursesCarousel
+          courses={courses}
+          cid={cid}
+          examName={examName}
+          governmentExamsSlug={governmentExamsSlug}
         />
 
-        {courses.length >
-        0 ? (
-          <div
-            className="
-              mt-5
-              grid
-              grid-cols-1
-              gap-4
-              sm:grid-cols-2
-              lg:grid-cols-3
-              xl:grid-cols-4
-            "
-          >
-            {courses.map(
-              (course) => (
-                <RecommendedCourseCard
-                  key={
-                    `${cid}-${course.id}`
-                  }
-                  course={
-                    course
-                  }
-                  cid={
-                    cid
-                  }
-                  governmentExamsSlug={
-                    governmentExamsSlug
-                  }
-                  examName={
-                    examName
-                  }
-                />
-              )
-            )}
-          </div>
-        ) : (
+        {!courses.length && (
           <div
             className="
               mt-5
