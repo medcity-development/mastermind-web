@@ -183,7 +183,10 @@ export default function useExamSubmission(ctx) {
         cid,
         exam_id: id,
         exam_type: type,
-        lastposition: resumePosition,
+        lastposition:
+          action === "submit"
+            ? totalQuestions
+            : resumePosition,
 
         total_questions: totalQuestions,
         total_mark: totalMark,

@@ -21,10 +21,10 @@ for (const [correct, wrong, skipped, penalty, score] of [
     assert.equal(result.score, score);
     assert.equal(result.negativeMark, penalty);
     assert.equal(result.attempted, correct + wrong);
-    const mock = calculateMockResult({ questions: answerArray.map((answer, id) => ({ id, answer })), answers: Object.fromEntries(userAnswers.map((answer, id) => [id, answer])) });
+    const mock = calculateMockResult({ questions: answerArray.map((answer, id) => ({ id, answer, option1: "A", option2: "B", option3: "C", option4: "D", option5: "E" })), answers: Object.fromEntries(userAnswers.map((answer, id) => [id, answer])) });
     assert.equal(mock.userScore, score);
     assert.equal(mock.minusMark, penalty);
-    for (const exam_type of ["mock", "pqp", "pyq", "scert"]) {
+    for (const exam_type of ["mock", "pqp", "pyq", "scert", "tst"]) {
       const payload = buildAttemptPayload({ exam_type, exam_status: "finish", total_mark: 200, answer_array: answerArray, user_answers: userAnswers, minus_mark: 0.5, __scoring: { markPerCorrect: 2, negativeMarkPerWrong: 0.5 } }, 21);
       assert.equal(payload.user_score, score);
       assert.equal(payload.minus_mark, penalty);

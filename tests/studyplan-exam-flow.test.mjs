@@ -50,6 +50,7 @@ test("Study Plan saves pause and finish with the expected API fields", () => {
     answers,
     remainingSeconds: 120,
     startTime: 1791512820000,
+    lastPosition: 2,
   };
 
   const pause = examUtils.buildStudyPlanAttemptPayload({
@@ -59,6 +60,7 @@ test("Study Plan saves pause and finish with the expected API fields", () => {
   assert.equal(pause.exam_type, "studyplan");
   assert.equal(pause.exam_status, "pause");
   assert.equal(pause.remaining_seconds, 120);
+  assert.equal(pause.lastposition, 2);
   assert.deepEqual(pause.answer_array, ["A", "E"]);
   assert.deepEqual(pause.user_answers, ["B", "E"]);
 
@@ -68,6 +70,7 @@ test("Study Plan saves pause and finish with the expected API fields", () => {
   });
   assert.equal(finish.exam_type, "studyplan");
   assert.equal(finish.exam_status, "finish");
+  assert.equal(finish.lastposition, questions.length);
   assert.deepEqual(finish.user_answers, ["B", "E"]);
 
   const result = examUtils.buildStudyPlanResult({
@@ -91,10 +94,44 @@ test("Study Plan saves pause and finish with the expected API fields", () => {
   );
   assert.equal(apiPayload.exam_status, "finish");
   assert.equal(apiPayload.exam_type, "studyplan");
+  assert.equal(apiPayload.lastposition, questions.length);
+  assert.equal(apiPayload.paused_time, "");
   assert.equal(apiPayload.user_score, 0.67);
   assert.equal(apiPayload.minus_mark, 0.33);
   assert.equal(apiPayload.total_correct, 1);
   assert.equal(apiPayload.total_wrong, 1);
+  const pausedApiPayload = attemptData.buildAttemptPayload(
+    {
+      ...pause,
+      exam_type: "studyplan",
+    },
+    21
+  );
+  assert.equal(pausedApiPayload.exam_status, "pause");
+  assert.equal(pausedApiPayload.lastposition, 2);
+  assert.equal(pausedApiPayload.paused_time, 120000);
+  assert.equal(
+    attemptData.buildAttemptPayload(
+      {
+        ...finish,
+        exam_type: "studyplan",
+        lastposition: "studyplan",
+      },
+      21
+    ).lastposition,
+    questions.length
+  );
+  assert.equal(
+    attemptData.buildAttemptPayload(
+      {
+        ...pause,
+        exam_type: "studyplan",
+        lastposition: "studyplan",
+      },
+      21
+    ).lastposition,
+    2
+  );
 
   const displayedResult = resultUtils.calculateExamScore({
     ...result,
@@ -201,6 +238,20 @@ test("Study Plan restores A-E answer letters and rejects non-paused attempts", (
     examUtils.restoreStudyPlanAnswers(questions, '["B","E"]'),
     { 10: "B", 11: "E" }
   );
+  assert.equal(
+    examUtils.getStudyPlanLastPosition(
+      { lastposition: "2", user_answers: '["B","E"]' },
+      questions
+    ),
+    2
+  );
+  assert.equal(
+    examUtils.getStudyPlanLastPosition(
+      { user_answers: '["0","E"]' },
+      questions
+    ),
+    2
+  );
 
   const paused = {
     id: 901,
@@ -264,32 +315,40 @@ test("Study Plan uses getUserExams, setNewUserExams, and setUpdateUserExams", as
     examId: 40,
     examType: "studyplan",
   });
-  await helper.createUserExamAttempt({
-    cid: 1,
-    uid: 21,
-    exam_id: 40,
-    exam_type: "studyplan",
-    exam_status: "pause",
-    total_questions: 2,
-    total_mark: 2,
-    paused_time: 120000,
-    answer_array: ["A", "E"],
-    user_answers: ["B", "E"],
-  });
-  await helper.updateUserExamAttempt({
-    cid: 1,
-    uid: 21,
-    exam_id: 40,
-    exam_type: "studyplan",
-    exam_status: "finish",
-    pauseid: 329,
-    total_questions: 2,
-    total_mark: 2,
-    answer_array: ["A", "E"],
-    user_answers: ["B", "E"],
-    user_score: 0.67,
-    minus_mark: 0.33,
-  });
+  await helper.createUserExamAttempt(
+    attemptData.buildAttemptPayload(
+      {
+        cid: 1,
+        exam_id: 40,
+        exam_type: "studyplan",
+        exam_status: "pause",
+        total_questions: 2,
+        total_mark: 2,
+        remaining_seconds: 120,
+        answer_array: ["A", "E"],
+        user_answers: ["B", "E"],
+        lastposition: 2,
+      },
+      21
+    )
+  );
+  await helper.updateUserExamAttempt(
+    attemptData.buildAttemptPayload(
+      {
+        cid: 1,
+        exam_id: 40,
+        exam_type: "studyplan",
+        exam_status: "finish",
+        total_questions: 2,
+        total_mark: 2,
+        answer_array: ["A", "E"],
+        user_answers: ["B", "E"],
+        pauseid: 329,
+        lastposition: "studyplan",
+      },
+      21
+    )
+  );
 
   assert.deepEqual(
     requests.map((request) => request.endpoint),
@@ -303,10 +362,14 @@ test("Study Plan uses getUserExams, setNewUserExams, and setUpdateUserExams", as
   assert.equal(requests[0].fields.exam_id, "40");
   assert.equal(requests[1].fields.exam_status, "pause");
   assert.equal(requests[1].fields.exam_type, "studyplan");
+  assert.equal(requests[1].fields.lastposition, "2");
+  assert.equal(requests[1].fields.paused_time, "120000");
   assert.equal(requests[1].fields.user_score, "0");
   assert.equal(requests[1].fields.minus_mark, "0");
   assert.equal(requests[1].fields.user_answers, '["B","E"]');
   assert.equal(requests[2].fields.pauseid, "329");
   assert.equal(requests[2].fields.exam_status, "finish");
+  assert.equal(requests[2].fields.lastposition, "2");
+  assert.equal(requests[2].fields.paused_time, "");
   assert.equal(requests[2].fields.user_score, "0.67");
 });

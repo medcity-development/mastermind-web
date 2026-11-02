@@ -1058,17 +1058,27 @@ export async function getUserTransactions({
       cache: "no-store",
     });
 
-    const transactions =
-      Array.isArray(result?.data)
-        ? result.data
-        : Array.isArray(result?.details)
-          ? result.details
-          : Array.isArray(result?.transactions)
-            ? result.transactions
-            : [];
+    const transactionList = [
+      result?.data,
+      result?.details,
+      result?.transactions,
+    ].find(Array.isArray);
+    const transactions = transactionList ?? [];
 
-    const status =
+    const backendStatus =
       isPscSuccessStatus(result?.status);
+    const backendMessage = String(
+      result?.message ?? result?.msg ?? ""
+    ).trim();
+    const emptyMessage =
+      /^no (?:purchases?|transactions?|records?)(?:\s+(?:found|available|available yet))?\.?$/i.test(
+        backendMessage
+      );
+    const emptyWithoutError =
+      !backendStatus &&
+      (!transactionList || transactionList.length === 0) &&
+      (!backendMessage || emptyMessage);
+    const status = backendStatus || emptyWithoutError;
 
     if (!status) {
       console.warn(
@@ -1089,8 +1099,9 @@ export async function getUserTransactions({
       status,
       transactions,
       message:
-        result?.message ??
-        result?.msg ??
+        (backendMessage && !emptyMessage
+          ? backendMessage
+          : null) ??
         (status
           ? ""
           : "Purchase history is temporarily unavailable."),

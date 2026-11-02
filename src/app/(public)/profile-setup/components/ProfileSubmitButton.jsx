@@ -15,7 +15,7 @@ export default function ProfileSubmitButton({
       className="
         group
         flex
-        h-[44px]
+        h-12
         lg:h-[50px]
         w-full
         items-center
@@ -33,12 +33,13 @@ export default function ProfileSubmitButton({
         shadow-[0_10px_24px_rgba(67,74,239,0.24)]
         transition-all
         duration-300
-
+        hover:cursor-pointer
         hover:-translate-y-0.5
         hover:shadow-[0_18px_36px_rgba(67,74,239,0.32)]
 
         disabled:cursor-not-allowed
         disabled:opacity-60
+        sm:h-[50px]
       "
     >
       {loading ? (

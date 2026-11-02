@@ -9,9 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import {
-  getAttemptId,
   normalizeExamAnswer,
-  secondsToMilliseconds,
 } from "@/lib/examAttemptData";
 
 import {
@@ -25,44 +23,11 @@ import ExamQuestions from "./ExamQuestions";
 import ExamPagination from "./ExamPagination";
 import ExamControls from "./ExamControls";
 import LoginRequiredModal from "./LoginRequiredModal";
+import ExamTimeFinishedModal from "@/components/exam-timer/ExamTimeFinishedModal";
 
 import {
   QUESTIONS_PER_PAGE,
 } from "../utils/examUtils";
-
-function getCorrectAnswer(question) {
-  return normalizeExamAnswer(
-    question?.correct_answer ??
-      question?.correctAnswer ??
-      question?.answer ??
-      question?.right_answer ??
-      question?.rightAnswer
-  );
-}
-
-async function sendAttemptRequest(endpoint, payload) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const result = await response.json();
-
-  if (
-    !response.ok ||
-    result?.status === false ||
-    result?.status === "false"
-  ) {
-    throw new Error(
-      result?.message || "Unable to save exam attempt."
-    );
-  }
-
-  return result;
-}
 
 export default function ExamClient({
   exam,
@@ -96,6 +61,9 @@ export default function ExamClient({
 
   const draftKey =
     `exam_draft_${signedIn ? uid : "guest"}_${cid}_${examType}_${examId}`;
+  const publicCardPath =
+    `/government-exams-coaching/${encodeURIComponent(governmentExamsSlug)}` +
+    `/statement-type-exams/${encodeURIComponent(statementTypeSlug)}`;
 
   const requestRef = useRef(false);
   const timerFinishedRef = useRef(false);
@@ -116,6 +84,7 @@ export default function ExamClient({
   const [restoring, setRestoring] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [timeoutModalOpen, setTimeoutModalOpen] = useState(false);
 
   const [modalState, setModalState] = useState({
     open: false,
@@ -243,41 +212,6 @@ export default function ExamClient({
     });
   }
 
-  function buildPayload(status) {
-    const correctAnswers = questions.map(getCorrectAnswer);
-
-    const userAnswers = questions.map(
-      (question, index) => {
-        const id = String(question?.id ?? index + 1);
-        return normalizeExamAnswer(answers[id]) || 0;
-      }
-    );
-
-    return {
-      cid: Number(cid),
-      exam_id: Number(examId),
-      exam_type: "tst",
-      exam_status: status,
-      lastposition: currentPage,
-      total_questions: questions.length,
-
-      // Backend expects milliseconds.
-      paused_time: secondsToMilliseconds(timeLeft),
-
-      total_mark:
-        Number(exam?.total_mark) || questions.length,
-
-      start_time: startTime,
-      ...(status === "finish"
-        ? { end_time: Date.now() }
-        : {}),
-
-      answer_array: correctAnswers,
-      user_answers: userAnswers,
-      ...(pauseId ? { pauseid: pauseId } : {}),
-    };
-  }
-
   function openLoginModal(action) {
     setSaveError("");
     setModalState({
@@ -286,9 +220,7 @@ export default function ExamClient({
     });
   }
 
-  function handleGuestLogin() {
-    const action = modalState.action;
-
+  function continueToDashboard(action) {
     try {
       saveGuestExamHandoff({
         examId,
@@ -308,6 +240,19 @@ export default function ExamClient({
           exam?.exam_name || exam?.title || "",
       });
 
+      if (signedIn) {
+        const params = new URLSearchParams({
+          examId: String(examId),
+          guestAction: action,
+        });
+        router.push(
+          `/dashboard/${encodeURIComponent(governmentExamsSlug)}` +
+            `/statement-type-exams/${encodeURIComponent(statementTypeSlug)}` +
+            `/${encodeURIComponent(examSlug)}/start?${params.toString()}`
+        );
+        return;
+      }
+
       const redirect =
         guestExamLoginRedirectPath(action);
 
@@ -322,96 +267,30 @@ export default function ExamClient({
     }
   }
 
-  async function saveSignedInAttempt(status) {
-    if (requestRef.current || !signedIn) return;
-
-    requestRef.current = true;
-    setSaving(true);
-    setSaveError("");
-
-    try {
-      const payload = buildPayload(status);
-
-      const result = await sendAttemptRequest(
-        pauseId
-          ? "/api/exam-attempt/update"
-          : "/api/exam-attempt/create",
-        payload
-      );
-
-      const id = pauseId || getAttemptId(result);
-
-      if (!id) {
-        throw new Error(
-          "The backend did not return an attempt ID."
-        );
-      }
-
-      setPauseId(id);
-
-      if (status === "pause") {
-        localStorage.setItem(
-          draftKey,
-          JSON.stringify({
-            answers,
-            currentPage,
-            remainingSeconds: timeLeft,
-            startTime,
-            pauseId: id,
-          })
-        );
-      } else {
-        localStorage.removeItem(draftKey);
-      }
-
-      // Signed-in users should continue inside dashboard.
-      const params = new URLSearchParams({
-        examId: String(examId),
-        ...(status === "finish"
-          ? { guestAction: "submit" }
-          : { guestAction: "pause" }),
-      });
-
-      router.push(
-        `/dashboard/${governmentExamsSlug}` +
-          `/statement-type-exams/${statementTypeSlug}` +
-          `/${examSlug}/start?${params.toString()}`
-      );
-    } catch (error) {
-      setSaveError(
-        error?.message || "Unable to save exam."
-      );
-    } finally {
-      requestRef.current = false;
-      setSaving(false);
-    }
+  function handleGuestLogin() {
+    continueToDashboard(modalState.action);
   }
 
   function handlePause() {
-    if (saving || restoring) return;
+    if (saving || restoring || isTimeOver) return;
 
     if (!signedIn) {
       openLoginModal("pause");
       return;
     }
 
-    // For signed-in users, use dashboard confirmation.
-    router.push(
-      `/dashboard/${governmentExamsSlug}` +
-        `/statement-type-exams/${statementTypeSlug}` +
-        `/${examSlug}/start`
-    );
+    continueToDashboard("pause");
   }
 
   function handleFinish() {
-    if (saving || restoring) return;
+    if (saving || restoring || isTimeOver) return;
 
     if (!signedIn) {
       openLoginModal("submit");
       return;
     }
 
-    void saveSignedInAttempt("finish");
+    continueToDashboard("submit");
   }
 
   useEffect(() => {
@@ -426,17 +305,29 @@ export default function ExamClient({
     timerFinishedRef.current = true;
 
     if (!signedIn) {
-      setModalState({
-        open: true,
-        action: "submit",
-      });
+      const timeout = window.setTimeout(
+        () => setTimeoutModalOpen(true),
+        0
+      );
+      return () => window.clearTimeout(timeout);
     } else {
-      void saveSignedInAttempt("finish");
+      continueToDashboard("submit");
     }
 
     // Only execute once when the timer expires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restoring, isTimeOver, signedIn]);
+
+  useEffect(() => {
+    if (!timeoutModalOpen) return undefined;
+
+    const timeout = window.setTimeout(
+      () => router.replace(publicCardPath),
+      5000
+    );
+
+    return () => window.clearTimeout(timeout);
+  }, [publicCardPath, router, timeoutModalOpen]);
 
   return (
     <>
@@ -450,6 +341,11 @@ export default function ExamClient({
           })
         }
         onLogin={handleGuestLogin}
+      />
+      <ExamTimeFinishedModal
+        open={timeoutModalOpen}
+        message="Your exam time has expired. Returning to the exams in 5 seconds."
+        onBackToExams={() => router.replace(publicCardPath)}
       />
 
       <main className="min-h-screen bg-[#f5f9ff]">

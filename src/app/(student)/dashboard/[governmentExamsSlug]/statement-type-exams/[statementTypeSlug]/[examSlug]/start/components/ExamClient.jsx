@@ -12,8 +12,11 @@ import {
 import { useRouter } from "next/navigation";
 
 import {
+  calculateExamResult,
   getAttemptId,
   getResultArray,
+  parseAnswers,
+  savedPausedTimeToSeconds,
   secondsToMilliseconds,
   timestampToMilliseconds,
 } from "@/lib/examAttemptData";
@@ -35,6 +38,7 @@ import ExamControls from "./ExamControls";
 
 import ExamResultModal from "@/components/ExamResultModal";
 import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
+import ExamNavigationGuard from "@/components/exam/ExamNavigationGuard";
 
 import {
   QUESTIONS_PER_PAGE,
@@ -192,6 +196,9 @@ export default function ExamClient({
 
   const dashboardHome =
     `/dashboard/${encodeURIComponent(governmentExamsSlug)}`;
+  const statementCardPath =
+    `${dashboardHome}/statement-type-exams/` +
+    `${encodeURIComponent(statementTypeSlug)}`;
 
   /* =======================================================
      STATE
@@ -249,6 +256,8 @@ export default function ExamClient({
 
   const restoredActionRef = useRef("");
 
+  const restoredQuestionPositionRef = useRef(0);
+
   const latestTimeRef = useRef(durationSeconds);
 
   /* =======================================================
@@ -283,9 +292,121 @@ export default function ExamClient({
             );
           }
         } else {
-          const raw = localStorage.getItem(draftKey);
+          try {
+            const raw = localStorage.getItem(draftKey);
+            draft = raw ? JSON.parse(raw) : null;
+          } catch (storageError) {
+            console.warn(
+              "Unable to read local Statement Type draft:",
+              storageError
+            );
+          }
 
-          draft = raw ? JSON.parse(raw) : null;
+          if (Number(uid) > 0) {
+            const params = new URLSearchParams({
+              cid: String(cid),
+              exam_id: String(examId),
+            });
+            const response = await fetch(
+              `/api/statement-type-attempt?${params.toString()}`,
+              { cache: "no-store" }
+            );
+            let result;
+
+            try {
+              result = await response.json();
+            } catch {
+              throw new Error(
+                "Unable to read saved Statement Type exam progress."
+              );
+            }
+
+            if (!response.ok || result?.status === false) {
+              throw new Error(
+                result?.message ||
+                  "Unable to load saved Statement Type exam progress."
+              );
+            }
+
+            const pausedAttempt = result?.paused;
+            if (pausedAttempt) {
+              const savedAnswers = parseAnswers(
+                pausedAttempt.user_answers
+              );
+              const restoredAnswers = {};
+
+              questions.forEach((question, index) => {
+                const answer = normalizeAnswerValue(
+                  savedAnswers[index]
+                );
+                if (answer) {
+                  restoredAnswers[
+                    String(question?.id ?? index + 1)
+                  ] = answer;
+                }
+              });
+
+              const pauseId = getAttemptId(pausedAttempt);
+              if (!pauseId) {
+                throw new Error(
+                  "The saved Statement Type attempt is missing its pause ID."
+                );
+              }
+
+              const localDraft = draft;
+              const localDraftMatches =
+                String(localDraft?.pauseId ?? "") === String(pauseId);
+              const savedPosition = Number(
+                pausedAttempt.lastposition ??
+                  pausedAttempt.last_position
+              );
+              const restoredPosition =
+                Number.isSafeInteger(savedPosition) &&
+                savedPosition > 0
+                  ? savedPosition
+                  : questions.reduce(
+                      (position, question, index) =>
+                        restoredAnswers[
+                          String(question?.id ?? index + 1)
+                        ]
+                          ? index + 1
+                          : position,
+                      0
+                    ) || 1;
+              restoredQuestionPositionRef.current =
+                restoredPosition;
+              const savedTime =
+                pausedAttempt.paused_time;
+              const restoredTime =
+                savedTime !== undefined &&
+                savedTime !== null &&
+                savedTime !== ""
+                  ? savedPausedTimeToSeconds(
+                      savedTime,
+                      durationSeconds
+                    )
+                  : localDraftMatches
+                    ? normalizeRemainingSeconds(
+                        localDraft.remainingSeconds ??
+                          localDraft.timeLeft,
+                        durationSeconds
+                      )
+                    : durationSeconds;
+
+              draft = {
+                answers: restoredAnswers,
+                pauseId,
+                currentPage: Math.ceil(
+                  restoredPosition / QUESTIONS_PER_PAGE
+                ),
+                remainingSeconds: restoredTime,
+                startTime:
+                  pausedAttempt.start_time ??
+                  pausedAttempt.started_at ??
+                  localDraft?.startTime,
+              };
+            }
+          }
         }
 
         if (cancelled) return;
@@ -383,9 +504,30 @@ export default function ExamClient({
     examId,
     examType,
     governmentExamsSlug,
+    uid,
+    cid,
     durationSeconds,
     totalPages,
+    questions,
   ]);
+
+  useEffect(() => {
+    if (restoring || !restoredQuestionPositionRef.current) {
+      return;
+    }
+
+    const target = document.querySelector(
+      `[data-exam-question-number="${restoredQuestionPositionRef.current}"]`
+    );
+
+    if (target) {
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      restoredQuestionPositionRef.current = 0;
+    }
+  }, [restoring, currentPage]);
 
   /* =======================================================
      TIMER
@@ -597,27 +739,29 @@ export default function ExamClient({
         const resultData =
           buildAnswerData();
 
-        const correctCount =
-          resultData.correctAnswerArray.length;
-
-        const wrongCount =
-          resultData.wrongAnswerArray.length;
-
-        const attemptedCount =
-          correctCount + wrongCount;
-
-        const negativeMark = Number(
-          (wrongCount * 0.333).toFixed(2)
-        );
-
-        const score = Number(
-          (
-            correctCount - wrongCount * 0.333
-          ).toFixed(2)
-        );
+        const calculatedResult = calculateExamResult({
+          answerArray: questions.map(getCorrectAnswer),
+          userAnswers: resultData.answerArray.map(
+            (item) => item.answer || 0
+          ),
+        });
+        const correctCount = calculatedResult.correct;
+        const wrongCount = calculatedResult.wrong;
+        const attemptedCount = calculatedResult.attempted;
+        const negativeMark = calculatedResult.negativeMark;
+        const score = calculatedResult.score;
 
         const remainingSeconds =
           latestTimeRef.current;
+        const lastAnsweredPosition = questions.reduce(
+          (position, question, index) =>
+            normalizeAnswerValue(
+              answers[String(question?.id ?? index + 1)]
+            )
+              ? index + 1
+              : position,
+          0
+        );
 
         const payload = {
           uid: Number(uid),
@@ -627,7 +771,10 @@ export default function ExamClient({
             ? "finish"
             : "pause",
 
-          lastposition: currentPage,
+          lastposition: isFinished
+            ? questions.length
+            : lastAnsweredPosition ||
+              (currentPage - 1) * QUESTIONS_PER_PAGE + 1,
 
           exam_id: examId,
 
@@ -637,11 +784,11 @@ export default function ExamClient({
             Number(exam?.total_questions) ||
             questions.length,
 
-          // Backend requires milliseconds.
-          paused_time:
-            secondsToMilliseconds(
-              remainingSeconds
-            ),
+          paused_time: isFinished
+            ? ""
+            : secondsToMilliseconds(
+                remainingSeconds
+              ),
 
           start_time: attemptStartTime,
 
@@ -930,8 +1077,7 @@ export default function ExamClient({
   function handlePauseSuccess() {
     setPauseSuccessOpen(false);
 
-    router.replace(dashboardHome);
-    router.refresh();
+    router.replace(statementCardPath);
   }
 
   /* =======================================================
@@ -1028,6 +1174,14 @@ export default function ExamClient({
 
   return (
     <>
+      <ExamNavigationGuard
+        active={
+          !restoring &&
+          questions.length > 0 &&
+          !attemptFinished &&
+          !attemptPaused
+        }
+      />
       <ExamResultModal
         open={resultModalOpen}
         result={submittedResult}
@@ -1038,9 +1192,7 @@ export default function ExamClient({
         }
         onClose={() => {
           setResultModalOpen(false);
-          router.replace(
-            `${dashboardHome}/exam-attempted`
-          );
+          handleViewAnalysis(submittedResult);
         }}
         onViewAnalysis={
           handleViewAnalysis
@@ -1128,13 +1280,13 @@ export default function ExamClient({
                 hover:bg-blue-800
               "
             >
-              Go to Dashboard
+              Go to Exams
             </button>
           </div>
         </div>
       )}
 
-      <main className="min-h-screen bg-[#f5f9ff]">
+      <main data-exam-workspace className="min-h-screen bg-[#f5f9ff]">
         <div
           className="
             mx-auto w-full

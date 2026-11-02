@@ -41,6 +41,7 @@ import {
   
     return (
       <article
+        data-exam-question-number={number}
         className="
           rounded-[22px]
           border

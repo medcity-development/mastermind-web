@@ -31,6 +31,7 @@ import ScertExamActions from "./ScertExamActions";
 
 
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamNavigationGuard from "@/components/exam/ExamNavigationGuard";
 import ExamPauseConfirmationModal from "@/app/(student)/dashboard/common-components/exam/ExamPauseConfirmationModal";
 import ExamTimeFinishedModal from "@/components/exam-timer/ExamTimeFinishedModal";
 import LoginRequiredModal from "@/app/(public)/government-exams-coaching/[governmentExamsSlug]/previous-questions/[examId]/components/LoginRequiredModal";
@@ -101,7 +102,6 @@ export default function ScertExamClient({
   classId,
   testSlug,
   examType = "scert",
-  lastPosition = "scert",
   durationMinutes = 90,
   questionsPerPage = 10,
   mode = "new",
@@ -578,12 +578,28 @@ export default function ScertExamClient({
         (question) =>
           current.answers[String(question.id)] ?? 0
       );
+      const lastAnsweredPosition = questions.reduce(
+        (position, question, index) => {
+          const answer = current.answers[String(question.id)];
+
+          return answer != null &&
+            String(answer).trim() !== "" &&
+            String(answer) !== "0"
+            ? index + 1
+            : position;
+        },
+        0
+      );
 
       const payload = {
         cid,
         exam_id: id,
         exam_type: type,
-        lastposition: lastPosition || type,
+        lastposition:
+          action === "submit"
+            ? totalQuestions
+            : lastAnsweredPosition ||
+              (current.currentPage - 1) * pageSize + 1,
 
         total_questions: totalQuestions,
 
@@ -723,7 +739,7 @@ export default function ScertExamClient({
         setInteractionFrozen(wasFrozen);
       }
     }
-  }, [ready, restoreError, paused, authenticated, uid, checkpoint, router, cid, id, lastPosition, totalQuestions, exam, questions, answerKeys, storeDraft, isHandoff, draftKey, cardsPath]);
+  }, [ready, restoreError, paused, authenticated, uid, checkpoint, router, cid, id, pageSize, totalQuestions, exam, questions, answerKeys, storeDraft, isHandoff, draftKey, cardsPath]);
 
   /* CONTINUE THE GUEST ACTION AFTER LOGIN */
 
@@ -941,7 +957,20 @@ export default function ScertExamClient({
     (currentPage - 1) * pageSize;
 
   return (
-    <main className="min-h-screen bg-[#f5f9ff] py-6 sm:py-8">
+    <main
+      data-exam-workspace
+      className="min-h-screen bg-[#f5f9ff] py-6 sm:py-8"
+    >
+      <ExamNavigationGuard
+        active={
+          typeof window !== "undefined" &&
+          window.location?.pathname?.startsWith("/dashboard/") &&
+          ready &&
+          questions.length > 0 &&
+          !submitted &&
+          !paused
+        }
+      />
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <ScertExamHeader
           exam={exam}
@@ -1050,7 +1079,7 @@ export default function ScertExamClient({
 
       <ExamTimeFinishedModal
         open={guestTimedOut}
-        message="Your exam time has expired. Returning to the exam cards in 5 seconds."
+        message="Your exam time has expired. Returning to the exams in 5 seconds."
         onBackToExams={() => router.replace(cardsPath)}
       />
 

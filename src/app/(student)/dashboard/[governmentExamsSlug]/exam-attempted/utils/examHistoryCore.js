@@ -179,14 +179,20 @@ export function normalizeRecord(record, requestedType) {
       normalized[field] = null;
     }
   } else {
-    for (const field of [
-      "total_attempted",
-      "total_correct",
-      "total_wrong",
-      "user_score",
-      "score",
-      "minus_mark",
-    ]) {
+    const savedFields =
+      prepared._resultSource ===
+      "saved-data-with-answer-fallback"
+        ? ["user_score", "score", "minus_mark"]
+        : [
+            "total_attempted",
+            "total_correct",
+            "total_wrong",
+            "user_score",
+            "score",
+            "minus_mark",
+          ];
+
+    for (const field of savedFields) {
       const saved = source?.[field];
 
       if (saved !== null && saved !== undefined && saved !== "") {

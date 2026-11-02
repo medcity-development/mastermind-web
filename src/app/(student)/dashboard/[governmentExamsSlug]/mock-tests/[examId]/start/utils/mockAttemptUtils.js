@@ -2,6 +2,7 @@
 import {
   getCorrectAnswer,
   getExamTotalMark,
+  isValidQuestionAnswer,
 } from "./mockTestUtils";
 
 export function buildMockAttemptPayload({
@@ -39,6 +40,16 @@ export function buildMockAttemptPayload({
     exam,
     questions.length
   );
+  const lastAnsweredPosition = questions.reduce(
+    (lastPosition, question, index) =>
+      isValidQuestionAnswer(
+        question,
+        answers[question?.id ?? index + 1]
+      )
+        ? index + 1
+        : lastPosition,
+    0
+  );
 
   const payload = {
     cid: String(cid),
@@ -61,15 +72,18 @@ export function buildMockAttemptPayload({
         }
       : {}),
 
-    lastposition:
-      exam?.lastposition ?? examType,
+    lastposition: finishing
+      ? questions.length
+      : Math.max(1, lastAnsweredPosition),
 
-    paused_time: String(
-      Math.max(
-        0,
-        Math.round(remainingSeconds)
-      )
-    ),
+    remaining_seconds: finishing
+      ? ""
+      : String(
+          Math.max(
+            0,
+            Math.round(remainingSeconds)
+          )
+        ),
 
     total_questions: String(
       questions.length

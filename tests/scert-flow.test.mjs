@@ -110,6 +110,8 @@ test("SCERT pause at zero answers waits for confirmation then creates and exits"
   await modal.props.onConfirm();
   assert.equal(h.requests.at(-1).body.action, "create");
   assert.equal(h.requests.at(-1).body.exam_status, "pause");
+  assert.equal(h.requests.at(-1).body.lastposition, 1);
+  assert.equal(h.requests.at(-1).body.remaining_seconds, 60);
   assert.equal(h.paths[0], "/dashboard/kerala-psc/scert-tests/classes/3");
 });
 
@@ -123,6 +125,7 @@ test("SCERT post-login pause asks for confirmation and Continue unlocks answers"
   await h.settle();
   await h.expire();
   assert.equal(h.requests.at(-1).body.exam_status, "finish");
+  assert.equal(h.requests.at(-1).body.lastposition, 2);
 });
 
 test("SCERT post-login finish saves restored answers and opens results", async () => {
@@ -190,11 +193,72 @@ test("SCERT paused lookup uses session identity and the scert exam type", async 
 for (const action of ["create", "update"]) {
   test(`SCERT ${action} uses the requested upstream API and converts time once`, async () => {
     const h = await routeModule();
-    const result = await h.exports.POST({ json: async () => ({ uid: 999, cid: 1, exam_id: 40, exam_type: "scert", action, pauseid: action === "update" ? 329 : undefined, exam_status: "pause", remaining_seconds: 20, start_time: Date.now(), answer_array: ["A", "B"], user_answers: ["A", 0] }) });
+    const result = await h.exports.POST({ json: async () => ({ uid: 999, cid: 1, exam_id: 40, exam_type: "scert", action, pauseid: action === "update" ? 329 : undefined, exam_status: "pause", remaining_seconds: 20, lastposition: 2, start_time: Date.now(), answer_array: ["A", "B"], user_answers: ["A", 0] }) });
     assert.equal(result.status, 200);
     assert.equal(h.requests[0].endpoint, `https://psc.example.test/${action === "create" ? "setNewUserExams" : "setUpdateUserExams"}`);
     assert.equal(h.requests[0].form.uid, "21");
     assert.equal(h.requests[0].form.paused_time, "20000");
     assert.equal(h.requests[0].form.exam_type, "scert");
+    assert.equal(h.requests[0].form.lastposition, "2");
   });
 }
+
+test("SCERT finish stores the final question position and empty pause time", async () => {
+  const h = await routeModule();
+  const result = await h.exports.POST({
+    json: async () => ({
+      cid: 1,
+      exam_id: 40,
+      exam_type: "scert",
+      action: "create",
+      exam_status: "finish",
+      remaining_seconds: 20,
+      lastposition: 1,
+      start_time: Date.now(),
+      answer_array: ["A", "B"],
+      user_answers: ["A", 0],
+    }),
+  });
+  assert.equal(result.status, 200);
+  assert.equal(h.requests[0].form.exam_status, "finish");
+  assert.equal(h.requests[0].form.lastposition, "2");
+  assert.equal(h.requests[0].form.paused_time, "");
+});
+
+test("topic-wise and statement-wise attempt payloads normalize positions and pause times", () => {
+  for (const exam_type of ["twe", "tst"]) {
+    const paused = data.buildAttemptPayload(
+      {
+        cid: 1,
+        exam_id: 40,
+        exam_type,
+        exam_status: "pause",
+        total_questions: 3,
+        lastposition: "3",
+        remaining_seconds: 45,
+        answer_array: ["A", "B", "C"],
+        user_answers: ["A", 0, "C"],
+      },
+      21
+    );
+    assert.equal(paused.lastposition, 3);
+    assert.equal(paused.paused_time, 45000);
+
+    const finished = data.buildAttemptPayload(
+      {
+        cid: 1,
+        exam_id: 40,
+        exam_type,
+        exam_status: "finish",
+        total_questions: 3,
+        lastposition: 1,
+        remaining_seconds: 10,
+        answer_array: ["A", "B", "C"],
+        user_answers: ["A", 0, "C"],
+      },
+      21
+    );
+    assert.equal(finished.lastposition, 3);
+    assert.equal(finished.paused_time, "");
+  }
+});

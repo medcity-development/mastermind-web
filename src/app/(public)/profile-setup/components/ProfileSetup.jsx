@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import Swal from "sweetalert2";
@@ -43,6 +43,19 @@ export default function ProfileSetup({
 }) {
   const router = useRouter();
   const submitting = useRef(false);
+
+  useEffect(() => {
+    const rootOverflow = document.documentElement.style.overflow;
+    const bodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = rootOverflow;
+      document.body.style.overflow = bodyOverflow;
+    };
+  }, []);
 
   const [gender, setGender] = useState(
     authData?.avatar || ""
@@ -278,107 +291,123 @@ export default function ProfileSetup({
 
   return (
     <>
-      {!showCourseModal && (
-        <button
-          type="button"
-          onClick={() => router.replace("/")}
-          aria-label="Close profile setup"
-          title="Close profile setup"
-          className="fixed right-4 top-4 z-[10001] flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-        >
-          <X size={20} />
-        </button>
-      )}
-
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-setup-title"
-        className="relative max-h-[calc(100dvh-88px)] w-full overflow-y-auto overscroll-contain rounded-[20px] border border-white/80 bg-gradient-to-br from-white via-white to-[#f7f9ff] px-4 py-4 shadow-[0_24px_70px_rgba(1,10,40,0.3)] ring-1 ring-black/5 sm:px-6 sm:py-5 lg:px-7"
+        className="relative"
       >
-        <ProfileHeader />
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2 lg:mt-4 lg:gap-x-5 lg:gap-y-3"
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-setup-title"
+          className="flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full flex-col overflow-hidden rounded-[22px] border border-white/80 bg-white px-4 py-3 shadow-[0_24px_70px_rgba(0,0,0,0.45)] ring-1 ring-white/10 sm:rounded-[28px] sm:px-7 sm:py-5 lg:max-h-none lg:px-9 lg:py-6"
         >
-          <div className="sm:col-span-2">
-            <AvatarSelector
-              gender={gender}
-              onChange={setGender}
-            />
+          {!showCourseModal && (
+            <div className="-mx-4 -mt-3 flex shrink-0 justify-end bg-white px-3 pt-1 sm:-mx-7 sm:-mt-5 sm:px-5 lg:-mx-9 lg:-mt-6 lg:px-7">
+              <button
+                type="button"
+                onClick={() =>
+                  router.replace(
+                    redirectTo
+                      ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+                      : "/login"
+                  )
+                }
+                aria-label="Close profile setup"
+                title="Close profile setup"
+                className="flex h-9 w-9 items-center justify-center text-slate-500 transition hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <X size={22} strokeWidth={2} />
+              </button>
+            </div>
+          )}
+
+          <div className="shrink-0">
+            <ProfileHeader />
           </div>
 
-          <ProfileField
-            label="Full Name"
-            value={name}
-            onChange={setName}
-            placeholder="Enter your full name"
-            required
-          />
+          <form
+            onSubmit={handleSubmit}
+            className="mt-3 flex min-h-0 flex-1 flex-col sm:mt-4 lg:flex-none"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-3 sm:pr-4 lg:flex-none lg:overflow-visible lg:pr-0">
+              <div className="grid grid-cols-1 gap-x-5 gap-y-3 pb-3 sm:grid-cols-2 sm:gap-y-4 sm:pb-4 lg:gap-x-8">
+                <div className="sm:col-span-2">
+                  <AvatarSelector
+                    gender={gender}
+                    onChange={setGender}
+                  />
+                </div>
 
-          <ProfileField
-            label="Phone Number"
-            value={phone}
-            onChange={(value) =>
-              setPhone(
-                String(value)
-                  .replace(/\D/g, "")
-                  .slice(0, 10)
-              )
-            }
-            placeholder="Enter 10 digit mobile number"
-            type="tel"
-            required
-          />
+                <ProfileField
+                  label="Full Name"
+                  value={name}
+                  onChange={setName}
+                  placeholder="Enter your full name"
+                  required
+                />
 
-          <div className="relative">
-            <ProfileField
-              label="Email Address"
-              value={email}
-              onChange={() => {}}
-              placeholder="Verified email address"
-              type="email"
-              required
-            />
-            <p className="mt-1 text-[11px] text-slate-500">
-              Email verified through OTP
-            </p>
-          </div>
+                <ProfileField
+                  label="Phone Number"
+                  value={phone}
+                  onChange={(value) =>
+                    setPhone(
+                      String(value)
+                        .replace(/\D/g, "")
+                        .slice(0, 10)
+                    )
+                  }
+                  placeholder="Enter 10 digit mobile number"
+                  type="tel"
+                  required
+                />
 
-          <ProfileField
-            label="Date of Birth"
-            value={dob}
-            onChange={setDob}
-            type="date"
-            required
-          />
+                <div className="relative">
+                  <ProfileField
+                    label="Email Address"
+                    value={email}
+                    onChange={() => {}}
+                    placeholder="Verified email address"
+                    type="email"
+                    required
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Email verified through OTP
+                  </p>
+                </div>
 
-          <DistrictSelect
-            value={district}
-            onChange={setDistrict}
-          />
+                <ProfileField
+                  label="Date of Birth"
+                  value={dob}
+                  onChange={setDob}
+                  type="date"
+                  required
+                />
 
-          <ProfileField
-            label="Reference Code (Optional)"
-            value={referenceCode}
-            onChange={setReferenceCode}
-            placeholder="Enter reference code"
-          />
+                <DistrictSelect
+                  value={district}
+                  onChange={setDistrict}
+                />
 
-          <div className="flex items-center">
-            <TermsCheckbox
-              checked={accepted}
-              onChange={setAccepted}
-            />
-          </div>
+                <ProfileField
+                  label="Reference Code (Optional)"
+                  value={referenceCode}
+                  onChange={setReferenceCode}
+                  placeholder="Enter reference code"
+                />
+              </div>
+            </div>
 
-          <div className="flex items-end sm:justify-end">
-            <ProfileSubmitButton
-              loading={loading}
-            />
-          </div>
-        </form>
+            <div className="grid shrink-0 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-[minmax(0,1fr)_minmax(200px,240px)] sm:items-center sm:pt-4">
+              <TermsCheckbox
+                checked={accepted}
+                onChange={setAccepted}
+              />
+
+              <ProfileSubmitButton
+                loading={loading}
+              />
+            </div>
+          </form>
+        </div>
       </div>
 
       <CourseChoiceModal

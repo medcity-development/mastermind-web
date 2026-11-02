@@ -4,9 +4,6 @@ import Image from "next/image";
 
 import {
   Check,
-  GraduationCap,
-  ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 import maleAvatar from "../images/avatar-male.png";
@@ -17,22 +14,15 @@ export default function AvatarSelector({
   onChange,
 }) {
   return (
-    <div
-        className="
-          grid
-          gap-4
-          lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]
-          lg:gap-5
-        "
-      >
-        <div>
+    <div className="w-full">
           <label
             className="
-              mb-1
+              mb-1.5
               block
-              text-[11px]
+              text-[10px]
               font-bold
               text-[#071b59]
+              sm:text-[11px]
               lg:text-[13px]
             "
           >
@@ -43,8 +33,8 @@ export default function AvatarSelector({
             className="
               grid
               grid-cols-2
-              gap-2
-              lg:gap-3
+              gap-2.5
+              sm:gap-3
             "
           >
             <AvatarOption
@@ -69,81 +59,7 @@ export default function AvatarSelector({
               }
             />
           </div>
-        </div>
-
-        <div
-          className="
-            relative
-            hidden
-            min-h-[148px]
-            overflow-hidden
-            rounded-2xl
-            bg-gradient-to-br
-            from-[#0b216c]
-            via-[#123c91]
-            to-[#315ff4]
-            p-4
-            text-white
-            lg:flex
-            lg:flex-col
-            lg:justify-between
-          "
-        >
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              -right-8
-              -top-12
-              h-36
-              w-36
-              rounded-full
-              border
-              border-white/10
-              bg-white/5
-            "
-          />
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              -bottom-20
-              -right-2
-              h-40
-              w-40
-              rounded-full
-              border
-              border-white/10
-            "
-          />
-
-          <div className="relative flex items-start justify-between">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-blue-100 ring-1 ring-white/15">
-              <GraduationCap size={19} />
-            </span>
-            <span className="flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-blue-100">
-              <Sparkles size={11} />
-              Your journey
-            </span>
-          </div>
-
-          <div className="relative mt-3">
-            <h3 className="text-[15px] font-bold tracking-tight">
-              Make this space yours
-            </h3>
-            <p className="mt-1 max-w-[280px] text-[10px] leading-[1.6] text-blue-100/85">
-              Your profile helps us shape a learning experience around you.
-            </p>
-          </div>
-
-          <div className="relative mt-3 flex items-center gap-2 border-t border-white/15 pt-2.5 text-[10px] font-medium text-blue-50">
-            <ShieldCheck size={14} className="shrink-0 text-cyan-200" />
-            Your details stay safe and secure
-          </div>
-        </div>
-      </div>
+    </div>
   );
 }
 
@@ -161,16 +77,16 @@ function AvatarOption({
         group
         relative
         flex
-        flex-col
+        flex-row
         items-center
         justify-center
-        gap-2
+        gap-2.5
         overflow-hidden
-        rounded-2xl
+        rounded-[14px]
         border
-        px-3
+        px-2.5
         py-2
-        lg:gap-2.5
+        lg:gap-3
         lg:px-4
         lg:py-3
         text-center
@@ -204,8 +120,10 @@ function AvatarOption({
       <div
         className={`
           relative
-          h-[48px]
-          w-[48px]
+          h-10
+          w-10
+          sm:h-12
+          sm:w-12
           lg:h-[64px]
           lg:w-[64px]
           shrink-0
@@ -254,6 +172,7 @@ function AvatarOption({
           text-[11px]
           font-bold
           text-slate-700
+          sm:text-xs
           lg:text-[13px]
         "
       >

@@ -18,6 +18,9 @@ const ANDROID_EXAM_TYPES = new Set([
   "pqp",
   "pyq",
   "scert",
+  "twe",
+  "topicwise",
+  "tst",
   "studyplan",
 ]);
 

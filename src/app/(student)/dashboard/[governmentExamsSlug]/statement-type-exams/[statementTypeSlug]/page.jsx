@@ -17,6 +17,14 @@ import {
 } from "@/lib/auth/getStudentSession";
 
 import {
+  getUserExamsList,
+} from "@/lib/examAttemptHelper";
+
+import {
+  getPausedAttemptIds,
+} from "@/lib/pausedExamAttempts";
+
+import {
   getStatementTypeTopics,
   getStatementTypeExamsByTopic,
 } from "@/lib/statementTypeExamHelper";
@@ -181,13 +189,22 @@ export default async function StatementTypeTopicPage({
      RRB & SSC -> 2
   ======================================================= */
 
-  const examsResult =
-    await getStatementTypeExamsByTopic({
-      uid,
-      cid,
-      topicId,
-      type,
-    });
+  const [examsResult, attemptsResult] =
+    await Promise.all([
+      getStatementTypeExamsByTopic({
+        uid,
+        cid,
+        topicId,
+        type,
+      }),
+      Number(uid) > 0
+        ? getUserExamsList({
+            uid,
+            cid,
+            exam_type: type,
+          })
+        : Promise.resolve(null),
+    ]);
 
   const exams =
     Array.isArray(
@@ -195,6 +212,21 @@ export default async function StatementTypeTopicPage({
     )
       ? examsResult.data
       : [];
+
+  if (
+    Number(uid) > 0 &&
+    attemptsResult?.status === false
+  ) {
+    console.error(
+      "Unable to load paused Statement Type exams:",
+      attemptsResult.message
+    );
+  }
+
+  const pausedAttempts =
+    attemptsResult?.status !== false
+      ? getPausedAttemptIds(attemptsResult)
+      : {};
 
   /* =======================================================
      BASE PATH
@@ -349,6 +381,7 @@ export default async function StatementTypeTopicPage({
           }
           cid={cid}
           uid={uid}
+          pausedAttempts={pausedAttempts}
           type={type}
           examName={name}
           shortName={

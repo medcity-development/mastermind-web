@@ -122,6 +122,7 @@ export function prepareExamHistoryResult(
 
   const attempted = finished
     ? (
+        calculated?.attempted ??
         firstNumber(
           item.total_attempted,
           item.attempted,
@@ -135,6 +136,7 @@ export function prepareExamHistoryResult(
 
   const correct = finished
     ? (
+        calculated?.correct ??
         firstNumber(
           item.total_correct,
           item.correct,
@@ -148,6 +150,7 @@ export function prepareExamHistoryResult(
 
   const wrong = finished
     ? (
+        calculated?.wrong ??
         firstNumber(
           item.total_wrong,
           item.wrong,
@@ -159,7 +162,7 @@ export function prepareExamHistoryResult(
       )
     : null;
 
-  const androidScore = finished && ["mock", "pqp", "pyq", "scert", "studyplan"].includes(
+  const androidScore = finished && ["mock", "pqp", "pyq", "scert", "twe", "topicwise", "tst", "studyplan"].includes(
     String(item.exam_type ?? item.examType ?? "").trim().toLowerCase()
   ) ? calculateExamScore({ ...item, total_correct: correct, total_wrong: wrong }) : null;
 

@@ -12,11 +12,12 @@ export default function ProfileField({
     <div>
       <label
         className="
-          mb-1
+          mb-1.5
           block
-          text-[11px]
+          text-[10px]
           font-semibold
           text-slate-700
+          sm:text-[11px]
           lg:text-[13px]
         "
       >
@@ -48,7 +49,7 @@ export default function ProfileField({
         className="
           h-[42px]
           w-full
-          rounded-[11px]
+          rounded-[12px]
           border
           border-slate-200
           bg-slate-50/70
@@ -59,6 +60,7 @@ export default function ProfileField({
           outline-none
           transition-all
           duration-200
+          shadow-[0_1px_2px_rgba(15,23,42,0.02)]
           lg:h-[50px]
           lg:rounded-[12px]
           lg:px-4
@@ -68,7 +70,7 @@ export default function ProfileField({
 
           focus:border-[#4f6cf7]
           focus:bg-white
-          focus:shadow-[0_0_0_4px_rgba(79,108,247,0.08)]
+          focus:shadow-[0_0_0_3px_rgba(79,108,247,0.1)]
           hover:border-slate-300
         "
       />

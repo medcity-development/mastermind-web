@@ -7,9 +7,7 @@ import {
   useState,
 } from "react";
 
-import {
-  useRouter,
-} from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import ExamHero from "./ExamHero";
 import ExamTimer from "./ExamTimer";
@@ -25,6 +23,7 @@ import ExamEmpty from "./ExamEmpty";
 import useExamController from "./hooks/useExamController";
 
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamNavigationGuard from "@/components/exam/ExamNavigationGuard";
 import ExamTimeFinishedModal from "@/components/exam-timer/ExamTimeFinishedModal";
 import LoginRequiredModal from "@/app/(public)/government-exams-coaching/[governmentExamsSlug]/previous-questions/[examId]/components/LoginRequiredModal";
 import ExamPauseConfirmationModal from "@/app/(student)/dashboard/common-components/exam/ExamPauseConfirmationModal";
@@ -359,7 +358,16 @@ export default function ExamClient({
 
   return (
     <>
-      <section className="space-y-6">
+      <ExamNavigationGuard
+        active={
+          typeof window !== "undefined" &&
+          window.location?.pathname?.startsWith("/dashboard/") &&
+          c.restoreReady &&
+          !c.paused &&
+          !c.submitted
+        }
+      />
+      <section data-exam-workspace className="space-y-6">
         {c.saveError && (
           <p
             role="alert"
@@ -534,7 +542,7 @@ export default function ExamClient({
 
       <ExamTimeFinishedModal
         open={guestTimedOut}
-        message="Your exam time has expired. Returning to the exam cards in 5 seconds."
+        message="Your exam time has expired. Returning to the exams in 5 seconds."
         onBackToExams={() => router.replace(cardsPath)}
       />
 

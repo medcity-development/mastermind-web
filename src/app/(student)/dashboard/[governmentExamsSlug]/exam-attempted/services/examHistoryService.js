@@ -11,6 +11,7 @@ import {
 } from "../utils/examHistoryCore";
 
 const HISTORY_TTL = 120000;
+const HISTORY_ERROR_TTL = 20000;
 const NAME_TTL = 30 * 60 * 1000;
 const NAME_FAILURE_TTL = 60000;
 const DEFAULT_COOLDOWN = 60000;
@@ -19,6 +20,7 @@ const MAX_HISTORY_CACHE = 100;
 const MAX_NAME_CACHE = 500;
 
 const historyCache = new Map();
+const historyFailureCache = new Map();
 const nameCache = new Map();
 
 const pendingHistory = new Map();
@@ -135,6 +137,7 @@ export async function loadHistoryType({
   const key = historyKey(cid, type);
 
   const cached = historyCache.get(key);
+  const cachedFailure = historyFailureCache.get(key);
 
   if (
     !force &&
@@ -148,6 +151,15 @@ export async function loadHistoryType({
     return pendingHistory.get(key);
   }
 
+  if (
+    !force &&
+    cachedFailure &&
+    cachedFailure.expiresAt > Date.now()
+  ) {
+    throw cachedFailure.error;
+  }
+
+  historyFailureCache.delete(key);
   checkCooldown();
 
   const promise = (async () => {
@@ -218,7 +230,25 @@ export async function loadHistoryType({
   pendingHistory.set(key, promise);
 
   try {
-    return await promise;
+    const result = await promise;
+    historyFailureCache.delete(key);
+    return result;
+  } catch (error) {
+    putCache(
+      historyFailureCache,
+      key,
+      {
+        error,
+        expiresAt:
+          Date.now() +
+          (error?.rateLimited && cooldownSeconds() > 0
+            ? cooldownSeconds() * 1000
+            : HISTORY_ERROR_TTL),
+      },
+      MAX_HISTORY_CACHE
+    );
+
+    throw error;
   } finally {
     if (pendingHistory.get(key) === promise) {
       pendingHistory.delete(key);

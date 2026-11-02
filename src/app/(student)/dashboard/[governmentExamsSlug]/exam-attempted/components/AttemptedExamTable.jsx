@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { Eye, FileQuestion } from "lucide-react";
 import { getAttemptEndTime, getAttemptStartTime, getAttemptExamName, getAttemptExamType, getExamTypeLabel } from "../utils/examHistoryUtils";
@@ -47,9 +48,9 @@ function AnalysisButton({ attempt, getAnalysisHref }) {
     </Link>
   );
 }
-export default function AttemptedExamTable({ attempts = [], startIndex = 0, loading = false, getAnalysisHref, emptyMessage = "No attempted exams found." }) {
+function AttemptedExamTable({ attempts = [], startIndex = 0, loading = false, getAnalysisHref, emptyMessage = "No attempted exams found.", emptyDescription = "Attempt an exam to see your scores and analysis here." }) {
   if (loading) return <div className="space-y-3 p-4 sm:p-6" aria-label="Loading exam history">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>;
-  if (!attempts.length) return <div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><FileQuestion size={32} className="text-slate-400" /><p className="font-bold text-slate-600">{emptyMessage}</p></div>;
+  if (!attempts.length) return <div className="flex flex-col items-center px-6 py-14 text-center sm:py-16" role="status"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><FileQuestion size={28} aria-hidden="true" /></span><p className="mt-4 font-bold text-slate-700">{emptyMessage}</p><p className="mt-1 max-w-md text-sm leading-6 text-slate-500">{emptyDescription}</p></div>;
 
   return (
     <>
@@ -122,3 +123,5 @@ export default function AttemptedExamTable({ attempts = [], startIndex = 0, load
     </>
   );
 }
+
+export default memo(AttemptedExamTable);

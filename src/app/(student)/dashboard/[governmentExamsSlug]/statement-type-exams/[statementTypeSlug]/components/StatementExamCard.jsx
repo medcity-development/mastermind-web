@@ -18,6 +18,7 @@ export default function StatementExamCard({
   statementTypeSlug,
   cid,
   uid,
+  pausedAttempts = {},
   type = "tst",
   examName,
   shortName,
@@ -64,6 +65,18 @@ export default function StatementExamCard({
   const examHref =
     `/dashboard/${governmentExamsSlug}` +
     `/statement-type-exams/${statementTypeSlug}/${examSlug}`;
+
+  const pauseId =
+    pausedAttempts[String(exam.id)];
+
+  const hasPausedAttempt =
+    Number(uid) > 0 &&
+    Boolean(pauseId);
+
+  const actionHref =
+    hasPausedAttempt
+      ? `${examHref}/start`
+      : examHref;
 
   return (
     <article
@@ -346,9 +359,7 @@ export default function StatementExamCard({
         </div>
       ) : (
         <Link
-          href={
-            examHref
-          }
+          href={actionHref}
           className="
             mt-auto
             pt-6
@@ -377,7 +388,7 @@ export default function StatementExamCard({
             "
           >
             <span>
-              View Exam
+              {hasPausedAttempt ? "Resume Exam" : "Start Exam"}
             </span>
 
             <span

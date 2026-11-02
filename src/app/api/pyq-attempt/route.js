@@ -189,6 +189,7 @@ export async function POST(request) {
                 exam_id: examId,
                 exam_type: "pqp",
                 exam_status: examStatus,
+                total_questions: body.answer_array.length,
 
                 __scoring: {
                     markPerCorrect: 1,
@@ -203,7 +204,10 @@ export async function POST(request) {
         );
 
         // Convert explicit seconds to milliseconds once.
-        payload.paused_time = seconds * 1000;
+        payload.paused_time =
+            examStatus === "finish"
+                ? ""
+                : seconds * 1000;
 
         const formData = new FormData();
         const upstreamPayload =

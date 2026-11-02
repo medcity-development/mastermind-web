@@ -191,10 +191,13 @@ export default function ExamHistoryClient({
 
   const emptyMessage =
     attempts.length === 0
-      ? historyIncomplete
-        ? "Exam history is temporarily unavailable. Please try again later."
-        : "No exams attempted so far."
+      ? "No exams attempted yet"
       : "No exams match your search or filter.";
+
+  const emptyDescription =
+    attempts.length === 0
+      ? "Attempt an exam to see your scores and analysis here."
+      : "Try changing your search or selecting a different exam type.";
 
   return (
     <div className="w-full min-w-0 space-y-5">
@@ -224,7 +227,7 @@ export default function ExamHistoryClient({
         </p>
       )}
 
-      {historyIncomplete && !loading && (
+      {historyIncomplete && !loading && attempts.length > 0 && (
         <p
           role="status"
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
@@ -244,6 +247,7 @@ export default function ExamHistoryClient({
           startIndex={startIndex}
           getAnalysisHref={getAnalysisHref}
           emptyMessage={emptyMessage}
+          emptyDescription={emptyDescription}
         />
 
         {filteredAttempts.length > 0 && (

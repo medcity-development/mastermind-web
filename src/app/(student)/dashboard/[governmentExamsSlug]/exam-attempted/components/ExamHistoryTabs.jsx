@@ -1,6 +1,8 @@
 "use client";
 
-export default function ExamHistoryTabs({
+import { memo } from "react";
+
+function ExamHistoryTabs({
     tabs = [],
     activeTab = "all",
     onChange,
@@ -48,6 +50,7 @@ export default function ExamHistoryTabs({
                                 key={
                                     tab.key
                                 }
+
                                 type="button"
                                 onClick={() =>
                                     onChange?.(
@@ -125,8 +128,11 @@ export default function ExamHistoryTabs({
                             </button>
                         );
                     }
+
                 )}
             </div>
         </section>
     );
 }
+
+export default memo(ExamHistoryTabs);

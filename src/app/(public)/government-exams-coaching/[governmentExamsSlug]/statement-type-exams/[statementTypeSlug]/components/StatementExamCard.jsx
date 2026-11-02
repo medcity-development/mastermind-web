@@ -375,7 +375,7 @@ export default function StatementExamCard({
             "
           >
             <span>
-              View Exam
+              Start Exam
             </span>
 
             <span

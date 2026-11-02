@@ -34,7 +34,7 @@ function setup(overrides = {}, fail = false) {
     if (fail) return new Response(JSON.stringify({ status: false, message: "Save failed" }), { status: 502 });
     return new Response(JSON.stringify({ status: true, pauseid: 329, data: { exam_status: "finish" } }));
   };
-  const props = { uid: 21, cid: 1, examId: 40, governmentExamsSlug: "kerala-psc", exam: { total_mark: 2 }, questions: [{ id: 1, answer: "A" }, { id: 2, answer: "B" }], answersRef: { current: {} }, remainingSeconds: 60, currentPage: 1, startTime: Date.now(), ...overrides };
+  const props = { uid: 21, cid: 1, examId: 40, governmentExamsSlug: "kerala-psc", exam: { total_mark: 2 }, questions: [{ id: 1, answer: "A", option1: "One", option2: "Two" }, { id: 2, answer: "B", option1: "One", option2: "Two" }], answersRef: { current: {} }, remainingSeconds: 60, currentPage: 1, startTime: Date.now(), ...overrides };
   const render = () => { globalThis.mockHooks.index = 0; return runAttemptHook(props); };
   return { render, requests, paths };
 }
@@ -96,11 +96,50 @@ test("getUserExams restores only latest matching paused attempt", () => {
   assert.equal(selectMockPausedAttempt({ data: [] }, query), null);
 });
 
-test("mock payload sends remaining seconds for one server conversion", async () => {
+test("mock payload stores question positions and converts pause time once", async () => {
   const { buildMockAttemptPayload } = await import(payloadUrl);
-  for (const seconds of [0, 30, 120, 3600]) {
-    assert.equal(buildMockAttemptPayload({ remainingSeconds: seconds }).paused_time, String(seconds));
-  }
+  const questions = [
+    { id: 1, answer: "A", option1: "One", option2: "Two", option3: "Three" },
+    { id: 2, answer: "B", option1: "One", option2: "Two", option3: "Three" },
+    { id: 3, answer: "C", option1: "One", option2: "Two", option3: "Three" },
+  ];
+  const pause = buildMockAttemptPayload({
+    cid: 1,
+    examId: 40,
+    examType: "mock",
+    questions,
+    answers: { 1: "A", 3: "C" },
+    remainingSeconds: 60,
+    examStatus: "pause",
+  });
+
+  assert.equal(pause.lastposition, 3);
+  assert.equal(pause.remaining_seconds, "60");
+  assert.equal(Object.hasOwn(pause, "paused_time"), false);
+
+  const finish = buildMockAttemptPayload({
+    cid: 1,
+    examId: 40,
+    examType: "mock",
+    questions,
+    answers: { 1: "A" },
+    remainingSeconds: 60,
+    examStatus: "finish",
+    result: { scoreVerified: true, answerArray: ["A", "B", "C"], userAnswers: ["A", 0, 0] },
+  });
+  assert.equal(finish.lastposition, questions.length);
+  assert.equal(finish.remaining_seconds, "");
+
+  const attemptDataUrl = url(await read("lib/examAttemptData.js"));
+  const { buildAttemptPayload } = await import(attemptDataUrl);
+  const pausedApiPayload = buildAttemptPayload(pause, 21);
+  assert.equal(pausedApiPayload.lastposition, 3);
+  assert.equal(pausedApiPayload.paused_time, 60000);
+
+  const finishedApiPayload = buildAttemptPayload(finish, 21);
+  assert.equal(finishedApiPayload.exam_status, "finish");
+  assert.equal(finishedApiPayload.lastposition, questions.length);
+  assert.equal(finishedApiPayload.paused_time, "");
 });
 
 

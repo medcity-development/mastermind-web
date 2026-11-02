@@ -37,6 +37,7 @@ import ExamControls from "./ExamControls";
 
 import ExamResultModal from "@/components/ExamResultModal";
 import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
+import ExamNavigationGuard from "@/components/exam/ExamNavigationGuard";
 
 function positiveId(value) {
   const number = Number(value);
@@ -169,11 +170,6 @@ export default function ExamClient({
   const [paused, setPaused] = useState(false);
   const [showPauseConfirmation, setShowPauseConfirmation] = useState(false);
   const [showTimeoutModal, setShowTimeoutModal] = useState(false);
-
-  const [
-    resultModalOpen,
-    setResultModalOpen,
-  ] = useState(false);
 
   const [
     submittedResult,
@@ -505,7 +501,6 @@ export default function ExamClient({
             snapshot.current.submittedResult
           );
 
-          setResultModalOpen(true);
         }
 
         setReady(true);
@@ -552,7 +547,6 @@ export default function ExamClient({
     }
 
     if (snapshot.current.submittedResult) {
-      setResultModalOpen(true);
       return true;
     }
 
@@ -576,12 +570,30 @@ export default function ExamClient({
       }
 
       const current = snapshot.current;
+      const lastAnsweredPosition = questions.reduce(
+        (position, question, index) => {
+          const answer =
+            current.answers[String(question.id)];
+
+          return answer != null &&
+            String(answer).trim() !== "" &&
+            String(answer) !== "0"
+            ? index + 1
+            : position;
+        },
+        0
+      );
+      const lastPosition =
+        action === "submit"
+          ? totalQuestions
+          : lastAnsweredPosition ||
+            (current.currentPage - 1) * pageSize + 1;
 
       const payload = {
         cid,
         exam_id: id,
         exam_type: type,
-        lastposition: type,
+        lastposition: lastPosition,
 
         total_questions: totalQuestions,
 
@@ -688,7 +700,6 @@ export default function ExamClient({
 
         setSubmittedResult(finalResult);
         setSubmitted(true);
-        setResultModalOpen(true);
 
         try {
           localStorage.removeItem(draftKey);
@@ -975,7 +986,18 @@ export default function ExamClient({
     (currentPage - 1) * pageSize;
 
   return (
-    <main className="min-h-screen bg-[#f5f9ff] py-6">
+    <main
+      data-exam-workspace
+      className="min-h-screen bg-[#f5f9ff] py-6"
+    >
+      <ExamNavigationGuard
+        active={
+          ready &&
+          questions.length > 0 &&
+          !paused &&
+          !submitted
+        }
+      />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Link
@@ -1080,19 +1102,10 @@ export default function ExamClient({
           />
         )}
 
-        {submitted && (
-          <button
-            type="button"
-            onClick={() => setResultModalOpen(true)}
-            className="mt-5 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white"
-          >
-            Show Result
-          </button>
-        )}
       </div>
 
       <ExamResultModal
-        open={resultModalOpen}
+        open={Boolean(submittedResult)}
         result={submittedResult}
         notice={
           saveError
@@ -1104,7 +1117,7 @@ export default function ExamClient({
           exam?.title ??
           "Topic Wise Exam"
         }
-        onClose={() => setResultModalOpen(false)}
+        onClose={() => viewAttempted(submittedResult)}
         onViewAnalysis={viewAttempted}
       />
       {showTimeoutModal && (

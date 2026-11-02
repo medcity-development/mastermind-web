@@ -120,6 +120,38 @@ export function getStudyPlanRemainingSeconds(attempt, exam) {
   return Math.min(duration, remaining);
 }
 
+export function getStudyPlanLastPosition(attempt, questions) {
+  const savedPosition = Number(
+    attempt?.lastposition ??
+    attempt?.last_position ??
+    attempt?.lastPosition
+  );
+
+  if (
+    Number.isSafeInteger(savedPosition) &&
+    savedPosition > 0 &&
+    savedPosition <= questions.length
+  ) {
+    return savedPosition;
+  }
+
+  const savedAnswers = parseAnswerArray(attempt?.user_answers);
+  let lastAnsweredPosition = 0;
+
+  savedAnswers.forEach((answer, index) => {
+    if (
+      index < questions.length &&
+      getQuestionOptions(questions[index]).includes(
+        String(answer ?? "").trim().toUpperCase()
+      )
+    ) {
+      lastAnsweredPosition = index + 1;
+    }
+  });
+
+  return lastAnsweredPosition || 1;
+}
+
 export function buildStudyPlanAttemptPayload({
   cid,
   examId,
@@ -130,6 +162,7 @@ export function buildStudyPlanAttemptPayload({
   remainingSeconds,
   startTime,
   pauseId,
+  lastPosition,
 }) {
   const result = calculateMockResult({
     questions,
@@ -153,7 +186,16 @@ export function buildStudyPlanAttemptPayload({
     exam_id: String(examId),
     exam_type: "studyplan",
     exam_status: examStatus,
-    lastposition: "studyplan",
+    lastposition:
+      examStatus === "finish"
+        ? questions.length
+        : Math.max(
+            1,
+            Math.min(
+              questions.length,
+              Math.trunc(Number(lastPosition) || 1)
+            )
+          ),
     total_questions: String(questions.length),
     total_mark: String(
       getExamTotalMark(exam, questions.length)

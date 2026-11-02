@@ -12,12 +12,12 @@ export default function TermsCheckbox({
         flex
         cursor-pointer
         items-start
-        gap-2.5
+        gap-3
         rounded-[14px]
         border
         border-slate-200
         bg-white/80
-        p-2.5
+        p-3
         lg:p-3
       "
     >
@@ -45,6 +45,7 @@ export default function TermsCheckbox({
           text-[10px]
           leading-4
           text-slate-600
+          sm:text-[11px]
           lg:text-[11px]
           lg:leading-5
         "

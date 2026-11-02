@@ -38,17 +38,17 @@ export default function TopicWiseExamCard({
           <BookOpen size={23} />
         </div>
 
-        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-black text-amber-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-700">
           <Sparkles size={11} />
           Topic Wise
         </span>
       </div>
 
-      <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-emerald-600">
+      <p className="mt-6 text-[10px] font-bold uppercase tracking-widest text-emerald-600">
         {name} Practice
       </p>
 
-      <h3 className="mt-2 text-xl font-black text-slate-900">
+      <h3 className="mt-2 text-xl font-bold text-slate-900">
         {title}
       </h3>
 

@@ -25,7 +25,7 @@ import {
   loadHistoryType,
 } from "../services/examHistoryService";
 
-const MAX_WORKERS = 2;
+const MAX_WORKERS = 4;
 
 export default function useExamHistory({
   cid,

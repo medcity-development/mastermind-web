@@ -13,8 +13,9 @@ export default function ProfileHeader() {
         gap-3
         border-b
         border-slate-100
-        pb-4
+        pb-3
         lg:gap-4
+        sm:pb-4
         lg:pb-5
       "
     >
@@ -22,8 +23,8 @@ export default function ProfileHeader() {
         className="
           shrink-0
           flex
-          h-11
-          w-11
+          h-10
+          w-10
           items-center
           justify-center
           rounded-2xl
@@ -33,6 +34,8 @@ export default function ProfileHeader() {
           text-[#2468f2]
           ring-1
           ring-blue-100
+          sm:h-12
+          sm:w-12
           lg:h-14
           lg:w-14
         "
@@ -43,23 +46,24 @@ export default function ProfileHeader() {
       </div>
 
       <div>
-        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-600 lg:text-[10px]">
+        <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-blue-600 sm:text-[9px] sm:tracking-[0.2em] lg:text-[10px]">
           Student account
         </p>
         <h2
           id="profile-setup-title"
           className="
             mt-0.5
-            text-[21px]
+            text-[18px]
             font-extrabold
             tracking-[-0.04em]
             text-[#071b59]
+            sm:text-[22px]
             lg:text-[27px]
           "
         >
           Complete Your Profile
         </h2>
-        <p className="mt-0.5 text-[11px] leading-4 text-slate-500 lg:text-[13px]">
+        <p className="mt-1 text-[10px] leading-[1.4] text-slate-500 sm:text-[11px] sm:leading-4 lg:text-[13px]">
           Add your details to personalize your learning experience.
         </p>
       </div>

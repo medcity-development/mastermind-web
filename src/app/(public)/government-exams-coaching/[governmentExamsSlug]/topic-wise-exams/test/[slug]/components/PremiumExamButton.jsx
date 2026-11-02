@@ -50,19 +50,19 @@ export default function PremiumExamButton() {
           onClick={handleOpenModal}
           className="
             flex w-full items-center justify-center gap-2
-            rounded-xl bg-amber-500
+            rounded-xl border border-amber-200
             px-5 py-3.5
-            text-sm font-black text-white
+            text-sm font-bold text-amber-700
             transition-colors duration-200
             hover:bg-amber-600
             focus-visible:outline-none
-            focus-visible:ring-2
+            focus-visible:ring-2 hover:text-white
             focus-visible:ring-amber-500
             focus-visible:ring-offset-2
           "
         >
           <LockKeyhole size={16} />
-          <span>OK</span>
+          <span>Unlock Premium</span>
         </button>
       </div>
 

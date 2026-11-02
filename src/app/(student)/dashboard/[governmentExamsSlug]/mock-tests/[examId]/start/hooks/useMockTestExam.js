@@ -165,7 +165,7 @@ export default function useMockTestExam({
             : null;
 
         if (guestAction && !matchingGuestAttempt) {
-          throw new Error("Your saved guest attempt is unavailable. Please return to the exam cards and start again.");
+          throw new Error("Your saved guest attempt is unavailable. Please return to the exams and start again.");
         }
         if (matchingGuestAttempt?.questionIds?.length) {
           const ids = (data?.questions ?? []).map((question) => String(question.id));

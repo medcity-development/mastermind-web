@@ -176,9 +176,9 @@ export default async function TopicWiseTestListPage({ params }) {
                 {validId && (isFree || hasPausedAttempt) ? (
                   <Link
                     href={hasPausedAttempt ? resumeHref : detailsHref}
-                    className="mt-auto rounded-xl bg-[#017dc0] px-5 py-3 text-center text-sm font-bold text-white"
+                    className="mt-auto rounded-xl border border-green-400 text-green-700 text-center text-sm font-bold py-3.5 hover:text-white hover:bg-green-700"
                   >
-                    {hasPausedAttempt ? "Resume Exam" : "View Exam"}
+                    {hasPausedAttempt ? "Resume Exam" : "Start Exam"}
                   </Link>
                 ) : isPaid ? (
                   <PremiumExamButton

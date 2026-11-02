@@ -16,6 +16,7 @@ import MockQuestionPagination from "./MockQuestionPagination";
 import MockQuestionsSection from "./MockQuestionsSection";
 
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamNavigationGuard from "@/components/exam/ExamNavigationGuard";
 
 import ExamPauseConfirmationModal from "@/app/(student)/dashboard/common-components/exam/ExamPauseConfirmationModal";
 
@@ -277,7 +278,16 @@ export default function MockTestQuestions({
 
   return (
     <>
+      <ExamNavigationGuard
+        active={
+          !loading &&
+          questions.length > 0 &&
+          !submitted &&
+          !isPaused
+        }
+      />
       <section
+        data-exam-workspace
         className="
           overflow-hidden
           rounded-[26px]

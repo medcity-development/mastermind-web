@@ -1110,7 +1110,7 @@ export default function MockTestQuestions({
 
       <ExamTimeFinishedModal
         open={timeFinishedOpen}
-        message="Your exam time has expired. Returning to the exam cards in 5 seconds."
+        message="Your exam time has expired. Returning to the exams in 5 seconds."
         onBackToExams={
           handleBackToExams
         }

@@ -19,6 +19,7 @@ import {
 
 import ExamPauseConfirmModal from "@/components/ExamPauseConfirmModal";
 import ExamResultModal from "@/components/ExamResultModal";
+import ExamNavigationGuard from "@/components/exam/ExamNavigationGuard";
 import {
   clearGuestExamHandoff,
   guestExamLoginRedirectPath,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/guestExamHandoff";
 import {
   getAttemptId,
+  getStudyPlanLastPosition,
   getStudyPlanRemainingSeconds,
   restoreStudyPlanAnswers,
   selectStudyPlanPausedAttempt,
@@ -127,6 +129,7 @@ export default function StudyPlanExamClient({
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [lastPosition, setLastPosition] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -258,6 +261,21 @@ export default function StudyPlanExamClient({
             : Number.isFinite(duration) && duration > 0
               ? Math.floor(duration)
               : 0;
+        const initialLastPosition = guestAttempt
+          ? Math.max(
+              1,
+              Math.min(
+                loadedQuestions.length,
+                Number(guestAttempt.lastPosition) ||
+                  (Number(guestAttempt.currentPage) - 1) *
+                    QUESTIONS_PER_PAGE +
+                    1
+              )
+            )
+          : getStudyPlanLastPosition(
+              pausedAttempt,
+              loadedQuestions
+            );
 
         if (duration <= 0) {
           throw new Error("The Study Plan exam duration is missing.");
@@ -286,6 +304,7 @@ export default function StudyPlanExamClient({
           guestAction === "submit"
         );
         setRemainingSeconds(initialTime);
+        setLastPosition(initialLastPosition);
         setCurrentPage(
           Math.max(
             1,
@@ -294,7 +313,9 @@ export default function StudyPlanExamClient({
                 1,
                 Math.ceil(loadedQuestions.length / QUESTIONS_PER_PAGE)
               ),
-              Number(guestAttempt?.currentPage) || 1
+              Math.ceil(
+                initialLastPosition / QUESTIONS_PER_PAGE
+              )
             )
           )
         );
@@ -352,6 +373,7 @@ export default function StudyPlanExamClient({
         remainingSeconds: timedOut ? 0 : remainingSeconds,
         startTime,
         pauseId,
+        lastPosition,
       });
       const saved = pauseId
         ? await postJson("/api/exam-attempt/update", payload)
@@ -398,6 +420,7 @@ export default function StudyPlanExamClient({
     questions,
     remainingSeconds,
     startTime,
+    lastPosition,
   ]);
 
   const pauseExam = useCallback(async () => {
@@ -425,6 +448,7 @@ export default function StudyPlanExamClient({
         remainingSeconds,
         startTime,
         pauseId,
+        lastPosition,
       });
       const saved = pauseId
         ? await postJson("/api/exam-attempt/update", payload)
@@ -475,6 +499,7 @@ export default function StudyPlanExamClient({
     router,
     startTime,
     uid,
+    lastPosition,
   ]);
 
   useEffect(() => {
@@ -564,6 +589,7 @@ export default function StudyPlanExamClient({
           String(question?.id ?? "")
         ),
         currentPage,
+        lastPosition,
         remainingSeconds,
         startTime,
         examTitle: title,
@@ -610,6 +636,7 @@ export default function StudyPlanExamClient({
 
     const questionIndex = questions.indexOf(question);
     const key = question?.id ?? questionIndex + 1;
+    setLastPosition(questionIndex + 1);
     setAnswers((current) => ({
       ...current,
       [key]: answer,
@@ -641,7 +668,7 @@ export default function StudyPlanExamClient({
           onClick={() => router.push(detailsPath)}
           className="mt-5 rounded-xl bg-blue-700 px-4 py-2 font-bold text-white"
         >
-          Return to exam card
+          Return to exams
         </button>
       </section>
     );
@@ -701,7 +728,7 @@ export default function StudyPlanExamClient({
                 onClick={() => router.push(detailsPath)}
                 className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700"
               >
-                Back to exam card
+                Back to exams
               </button>
               <button
                 type="button"
@@ -718,17 +745,29 @@ export default function StudyPlanExamClient({
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main
+      data-exam-workspace
+      className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
+    >
+      <ExamNavigationGuard
+        active={
+          hasStarted &&
+          questions.length > 0 &&
+          !loading &&
+          !submittedResult
+        }
+      />
       <header className="mb-6 rounded-2xl bg-gradient-to-r from-[#071f55] to-[#017dc0] p-5 text-white sm:flex sm:items-center sm:justify-between sm:p-7">
         <div>
           <button
             type="button"
             onClick={() => router.push(detailsPath)}
+            data-exam-exit
             disabled={saving}
             className="mb-4 inline-flex items-center gap-2 text-xs font-bold text-blue-100 hover:text-white"
           >
             <ArrowLeft size={15} />
-            Exam card
+            Exams
           </button>
           <p className="text-[10px] font-black uppercase tracking-widest text-blue-100">
             Study Plan Exam
@@ -903,14 +942,14 @@ export default function StudyPlanExamClient({
               Your time is up
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              This guest attempt was not submitted. Return to the exam card to try again.
+              This guest attempt was not submitted. Return to the exams to try again.
             </p>
             <button
               type="button"
               onClick={() => router.push(detailsPath)}
               className="mt-6 w-full rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white"
             >
-              Return to Exam Card
+              Return to Exams
             </button>
           </section>
         </div>

@@ -417,6 +417,38 @@ export function buildAttemptPayload(body = {}, uid) {
   );
 
   const isFinished = examStatus === "finish";
+  const isPositionedExam = [
+    "studyplan",
+    "mock",
+    "pqp",
+    "twe",
+    "tst",
+    "scert",
+  ].includes(examType);
+  const savedPosition = Math.trunc(
+    numeric(body.lastposition, 0)
+  );
+  const savedAnswerPosition =
+    isPositionedExam
+      ? userAnswers.reduce(
+          (position, answer, index) =>
+            normalizeExamAnswer(answer)
+              ? index + 1
+              : position,
+          0
+        )
+      : 0;
+  const normalizedLastPosition = isFinished
+    ? totalQuestions
+    : Math.max(
+        1,
+        Math.min(
+          totalQuestions || 1,
+          savedPosition > 0
+            ? savedPosition
+            : savedAnswerPosition || 1
+        )
+      );
 
   const calculated = isFinished
     ? calculateExamResult({
@@ -431,7 +463,9 @@ export function buildAttemptPayload(body = {}, uid) {
     uid,
     cid: body.cid,
     exam_status: examStatus,
-    lastposition: body.lastposition ?? examType,
+    lastposition: isPositionedExam
+      ? normalizedLastPosition
+      : body.lastposition ?? examType,
     exam_id: body.exam_id,
     exam_type: examType,
     total_questions: totalQuestions,
@@ -439,7 +473,10 @@ export function buildAttemptPayload(body = {}, uid) {
     // paused_time and time_taken are milliseconds.
     // remaining_seconds is converted exactly once.
     paused_time:
-      body.paused_time != null && body.paused_time !== ""
+      isFinished &&
+      isPositionedExam
+        ? ""
+        : body.paused_time != null && body.paused_time !== ""
         ? Math.max(0, Math.round(numeric(body.paused_time)))
         : body.remaining_seconds != null &&
             body.remaining_seconds !== ""

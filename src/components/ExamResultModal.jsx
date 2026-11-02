@@ -84,6 +84,7 @@ export default function ExamResultModal({
     mock: "Mock",
     pqp: "PYQ",
     scert: "SCERT",
+    tst: "Statement Type",
     twe: "Topic Wise",
     topicwise: "Topic Wise",
     studyplan: "Study Plan",

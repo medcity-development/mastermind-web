@@ -18,6 +18,13 @@ export function selectMockPausedAttempt(result, { examId, uid, cid, examType = "
   candidates.sort((a, b) => id(b) - id(a));
   const latest = candidates[0];
   if (!latest || id(latest) <= 0) return null;
-  const status = String(latest.exam_status ?? latest.examStatus ?? "").toLowerCase();
+  const status = String(
+    latest.exam_status ??
+    latest.examStatus ??
+    latest.status ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
   return ["pause", "paused"].includes(status) ? latest : null;
 }

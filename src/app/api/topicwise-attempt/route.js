@@ -193,6 +193,7 @@ export async function POST(request) {
           exam_id: examId,
           exam_type: "twe",
           exam_status: examStatus,
+          total_questions: body.answer_array.length,
           __scoring: {
             markPerCorrect: 1,
             negativeMarkPerWrong: 0.333,
@@ -217,7 +218,10 @@ export async function POST(request) {
 
     // PSC Topic Wise backend stores remaining time
     // in milliseconds, not seconds.
-    payload.paused_time = seconds * 1000;
+    payload.paused_time =
+      examStatus === "finish"
+        ? ""
+        : seconds * 1000;
 
     const form = new FormData();
 

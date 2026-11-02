@@ -121,12 +121,8 @@ export default async function ProfileSetupPage({
   }
 
   return (
-    <main className="relative isolate flex min-h-[calc(100dvh-64px)] items-center justify-center overflow-y-auto bg-gradient-to-br from-[#071b59] via-[#102b78] to-[#10144b] px-3 py-3 sm:px-5 sm:py-4">
-      <div className="pointer-events-none absolute -left-32 -top-32 -z-10 h-[420px] w-[420px] rounded-full bg-blue-500/20 blur-[110px]" />
-
-      <div className="pointer-events-none absolute -bottom-32 -right-32 -z-10 h-[420px] w-[420px] rounded-full bg-violet-500/20 blur-[110px]" />
-
-      <div className="relative mx-auto w-full max-w-[760px]">
+    <main className="fixed inset-0 z-[10000] flex h-dvh w-full items-center justify-center overflow-hidden bg-black p-3 sm:p-5">
+      <div className="relative mx-auto my-auto w-full max-w-[840px]">
         <ProfileSetup
           redirectTo={redirectTo}
           authData={{

@@ -7,6 +7,7 @@ export default function LoginPage({ redirectTo = "" }) {
     <main
       className="
         relative
+        -mt-[72px]
         min-h-screen
         overflow-hidden
         bg-[#05070d]
@@ -39,13 +40,14 @@ export default function LoginPage({ redirectTo = "" }) {
           relative
           z-20
           flex
-          min-h-screen
+          min-h-[100svh]
           w-full
           items-center
           justify-center
           px-4
-          py-8
+          py-4
           sm:px-6
+          sm:py-8
           lg:px-8
         "
       >

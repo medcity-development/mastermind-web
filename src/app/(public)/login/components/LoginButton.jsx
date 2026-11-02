@@ -16,7 +16,7 @@ export default function LoginButton({
       className="
         group
         flex
-        h-[56px] cursor-pointer
+        h-12 cursor-pointer
         w-full
         items-center
         justify-center
@@ -36,6 +36,7 @@ export default function LoginButton({
         hover:shadow-[0_18px_36px_rgba(67,74,239,0.38)]
         disabled:cursor-not-allowed
         disabled:opacity-60
+        sm:h-[56px]
       "
     >
       <span
@@ -52,8 +53,10 @@ export default function LoginButton({
       <span
         className="
           flex
-          h-9
-          w-9
+          h-8
+          w-8
+          sm:h-9
+          sm:w-9
           items-center
           justify-center
           rounded-full

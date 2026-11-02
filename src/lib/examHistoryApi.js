@@ -443,6 +443,29 @@ async function requestHistory(
       );
     }
 
+    const backendMessage = String(
+      result?.message ?? result?.msg ?? ""
+    ).trim();
+    const records = extractRecords(result);
+
+    if (
+      !isBackendSuccess(result) &&
+      !backendMessage &&
+      (!records || records.length === 0)
+    ) {
+      return {
+        status: true,
+        empty: true,
+        exam_type: type,
+        details: [],
+        data: [],
+        total: 0,
+        httpStatus: response.status,
+        retryAfter: null,
+        rateLimited: false,
+      };
+    }
+
     /* -----------------------------------------------------
        BACKEND ERROR
     ----------------------------------------------------- */
@@ -459,8 +482,6 @@ async function requestHistory(
     /* -----------------------------------------------------
        EXTRACT ATTEMPTS
     ----------------------------------------------------- */
-
-    const records = extractRecords(result);
 
     if (!records) {
       return fail(

@@ -38,6 +38,38 @@ test("history request includes the active course ID", async (context) => {
   assert.equal(requestedFields.exam_type, "mock");
 });
 
+test("treats a message-free empty backend response as no exam history", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const previousBaseUrl = process.env.PSC_API_BASE_URL;
+  const previousApiKey = process.env.PSC_API_KEY;
+  globalThis.fetch = async () =>
+    Response.json({
+      status: false,
+      details: [],
+      data: [],
+    });
+  process.env.PSC_API_BASE_URL = "https://api.example.invalid";
+  process.env.PSC_API_KEY = "test-key";
+
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+    if (previousBaseUrl === undefined) delete process.env.PSC_API_BASE_URL;
+    else process.env.PSC_API_BASE_URL = previousBaseUrl;
+    if (previousApiKey === undefined) delete process.env.PSC_API_KEY;
+    else process.env.PSC_API_KEY = previousApiKey;
+  });
+
+  const result = await getCourseExamHistory({
+    uid: 9,
+    cid: 2,
+    examType: "scert",
+  });
+
+  assert.equal(result.status, true);
+  assert.equal(result.total, 0);
+  assert.deepEqual(result.details, []);
+});
+
 test("course-less records require explicit course evidence", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });

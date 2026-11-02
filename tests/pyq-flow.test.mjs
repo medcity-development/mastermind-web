@@ -102,6 +102,59 @@ test("PYQ timeout submit opens results and duplicate clicks save once", async ()
   assert.equal(h.render().resultModalOpen, true);
 });
 
+test("PYQ attempt API payload serializes pause time in milliseconds and finishes at final question", () => {
+  const paused = data.buildAttemptPayload(
+    {
+      cid: 1,
+      exam_id: 40,
+      exam_type: "pqp",
+      exam_status: "pause",
+      total_questions: 2,
+      lastposition: "2",
+      remaining_seconds: 120,
+      answer_array: ["A", "B"],
+      user_answers: ["A", "B"],
+    },
+    21
+  );
+  assert.equal(paused.lastposition, 2);
+  assert.equal(paused.paused_time, 120000);
+
+  const invalidPausePosition = data.buildAttemptPayload(
+    {
+      cid: 1,
+      exam_id: 40,
+      exam_type: "pqp",
+      exam_status: "pause",
+      total_questions: 3,
+      lastposition: "pqp",
+      remaining_seconds: 30,
+      answer_array: ["A", "B", "C"],
+      user_answers: ["A", 0, "C"],
+    },
+    21
+  );
+  assert.equal(invalidPausePosition.lastposition, 3);
+
+  const finished = data.buildAttemptPayload(
+    {
+      cid: 1,
+      exam_id: 40,
+      exam_type: "pqp",
+      exam_status: "finish",
+      total_questions: 2,
+      lastposition: 1,
+      remaining_seconds: 15,
+      answer_array: ["A", "B"],
+      user_answers: ["A", "B"],
+    },
+    21
+  );
+  assert.equal(finished.exam_status, "finish");
+  assert.equal(finished.lastposition, 2);
+  assert.equal(finished.paused_time, "");
+});
+
 function find(tree, type) {
   if (!tree || typeof tree !== "object") return null;
   if (tree.type === type) return tree;

@@ -6,6 +6,7 @@ export default function StatementExamList({
   statementTypeSlug,
   cid,
   uid,
+  pausedAttempts = {},
   type = "tst",
   examName,
   shortName,
@@ -149,6 +150,7 @@ export default function StatementExamList({
                 }
                 cid={cid}
                 uid={uid}
+                pausedAttempts={pausedAttempts}
                 type={type}
                 examName={
                   examName
