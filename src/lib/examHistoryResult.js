@@ -159,7 +159,7 @@ export function prepareExamHistoryResult(
       )
     : null;
 
-  const androidScore = finished && ["mock", "pqp", "pyq", "scert"].includes(
+  const androidScore = finished && ["mock", "pqp", "pyq", "scert", "studyplan"].includes(
     String(item.exam_type ?? item.examType ?? "").trim().toLowerCase()
   ) ? calculateExamScore({ ...item, total_correct: correct, total_wrong: wrong }) : null;
 

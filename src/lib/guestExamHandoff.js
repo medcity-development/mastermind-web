@@ -125,8 +125,10 @@ function allowedPathPrefixes(slug, type) {
 
     case "studyplan":
       return [
+        `${publicBase}/studyplan-tests/`,
         `${publicBase}/study-plan/`,
         `${publicBase}/studyplan/`,
+        `${dashboardBase}/studyplan-tests/`,
       ];
 
     default:

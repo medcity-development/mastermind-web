@@ -26,11 +26,14 @@ export default function StudyPlanMockTests({
   uid = 0,
   topicId,
   mockTestId,
-  onLoginRequired,
-  onStartTest,
+  governmentExamsSlug,
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const resolvedGovernmentExamsSlug =
+    governmentExamsSlug ||
+    pathname?.split("/")[2] ||
+    "";
 
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -105,24 +108,19 @@ export default function StudyPlanMockTests({
       return;
     }
 
-    if (!authenticated) {
-      if (onLoginRequired) {
-        onLoginRequired();
-      } else {
-        router.push(
-          `/login?redirect=${encodeURIComponent(
-            pathname || "/"
-          )}`
-        );
-      }
-
+    if (!resolvedGovernmentExamsSlug || !test?.id) {
+      setError("Unable to open this Study Plan test.");
       return;
     }
 
-    onStartTest?.(test);
+    router.push(
+      `/government-exams-coaching/${encodeURIComponent(
+        resolvedGovernmentExamsSlug
+      )}/studyplan-tests/${encodeURIComponent(String(test.id))}`
+    );
   }
   function handlePurchaseConfirmation() {
-    if (!governmentExamsSlug) {
+    if (!resolvedGovernmentExamsSlug) {
       setError("Unable to open login from the current page.");
       setShowPurchaseModal(false);
       return;
@@ -247,19 +245,14 @@ export default function StudyPlanMockTests({
 
         <button
           type="button"
-          disabled={
-            authenticated &&
-            !paid &&
-            !onStartTest
-          }
           onClick={handleStart}
           className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-violet-600 px-5 py-3 text-xs font-black text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {paid
             ? "OK"
-            : !authenticated
-              ? "Login to Continue"
-              : "Continue to Mock Test"}
+            : authenticated
+              ? "Continue to Study Plan Test"
+              : "Start Study Plan Test"}
 
           <ArrowRight size={16} />
         </button>

@@ -365,7 +365,7 @@ export default function StatementExamCard({
               border-green-200
               bg-green-50
               px-5
-              py-3.5
+              py-3
               text-[11px]
               font-bold
               text-green-700

@@ -7,6 +7,7 @@ import {
 } from "@/lib/examHistoryApi";
 
 import {
+  resolveExamHistoryName,
   verifyExamHistoryCourse,
 } from "@/lib/examHistoryHelper";
 
@@ -302,9 +303,20 @@ export async function getStudyPlanHistory({
     } = candidate;
 
     if (explicitCid === safeCid) {
+      const name =
+        examNameOf(row) ||
+        await resolveExamHistoryName({
+          uid: safeUid,
+          cid: safeCid,
+          examId,
+          examType: "studyplan",
+          item: row,
+        });
+
       return {
         ...candidate,
         verified: true,
+        name,
       };
     }
 
@@ -351,12 +363,24 @@ export async function getStudyPlanHistory({
     }
 
     const verified = await verificationCache.get(key);
+    const name =
+      verified === true
+        ? examNameOf(row) ||
+          await resolveExamHistoryName({
+            uid: safeUid,
+            cid: safeCid,
+            examId,
+            examType: "studyplan",
+            item: row,
+          })
+        : "";
 
     return {
       row,
       attemptId,
       examId,
       verified,
+      name,
     };
   }
 
@@ -383,7 +407,7 @@ export async function getStudyPlanHistory({
       continue;
     }
 
-    const name = examNameOf(item.row);
+    const name = item.name || examNameOf(item.row);
 
     accepted.push({
       ...item.row,

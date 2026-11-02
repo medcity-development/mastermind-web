@@ -463,6 +463,11 @@ export function buildAttemptPayload(body = {}, uid) {
       total_correct: calculated.correct,
       total_wrong: calculated.wrong,
     });
+  } else if (examType === "studyplan") {
+    Object.assign(payload, {
+      user_score: 0,
+      minus_mark: 0,
+    });
   }
 
   const startTime = timestampToMilliseconds(
@@ -506,6 +511,14 @@ export function withPausedAttemptPlaceholders(payload = {}) {
 
   if (!["pause", "paused"].includes(status)) {
     return payload;
+  }
+
+  if (String(payload.exam_type ?? "").toLowerCase() === "studyplan") {
+    return {
+      ...payload,
+      user_score: 0,
+      minus_mark: 0,
+    };
   }
 
   return {

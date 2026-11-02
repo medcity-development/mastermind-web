@@ -90,3 +90,37 @@ for (const action of ["pause", "submit"]) {
     assert.deepEqual(readGuestExamHandoff({ examId: 40, examType: "mock", governmentExamsSlug: "kerala-psc" }).answers, { 1: "A" });
   });
 }
+
+test("Study Plan guest pause resumes through its public exam route after login", () => {
+  installStorage();
+  const returnPath =
+    "/government-exams-coaching/kerala-psc/studyplan-tests/40/start?title=Study%20Plan";
+
+  saveGuestExamHandoff({
+    examId: 40,
+    examType: "studyplan",
+    governmentExamsSlug: "kerala-psc",
+    action: "pause",
+    answers: { 1: "E" },
+    remainingSeconds: 45,
+    returnPath,
+  });
+
+  const destination = new URL(
+    guestExamLoginRedirectPath("pause"),
+    window.location.origin
+  );
+  assert.equal(
+    destination.pathname,
+    "/government-exams-coaching/kerala-psc/studyplan-tests/40/start"
+  );
+  assert.equal(destination.searchParams.get("guestAction"), "pause");
+  assert.deepEqual(
+    readGuestExamHandoff({
+      examId: 40,
+      examType: "studyplan",
+      governmentExamsSlug: "kerala-psc",
+    }).answers,
+    { 1: "E" }
+  );
+});

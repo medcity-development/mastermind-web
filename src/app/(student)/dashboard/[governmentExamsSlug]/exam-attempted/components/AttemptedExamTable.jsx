@@ -65,9 +65,8 @@ export default function AttemptedExamTable({ attempts = [], startIndex = 0, load
                 <span className="text-[11px] font-semibold text-slate-500">#{startIndex + index + 1}</span>
               </div>
               <h3 className="mt-3 break-words text-sm font-extrabold leading-6 text-[#082e5a]">{nameOf(attempt)}</h3>
-              <div className="mt-2 space-y-1 text-xs text-slate-500">
-                <AttemptTime attempt={attempt} kind="start" />
-                <AttemptTime attempt={attempt} kind="end" />
+              <div className="mt-2 text-slate-500">
+                <AttemptTimes attempt={attempt} />
               </div>
               <div className="mt-4 rounded-xl bg-[#f5f8fd] p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{isFinished ? "Score" : "Status"}</p>

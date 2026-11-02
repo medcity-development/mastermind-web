@@ -12,7 +12,10 @@ import ExamHistoryTabs from "./components/ExamHistoryTabs";
 import AttemptedExamTable from "./components/AttemptedExamTable";
 import ExamHistoryPagination from "./components/ExamHistoryPagination";
 
-import { buildExamHistoryTabs } from "./utils/examHistoryUtils";
+import {
+  buildExamHistoryTabs,
+  getExamHistoryTabType,
+} from "./utils/examHistoryUtils";
 
 import {
   ITEMS_PER_PAGE,
@@ -81,10 +84,11 @@ export default function ExamHistoryClient({
       const type = normalizeType(
         getAttemptExamType(attempt)
       );
+      const tabType = getExamHistoryTabType(type);
 
       if (
         activeTab !== "all" &&
-        type !== activeTab
+        tabType !== activeTab
       ) {
         return false;
       }

@@ -35,7 +35,6 @@ export default function StudyPlanMockTests({
   topicId,
   cid = 1,
   governmentExamsSlug,
-  onStartTest,
 }) {
   const packageAccess = usePackageAccess();
   const router = useRouter();
@@ -52,9 +51,6 @@ export default function StudyPlanMockTests({
 
   useEffect(() => {
     if (!hasLinkedTest) {
-      setLoading(false);
-      setTest(null);
-      setError("");
       return;
     }
 
@@ -148,11 +144,6 @@ export default function StudyPlanMockTests({
       return;
     }
 
-    if (typeof onStartTest === "function") {
-      onStartTest(test);
-      return;
-    }
-
     if (!governmentExamsSlug || !hasValue(test?.id)) {
       setError(
         "Unable to open this Study Plan test. Test information is missing."
@@ -161,15 +152,11 @@ export default function StudyPlanMockTests({
     }
 
     const query = new URLSearchParams({
-      type: "studyplan",
-      title: String(
-        test?.exam_name || "Study Plan Test"
-      ),
-      cid: String(cid),
+      title: String(test?.exam_name || "Study Plan Test"),
     });
 
     router.push(
-      `/dashboard/${governmentExamsSlug}/mock-tests/${encodeURIComponent(
+      `/dashboard/${governmentExamsSlug}/studyplan-tests/${encodeURIComponent(
         String(test.id)
       )}?${query.toString()}`
     );

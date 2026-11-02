@@ -13,10 +13,12 @@ const source = await readFile(
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
 const {
   buildExamHistoryTabs,
+  filterExamHistory,
   formatExamDate,
   getAttemptEndTime,
   getAttemptEndTimestamp,
   getAttemptExamType,
+  getExamHistoryTabType,
   getAttemptStartTime,
   getAttemptStartTimestamp,
   sortAttemptsNewestFirst,
@@ -57,6 +59,32 @@ test("counts attempts by supported type and normalizes type aliases", () => {
       ["topicwise", 1],
       ["studyplan", 1],
     ]
+  );
+});
+
+test("groups topic-wise and statement-type attempts under the Topic Wise tab", () => {
+  const attempts = [
+    { exam_type: "twe" },
+    { exam_type: "topicwise" },
+    { exam_type: "tst" },
+    { exam_type: "statementtype" },
+  ];
+  const topicWiseTab = buildExamHistoryTabs(attempts).find(
+    ({ key }) => key === "topicwise"
+  );
+
+  assert.equal(topicWiseTab.count, 4);
+  assert.equal(
+    buildExamHistoryTabs(attempts).some(({ key }) => key === "tst"),
+    false
+  );
+  assert.equal(getExamHistoryTabType("tst"), "topicwise");
+  assert.equal(
+    filterExamHistory({
+      attempts,
+      activeTab: "topicwise",
+    }).length,
+    4
   );
 });
 

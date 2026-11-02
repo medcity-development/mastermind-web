@@ -64,6 +64,8 @@ export function getAttemptExamType(
     pyq: "pqp",
     twe: "topicwise",
     "topic wise": "topicwise",
+    statementtype: "tst",
+    "statement type": "tst",
     "study plan": "studyplan",
   };
 
@@ -570,11 +572,12 @@ export function filterExamHistory({
         getAttemptExamType(
           attempt
         );
+      const tabType = getExamHistoryTabType(type);
 
       if (
         activeTab !==
         "all" &&
-        type !==
+        tabType !==
         activeTab
       ) {
         return false;
