@@ -31,6 +31,7 @@ export default async function PublicStudyPlanExamStartPage({
   }
 
   const session = await getStudentSession();
+  const pauseId = Number(query?.pauseId);
 
   return (
     <StudyPlanExamClient
@@ -41,6 +42,11 @@ export default async function PublicStudyPlanExamStartPage({
       examTitle={String(query?.title ?? "")}
       basePath={`/government-exams-coaching/${governmentExamsSlug}/studyplan-tests`}
       guestAction={String(query?.guestAction ?? "")}
+      initialPauseId={
+        Number.isSafeInteger(pauseId) && pauseId > 0
+          ? pauseId
+          : null
+      }
     />
   );
 }

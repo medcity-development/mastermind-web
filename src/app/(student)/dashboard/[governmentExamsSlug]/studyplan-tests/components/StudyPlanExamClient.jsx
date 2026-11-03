@@ -43,6 +43,7 @@ import {
 import {
   timestampToMilliseconds,
 } from "@/lib/examAttemptData";
+import { getPausedAttemptIds } from "@/lib/pausedExamAttempts";
 import QuestionCard from "./QuestionCard";
 import ExamTimer from "./ExamTimer";
 
@@ -112,6 +113,7 @@ export default function StudyPlanExamClient({
   examTitle = "",
   basePath,
   guestAction = "",
+  initialPauseId = null,
 }) {
   const router = useRouter();
   const authenticated = Number(uid) > 0;
@@ -124,7 +126,12 @@ export default function StudyPlanExamClient({
   const [questions, setQuestions] = useState([]);
   const [instructions, setInstructions] = useState([]);
   const [answers, setAnswers] = useState({});
-  const [pauseId, setPauseId] = useState(null);
+  const [pauseId, setPauseId] = useState(
+    Number.isSafeInteger(Number(initialPauseId)) &&
+      Number(initialPauseId) > 0
+      ? Number(initialPauseId)
+      : null
+  );
   const [startTime, setStartTime] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
@@ -244,6 +251,11 @@ export default function StudyPlanExamClient({
               uid,
               cid,
             });
+        const resumedPauseId =
+          Number.isSafeInteger(Number(initialPauseId)) &&
+          Number(initialPauseId) > 0
+            ? Number(initialPauseId)
+            : getAttemptId(pausedAttempt);
         const duration = getDurationSeconds(loadedExam);
         const restoredAnswers = guestAttempt
           ? guestAttempt.answers
@@ -287,11 +299,7 @@ export default function StudyPlanExamClient({
         setQuestions(loadedQuestions);
         setInstructions(extractStudyPlanInstructions(details));
         setAnswers(restoredAnswers);
-        setPauseId(
-          pausedAttempt
-            ? getAttemptId(pausedAttempt)
-            : null
-        );
+        setPauseId(resumedPauseId || null);
         setStartTime(
           timestampToMilliseconds(
             guestAttempt?.startTime ??
@@ -346,6 +354,7 @@ export default function StudyPlanExamClient({
     examId,
     guestAction,
     governmentExamsSlug,
+    initialPauseId,
     uid,
   ]);
 
@@ -363,6 +372,35 @@ export default function StudyPlanExamClient({
     setSaveError("");
 
     try {
+      let activePauseId = pauseId;
+
+      if (!activePauseId) {
+        try {
+          const savedAttempts = await postJson(
+            "/api/exam-attempt/user-exams",
+            {
+              cid,
+              exam_type: "studyplan",
+            }
+          );
+          const pausedIds = getPausedAttemptIds(savedAttempts);
+          const existingPauseId = Number(pausedIds[String(examId)]);
+
+          if (
+            Number.isSafeInteger(existingPauseId) &&
+            existingPauseId > 0
+          ) {
+            activePauseId = existingPauseId;
+            setPauseId(existingPauseId);
+          }
+        } catch (lookupError) {
+          console.warn(
+            "Unable to look up paused Study Plan attempt:",
+            lookupError
+          );
+        }
+      }
+
       const payload = buildStudyPlanAttemptPayload({
         cid,
         examId,
@@ -372,13 +410,13 @@ export default function StudyPlanExamClient({
         examStatus: "finish",
         remainingSeconds: timedOut ? 0 : remainingSeconds,
         startTime,
-        pauseId,
+        pauseId: activePauseId,
         lastPosition,
       });
-      const saved = pauseId
+      const saved = activePauseId
         ? await postJson("/api/exam-attempt/update", payload)
         : await postJson("/api/exam-attempt/create", payload);
-      const attemptId = getAttemptId(saved) ?? pauseId;
+      const attemptId = getAttemptId(saved) ?? activePauseId;
 
       if (!attemptId) {
         throw new Error("The saved attempt ID was not returned.");
@@ -398,6 +436,18 @@ export default function StudyPlanExamClient({
       setGuestActionOpen(false);
       setTimeoutModalOpen(false);
       clearGuestExamHandoff();
+
+      try {
+        localStorage.removeItem(
+          `exam_draft_${uid}_${cid}_studyplan_${examId}`
+        );
+      } catch (storageError) {
+        console.warn(
+          "Unable to clear Study Plan local draft:",
+          storageError
+        );
+      }
+
       return true;
     } catch (error) {
       console.error("STUDY PLAN EXAM SUBMIT:", error);
@@ -417,6 +467,7 @@ export default function StudyPlanExamClient({
     exam,
     examId,
     pauseId,
+    uid,
     questions,
     remainingSeconds,
     startTime,
@@ -676,7 +727,7 @@ export default function StudyPlanExamClient({
 
   if (!hasStarted) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-9xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-sm">
           <header className="bg-gradient-to-r from-[#071f55] to-[#017dc0] p-6 text-white sm:p-9">
             <p className="text-[10px] font-black uppercase tracking-widest text-blue-100">
@@ -747,7 +798,7 @@ export default function StudyPlanExamClient({
   return (
     <main
       data-exam-workspace
-      className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
+      className="mx-auto w-full max-w-9xl px-4 py-8 sm:px-6 lg:px-8"
     >
       <ExamNavigationGuard
         active={

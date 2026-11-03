@@ -293,7 +293,7 @@ export default function ExamClient({
       const destination =
         `/dashboard/${encodeURIComponent(governmentExamsSlug)}` +
         `/topic-wise-exams/test/${encodeURIComponent(slug)}` +
-        `/${encodeURIComponent(examSlug)}/start` +
+        `/${encodeURIComponent(String(selectedExamId))}/start` +
         `?guestAction=${attempt.action}`;
 
       setRedirecting(true);

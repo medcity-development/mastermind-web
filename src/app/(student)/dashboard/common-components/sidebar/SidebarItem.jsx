@@ -12,7 +12,7 @@ export default function SidebarItem({
     <Link
       href={item.href}
       onClick={onNavigate}
-      title={item.label}
+      title={item.description || item.label}
       className={`
         group
         relative
@@ -150,6 +150,7 @@ export default function SidebarItem({
   `}
 >
   {item.label}
+  {item.description && <span className="mt-1 block truncate text-[9px] font-normal text-slate-400">{item.description}</span>}
 </span>
 
       {item.badge && (

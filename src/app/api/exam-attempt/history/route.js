@@ -367,6 +367,7 @@ export async function POST(request) {
                   examId: candidate.examId,
                   examType,
                   attemptId: candidate.attemptId,
+                  historyRow: candidate.row,
                 })
               )
               .catch((error) => {

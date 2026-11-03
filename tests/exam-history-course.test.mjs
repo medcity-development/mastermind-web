@@ -87,3 +87,46 @@ test("explicit wrong-course attempt is rejected", async (context) => {
   ] });
   assert.equal(await verifyExamHistoryCourse({ cid: 2, uid: 9, examId: 40, examType: "mock", attemptId: 157 }), false);
 });
+
+test("complete upstream history identity reuses one course lookup across repeated attempts", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return Response.json({ status: true, exam: { id: 810, cid: 2, type: "mock" } });
+  };
+  for (const id of [811, 812, 813]) {
+    assert.equal(await verifyExamHistoryCourse({
+      cid: 2, uid: 91, examId: 810, examType: "mock", attemptId: id,
+      historyRow: { id, uid: 91, exam_id: 810, exam_type: "mock" },
+    }), true);
+  }
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].endsWith("/getMockTestDetails"));
+});
+
+test("reused history identity still rejects a different exam course", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => Response.json({ status: true, exam: { id: 820, cid: 1 } });
+  assert.equal(await verifyExamHistoryCourse({
+    cid: 2, uid: 91, examId: 820, examType: "mock", attemptId: 821,
+    historyRow: { id: 821, uid: 91, exam_id: 820, exam_type: "mock" },
+  }), false);
+});
+
+test("incomplete history identity retains the saved-attempt lookup", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return Response.json({ status: true, details: [{ id: 831, uid: 92, exam_id: 830, cid: 2 }] });
+  };
+  assert.equal(await verifyExamHistoryCourse({
+    cid: 2, uid: 92, examId: 830, examType: "mock", attemptId: 831,
+    historyRow: { id: 831, exam_id: 830, exam_type: "mock" },
+  }), true);
+  assert.ok(calls[0].endsWith("/getExamAnalyticDetails"));
+});

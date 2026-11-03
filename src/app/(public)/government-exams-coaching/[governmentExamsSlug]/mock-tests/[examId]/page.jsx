@@ -1,5 +1,6 @@
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -61,6 +62,17 @@ export default async function MockTestDetailsPage({
 
   const query =
     await searchParams;
+
+  if (
+    !/^\d+$/.test(examId) &&
+    ["examId", "uid", "title", "selectedTestTitle"].some(
+      (key) => query?.[key] !== undefined
+    )
+  ) {
+    redirect(
+      `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${examId}`
+    );
+  }
 
   const config =
     getGovernmentExamConfig(

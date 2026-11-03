@@ -51,8 +51,7 @@ export default async function TopicWiseExamsPage({
   const uid = Number(session?.uid) || 0;
 
   const basePath =
-    `${uid > 0 ? "/dashboard" : "/government-exams-coaching"}` +
-    `/${governmentExamsSlug}/topic-wise-exams`;
+    `/government-exams-coaching/${governmentExamsSlug}/topic-wise-exams`;
 
   const result = await getTopicWiseExams({
     uid,

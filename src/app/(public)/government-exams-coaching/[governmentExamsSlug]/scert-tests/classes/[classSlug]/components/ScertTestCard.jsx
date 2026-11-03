@@ -7,6 +7,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
+import { createScertSlug } from "@/lib/scertSlug";
 
 import {
   ArrowRight,
@@ -17,25 +18,8 @@ import {
   Trophy,
 } from "lucide-react";
 
-function createSlug(
-  value = ""
-) {
-  return String(value)
-    .toLowerCase()
-    .trim()
-    .replace(
-      /[^a-z0-9]+/g,
-      "-"
-    )
-    .replace(
-      /^-+|-+$/g,
-      ""
-    );
-}
-
 export default function ScertTestCard({
   test,
-  classId,
   governmentExamsSlug = "kerala-psc",
 }) {
   const router = useRouter();
@@ -48,9 +32,6 @@ export default function ScertTestCard({
     return null;
   }
 
-  const examId =
-    test.id;
-
   const isPaid =
     String(
       test?.access || ""
@@ -59,22 +40,13 @@ export default function ScertTestCard({
       .trim() === "paid";
 
   const testSlug =
-    createSlug(
+    createScertSlug(
       test?.exam_name ||
         "scert-practice-test"
     );
 
-  const examHref = {
-    pathname:
-      `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}`,
-
-    query: {
-      classId:
-        String(classId),
-      examId:
-        String(examId),
-    },
-  };
+  const examHref =
+    `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}`;
 
   return (
     <>

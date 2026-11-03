@@ -55,7 +55,6 @@ export default function MainCoursesGrid() {
             "/api/main-courses",
             {
               method: "GET",
-              cache: "no-store",
             }
           );
 

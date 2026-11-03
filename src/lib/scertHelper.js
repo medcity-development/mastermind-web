@@ -1,4 +1,5 @@
 import { applyPackageAccess } from "@/lib/packageAccess";
+import { createScertSlug } from "@/lib/scertSlug";
 /* =========================================================
    ENVIRONMENT
 ========================================================= */
@@ -566,6 +567,69 @@ export async function getScertTestsByClassId({
       nextOffset: null,
     };
   }
+}
+
+export async function getScertTestBySlug({
+  uid = 0,
+  cid = 1,
+  slug,
+  classId,
+  examId,
+} = {}) {
+  const testSlug = String(slug ?? "").trim().toLowerCase();
+  if (!testSlug) return null;
+
+  let classes = [];
+  if (classId != null && classId !== "") {
+    classes = [{ id: classId }];
+  } else {
+    const foldersResult = await getScertFolders({
+      uid,
+      cid,
+      offset: 0,
+    });
+    classes = Array.isArray(foldersResult?.data)
+      ? foldersResult.data
+      : [];
+  }
+
+  for (const folder of classes) {
+    const currentClassId = folder?.id;
+    if (!currentClassId) continue;
+
+    const result = await getScertTestsByClassId({
+      uid,
+      classId: currentClassId,
+      filter: 0,
+    });
+
+    const tests = Array.isArray(result?.data)
+      ? result.data
+      : [];
+    const test = tests.find((item) => {
+      const matchesSlug =
+        createScertSlug(item?.exam_name) === testSlug;
+      const matchesLegacyId =
+        /^\d+$/.test(testSlug) &&
+        String(item?.id) === testSlug;
+      const matchesExamId =
+        examId == null ||
+        examId === "" ||
+        String(item?.id) === String(examId);
+
+      return (matchesSlug || matchesLegacyId) && matchesExamId;
+    });
+
+    if (test) {
+      return {
+        classId: currentClassId,
+        examId: test.id,
+        test,
+      };
+    }
+  }
+
+  return null;
 }
 
 /* =========================================================

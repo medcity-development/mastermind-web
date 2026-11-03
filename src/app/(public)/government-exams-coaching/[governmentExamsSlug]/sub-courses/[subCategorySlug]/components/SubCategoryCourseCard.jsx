@@ -47,8 +47,6 @@ function buildImageUrl(
 
 export default function SubCategoryCourseCard({
   course,
-  cid,
-  subId,
   subCategorySlug,
   filePath = "",
 }) {
@@ -72,34 +70,7 @@ export default function SubCategoryCourseCard({
         course?.icon
     );
 
-  /* =======================================================
-     DETAILS URL
-
-     examId = selected course/sub-exam id
-     subId  = selected level/category id
-  ======================================================= */
-
-  const href = {
-    pathname:
-      `/government-exams-coaching/kerala-psc/sub-courses/${subCategorySlug}/${courseSlug}`,
-
-    query: {
-      cid:
-        String(
-          cid || 1
-        ),
-
-      subId:
-        String(
-          subId || ""
-        ),
-
-      examId:
-        String(
-          course.id
-        ),
-    },
-  };
+  const href = `/government-exams-coaching/kerala-psc/sub-courses/${subCategorySlug}/${courseSlug}`;
 
   return (
     <Link

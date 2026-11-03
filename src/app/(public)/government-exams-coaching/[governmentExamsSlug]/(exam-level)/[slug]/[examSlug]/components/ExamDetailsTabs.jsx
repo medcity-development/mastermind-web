@@ -43,6 +43,7 @@ export default function ExamDetailsTabs({
   uid = 0,
   examId,
   subId,
+  governmentExamsSlug = "kerala-psc",
   exam,
   isAuthenticated = false,
   hasPremiumAccess = false,
@@ -117,6 +118,7 @@ export default function ExamDetailsTabs({
             cid={cid}
             uid={uid}
             subId={subId}
+            governmentExamsSlug={governmentExamsSlug}
           />
         )}
 

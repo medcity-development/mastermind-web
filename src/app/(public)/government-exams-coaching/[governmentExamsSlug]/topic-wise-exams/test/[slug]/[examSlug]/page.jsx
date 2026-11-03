@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import {
   getAllTopicWiseTests,
@@ -11,13 +11,22 @@ import {
 import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
 import { getStudentSession } from "@/lib/auth/getStudentSession";
 import { createSlug, formatSlug } from "@/lib/pscSlug";
+import {
+  getTopicWiseExamSlug,
+  normalizeTopicWiseExamSlug,
+} from "@/lib/topicWiseExamSlug";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { examSlug } = await params;
+  const normalizedSlug = normalizeTopicWiseExamSlug(examSlug);
+  const title = /[^\u0000-\u007f]/.test(normalizedSlug)
+    ? normalizedSlug.replace(/-/g, " ")
+    : formatSlug(normalizedSlug) || normalizedSlug;
+
   return {
-    title: `${formatSlug(examSlug)} | MasterMind Academy`,
+    title: `${title} | MasterMind Academy`,
   };
 }
 
@@ -27,6 +36,7 @@ export default async function TopicWiseExamDetailsPage({ params }) {
     examSlug,
     governmentExamsSlug,
   } = await params;
+  const requestedExamSlug = normalizeTopicWiseExamSlug(examSlug);
 
   const config = getGovernmentExamConfig(governmentExamsSlug);
   if (!config) notFound();
@@ -66,9 +76,13 @@ export default async function TopicWiseExamDetailsPage({ params }) {
     : [];
 
   const selected = tests.find((item) => {
+    const itemId = String(item.id ?? "");
+
     return (
-      String(item.id) === String(examSlug) ||
-      createSlug(item.exam_name || "") === examSlug
+      itemId === requestedExamSlug ||
+      `exam-${itemId}` === requestedExamSlug ||
+      createSlug(item.exam_name || "") === requestedExamSlug ||
+      getTopicWiseExamSlug(item) === requestedExamSlug
     );
   });
 
@@ -78,6 +92,13 @@ export default async function TopicWiseExamDetailsPage({ params }) {
 
   if (!Number.isSafeInteger(examId) || examId <= 0) {
     notFound();
+  }
+
+  const canonicalExamSlug = getTopicWiseExamSlug(selected);
+  if (requestedExamSlug !== canonicalExamSlug) {
+    redirect(
+      `${root}/test/${encodeURIComponent(slug)}/${encodeURIComponent(canonicalExamSlug)}`
+    );
   }
 
   const access = String(selected.access ?? "")
@@ -128,7 +149,7 @@ export default async function TopicWiseExamDetailsPage({ params }) {
     : [];
 
   const startHref =
-    `${root}/test/${slug}/${examId}/start`;
+    `${root}/test/${slug}/${canonicalExamSlug}/start`;
 
   return (
     <main className="min-h-screen bg-[#f5f9ff] py-6">

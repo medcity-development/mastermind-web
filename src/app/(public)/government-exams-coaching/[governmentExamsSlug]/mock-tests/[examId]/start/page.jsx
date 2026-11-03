@@ -20,6 +20,10 @@ import {
   checkPremiumExamAccess,
 } from "@/lib/premiumExamAccess";
 
+import {
+  getMockTestBySlug,
+} from "@/lib/pscApi";
+
 import MockTestQuestions from "../components/MockTestQuestions";
 
 function positiveId(value) {
@@ -78,13 +82,45 @@ export default async function MockExamStartPage({
     shortName,
   } = config;
 
+  const startPath =
+    `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${examId}/start`;
+
+  if (
+    !/^\d+$/.test(examId) &&
+    ["examId", "uid", "cid", "title"].some(
+      (key) => query?.[key] !== undefined
+    )
+  ) {
+    const cleanQuery = new URLSearchParams();
+    if (query?.type) cleanQuery.set("type", String(query.type));
+    if (query?.guestAction) {
+      cleanQuery.set("guestAction", String(query.guestAction));
+    }
+
+    const queryString = cleanQuery.toString();
+    redirect(queryString ? `${startPath}?${queryString}` : startPath);
+  }
+
   const session = await getStudentSession();
   const uid = positiveId(session?.uid) ?? 0;
 
-  const title = String(query?.title ?? "");
+  const examFromSlug = /^\d+$/.test(examId)
+    ? null
+    : await getMockTestBySlug({
+        uid,
+        cid,
+        slug: examId,
+      });
 
-  const selectedExamId = positiveId(
-    query?.examId ?? examId
+  const selectedExamId =
+    positiveId(query?.examId) ??
+    positiveId(examFromSlug?.id) ??
+    positiveId(examId);
+
+  const title = String(
+    query?.title ??
+      examFromSlug?.exam_name ??
+      ""
   );
 
   const detailsPath =
@@ -165,14 +201,7 @@ export default async function MockExamStartPage({
         >
           <div>
             <Link
-              href={{
-                pathname: detailsPath,
-                query: {
-                  uid: String(uid),
-                  title,
-                  examId: String(selectedExamId),
-                },
-              }}
+              href={detailsPath}
               className="
                 inline-flex
                 items-center

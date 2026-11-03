@@ -1,215 +1,61 @@
-// src/app/(public)/government-exams-coaching/[governmentExamsSlug]/sub-courses/[subCategorySlug]/[courseSlug]/page.jsx
-
-import {
-  notFound,
-} from "next/navigation";
-
-import {
-  getGovernmentExamConfig,
-} from "@/lib/governmentExamConfig";
-
-import {
-  getSubExamDetails,
-} from "@/lib/subExamDetailsHelper";
-
+import { cache } from "react";
+import { notFound } from "next/navigation";
+import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
+import { getSubCategories, getSubExams } from "@/lib/pscApi";
+import { createSlug } from "@/lib/pscSlug";
+import { getSubExamDetails } from "@/lib/subExamDetailsHelper";
 import ExamDetailsHero from "../../../(exam-level)/[slug]/[examSlug]/components/ExamDetailsHero";
-
 import ExamDetailsTabs from "../../../(exam-level)/[slug]/[examSlug]/components/ExamDetailsTabs";
 
-/* =========================================================
-   METADATA
-========================================================= */
+// Resolve within the selected category; query IDs must not override the URL.
+const resolveCourse = cache(async (governmentExamsSlug, subCategorySlug, courseSlug, type) => {
+  const config = getGovernmentExamConfig(governmentExamsSlug);
+  if (!config) return null;
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}) {
-  const {
-    governmentExamsSlug,
-    courseSlug,
-  } = await params;
+  const cid = Number(config.cid);
+  const { categories } = await getSubCategories({ cid, uid: 0 });
+  const category = categories.find((item) => createSlug(item?.name || "") === subCategorySlug);
+  if (!category?.id) return null;
 
-  const query =
-    await searchParams;
+  const { exams } = await getSubExams({ cid, subId: category.id, uid: 0 });
+  const course = exams.find((item) =>
+    createSlug(item?.exam || item?.name || item?.subcourse || "") === courseSlug
+  );
+  if (!course?.id) return null;
 
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
+  const result = await getSubExamDetails({
+    uid: 0, cid, subExamId: course.id, type, offset: 0,
+  });
+  if (!result?.status || !result?.data) return null;
 
-  if (!config) {
-    return {};
-  }
+  return { config, cid, subId: category.id, examId: course.id, exam: result.data };
+});
 
-  const examId =
-    query?.examId ??
-    query?.examid ??
-    null;
+function getType(query) {
+  return typeof query?.type === "string" ? query.type : "mock";
+}
 
-  if (!examId) {
-    return {
-      title:
-        `${config.name} Exam | MasterMind Academy`,
-    };
-  }
+export async function generateMetadata({ params, searchParams }) {
+  const { governmentExamsSlug, subCategorySlug, courseSlug } = await params;
+  const resolved = await resolveCourse(governmentExamsSlug, subCategorySlug, courseSlug, getType(await searchParams));
+  if (!resolved) return { title: "Course Not Found", robots: { index: false, follow: false } };
 
-  const result =
-    await getSubExamDetails({
-      uid: 0,
-
-      cid:
-        config.cid,
-
-      subExamId:
-        examId,
-
-      type:
-        query?.type ??
-        "mock",
-
-      offset: 0,
-    });
-
-  const exam =
-    result?.data ??
-    null;
-
-  const title =
-    exam?.exam ??
-    exam?.exam_name ??
-    exam?.name ??
-    String(
-      courseSlug
-    )
-      .replace(
-        /-/g,
-        " "
-      );
-
+  const { config, exam } = resolved;
+  const title = exam?.exam ?? exam?.exam_name ?? exam?.name ?? courseSlug.replace(/-/g, " ");
   return {
-    title:
-      `${title} | ${config.name} | MasterMind Academy`,
-
-    description:
-      `Explore ${title} preparation resources, mock tests, previous questions and study materials for ${config.name}.`,
+    title: `${title} | ${config.name} | MasterMind Academy`,
+    description: `Explore ${title} preparation resources, mock tests, previous questions and study materials for ${config.name}.`,
+    alternates: {
+      canonical: `/government-exams-coaching/${governmentExamsSlug}/sub-courses/${subCategorySlug}/${courseSlug}`,
+    },
   };
 }
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-export default async function SubCourseDetailsPage({
-  params,
-  searchParams,
-}) {
-  const {
-    governmentExamsSlug,
-    subCategorySlug,
-    courseSlug,
-  } = await params;
-
-  const query =
-    await searchParams;
-
-  /* =====================================================
-     GOVERNMENT EXAM CONFIG
-  ===================================================== */
-
-  const config =
-    getGovernmentExamConfig(
-      governmentExamsSlug
-    );
-
-  if (!config) {
-    notFound();
-  }
-
-  const cid =
-    Number(
-      config.cid
-    );
-
-  /* =====================================================
-     QUERY VALUES
-  ===================================================== */
-
-  const subId =
-    query?.subId ??
-    query?.subid ??
-    null;
-
-  const examId =
-    query?.examId ??
-    query?.examid ??
-    null;
-
-  const type =
-    query?.type ??
-    "mock";
-
-  if (!examId) {
-    console.error(
-      "Missing examId:",
-      {
-        governmentExamsSlug,
-        subCategorySlug,
-        courseSlug,
-      }
-    );
-
-    notFound();
-  }
-
-  /* =====================================================
-     EXAM DETAILS
-  ===================================================== */
-
-  const result =
-    await getSubExamDetails({
-      uid: 0,
-
-      cid,
-
-      subExamId:
-        examId,
-
-      type,
-
-      offset: 0,
-    });
-
-  if (
-    !result?.status ||
-    !result?.data
-  ) {
-    console.error(
-      "Unable to load exam details:",
-      {
-        cid,
-        examId,
-        type,
-        message:
-          result?.message,
-      }
-    );
-
-    notFound();
-  }
-
-  const exam =
-    result.data;
-
-  /* =====================================================
-     DYNAMIC BACK ROUTE
-  ===================================================== */
-
-  const levelSlug =
-    subCategorySlug;
-
-  /* =====================================================
-     PAGE
-  ===================================================== */
+export default async function SubCourseDetailsPage({ params, searchParams }) {
+  const { governmentExamsSlug, subCategorySlug, courseSlug } = await params;
+  const resolved = await resolveCourse(governmentExamsSlug, subCategorySlug, courseSlug, getType(await searchParams));
+  if (!resolved) notFound();
+  const { config, cid, subId, examId, exam } = resolved;
 
   return (
     <main
@@ -217,8 +63,7 @@ export default async function SubCourseDetailsPage({
         min-h-screen
         bg-[#f4f9ff]
         pb-12
-        pt-[95px]
-        lg:pt-[110px]
+        pt-10
       "
     >
       <div
@@ -240,7 +85,7 @@ export default async function SubCourseDetailsPage({
             exam
           }
           levelSlug={
-            levelSlug
+            `sub-courses/${subCategorySlug}`
           }
           governmentExamsSlug={
             governmentExamsSlug

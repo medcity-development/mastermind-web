@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileQuestion,
   History,
+  CirclePause,
   Home,
   Trophy,
   UserRound,
@@ -52,6 +53,12 @@ export function getSidebarItems({
   const mainItems = [
     ...dashboardItem,
     ...learningItems,
+    {
+      label: "Paused Exams",
+      description: "Resume your paused exams",
+      icon: CirclePause,
+      href: `${dashboardPath}/paused-exams`,
+    },
     {
       label: "Performance Analysis",
       icon: BookMarked,

@@ -10,6 +10,7 @@ import {
 
 export default function CurrentAffairsMonthHeader({
   title,
+  governmentExamsSlug,
 }) {
   return (
     <section
@@ -136,7 +137,7 @@ export default function CurrentAffairsMonthHeader({
           "
         >
           <Link
-            href="/government-exams-coaching/kerala-psc/current-affairs"
+            href={`/government-exams-coaching/${governmentExamsSlug}/current-affairs`}
             className="
               inline-flex
               w-fit

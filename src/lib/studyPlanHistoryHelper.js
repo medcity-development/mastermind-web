@@ -147,6 +147,7 @@ async function mapWithWorkers(items, handler) {
 export async function getStudyPlanHistory({
   uid,
   cid,
+  resolveNames = true,
 } = {}) {
   const safeUid = positiveId(uid);
   const safeCid = positiveId(cid);
@@ -305,13 +306,13 @@ export async function getStudyPlanHistory({
     if (explicitCid === safeCid) {
       const name =
         examNameOf(row) ||
-        await resolveExamHistoryName({
+        (resolveNames ? await resolveExamHistoryName({
           uid: safeUid,
           cid: safeCid,
           examId,
           examType: "studyplan",
           item: row,
-        });
+        }) : "");
 
       return {
         ...candidate,
@@ -344,6 +345,7 @@ export async function getStudyPlanHistory({
             examId,
             examType: "studyplan",
             attemptId,
+            historyRow: row,
           })
         )
         .catch((error) => {
@@ -366,13 +368,13 @@ export async function getStudyPlanHistory({
     const name =
       verified === true
         ? examNameOf(row) ||
-          await resolveExamHistoryName({
+          (resolveNames ? await resolveExamHistoryName({
             uid: safeUid,
             cid: safeCid,
             examId,
             examType: "studyplan",
             item: row,
-          })
+          }) : "")
         : "";
 
     return {

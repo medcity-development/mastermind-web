@@ -93,6 +93,8 @@ export async function POST(request) {
     const result = await getStudyPlanHistory({
       uid,
       cid,
+      // The client resolves names only for visible rows.
+      resolveNames: false,
     });
 
     if (!result?.status) {

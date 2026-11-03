@@ -5,8 +5,10 @@ import {
 
 import {
   getPyqExamDetails,
+  getPyqExamBySlug,
   getPyqQuestions,
 } from "@/lib/pyqDetailsHelper";
+import { createSlug } from "@/lib/pscSlug";
 
 import {
   getGovernmentExamConfig,
@@ -37,11 +39,7 @@ export default async function StartExamPage({
     governmentExamsSlug
   );
 
-  if (
-    !config ||
-    !Number.isSafeInteger(Number(examId)) ||
-    Number(examId) <= 0
-  ) {
+  if (!config) {
     notFound();
   }
 
@@ -51,16 +49,66 @@ export default async function StartExamPage({
   const uid = Number(session?.uid) || 0;
   const cid = Number(config.cid);
   const examType = "pqp";
+  let examRecord = null;
+  if (!/^\d+$/.test(examId)) {
+    try {
+      examRecord = await getPyqExamBySlug({
+        uid,
+        cid,
+        slug: examId,
+        type: examType,
+      });
+    } catch (error) {
+      console.error(
+        "Unable to resolve dashboard previous question paper slug:",
+        error
+      );
+      return <ExamLoadError retryAfter={error?.retryAfter} />;
+    }
+  }
+
+  const resolvedExamId =
+    /^\d+$/.test(examId) &&
+    Number.isSafeInteger(Number(examId)) &&
+    Number(examId) > 0
+      ? String(Number(examId))
+      : String(examRecord?.id ?? "");
+
+  if (!resolvedExamId) {
+    notFound();
+  }
+
+  if (examRecord?.exam_name) {
+    const canonicalSlug = createSlug(examRecord.exam_name);
+    if (canonicalSlug !== examId) {
+      const queryString = new URLSearchParams();
+      if (query?.guestAction) {
+        queryString.set("guestAction", String(query.guestAction));
+      }
+      if (query?.pauseId) {
+        queryString.set("pauseId", String(query.pauseId));
+      }
+
+      const suffix = queryString.toString();
+      redirect(
+        `/dashboard/${encodeURIComponent(governmentExamsSlug)}/previous-questions/${canonicalSlug}/start${suffix ? `?${suffix}` : ""}`
+      );
+    }
+  }
+
   const initialPauseId = Number(query?.pauseId);
 
   const detailsResult = await getPyqExamDetails({
     uid,
     cid,
-    examId,
+    examId: resolvedExamId,
     type: examType,
   });
 
-  if (!detailsResult?.exam) {
+  const exam =
+    detailsResult?.exam ?? examRecord;
+
+  if (!exam) {
     if (detailsResult?.httpStatus === 404) notFound();
     return <ExamLoadError retryAfter={detailsResult?.retryAfter} />;
   }
@@ -71,9 +119,9 @@ export default async function StartExamPage({
       access = await checkPremiumExamAccess({
         uid,
         cid,
-        examId,
+        examId: resolvedExamId,
         type: examType,
-        exam: detailsResult.exam,
+        exam,
       });
     } catch (error) {
       return <ExamLoadError retryAfter={error?.retryAfter} />;
@@ -89,7 +137,7 @@ export default async function StartExamPage({
   const questionsResult = await getPyqQuestions({
     uid,
     cid,
-    examId,
+    examId: resolvedExamId,
     examType,
   });
 
@@ -116,10 +164,10 @@ export default async function StartExamPage({
         <ExamClient
           key={`${examId}-${uid}-${initialPauseId || "new"}-${guestAction || "new"}`}
           exam={{
-            ...detailsResult.exam,
-            id: examId,
+            ...exam,
+            id: resolvedExamId,
           }}
-          examId={examId}
+          examId={resolvedExamId}
           questions={questions}
           imagePath={
             questionsResult.imagePath ?? ""

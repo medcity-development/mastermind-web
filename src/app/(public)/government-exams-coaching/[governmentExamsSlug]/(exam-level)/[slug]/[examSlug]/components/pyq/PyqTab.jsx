@@ -16,6 +16,7 @@ export default function PyqTab({
   cid = 1,
   uid = 0,
   subId,
+  governmentExamsSlug = "kerala-psc",
 }) {
   const [exams, setExams] =
     useState([]);
@@ -270,6 +271,9 @@ export default function PyqTab({
         cid={cid}
         levelFilter={
           selectedLevel
+        }
+        governmentExamsSlug={
+          governmentExamsSlug
         }
       />
     </section>

@@ -440,6 +440,15 @@ export async function resolveExamHistoryName({
     return "";
   }
 
+  // Study Plan analytics supplies the saved exam label (for example,
+  // "Exam - Day-01"). Generic details can contain a folder/topic name.
+  if (type === "studyplan") {
+    const analyticsName = await getAnalyticsExamName({
+      cid, uid, examId: resolvedId, examType: type,
+    });
+    if (analyticsName) return analyticsName;
+  }
+
   // Details work for both paused and completed attempts; analytics may only
   // exist after submission. Reuse details already cached by course verification.
   const detailsName = extractName(await loadDetails({
@@ -450,6 +459,7 @@ export async function resolveExamHistoryName({
   }));
 
   if (detailsName) return detailsName;
+  if (type === "studyplan") return "";
 
   return getAnalyticsExamName({
       cid,
@@ -639,6 +649,7 @@ export async function verifyExamHistoryCourse({
   examId,
   examType,
   attemptId,
+  historyRow,
 } = {}) {
   const safeCid = positiveId(cid);
   const safeUid = positiveId(uid);
@@ -660,8 +671,22 @@ export async function verifyExamHistoryCourse({
     return false;
   }
 
-  // Step 1: Confirm saved attempt identity.
-  const saved = await requestApi(
+  // Only server-fetched history rows with complete identity can avoid the
+  // per-attempt analytics request. Never pass client-supplied rows here.
+  const historyIdentityVerified = Boolean(
+    historyRow &&
+    firstId(historyRow.uid, historyRow.user_id, historyRow.userId) === safeUid &&
+    firstId(historyRow.exam_id, historyRow.examId, historyRow.examid,
+      historyRow.test_id, historyRow.testId) === safeExamId &&
+    normalizeHistoryType(historyRow.exam_type ?? historyRow.examType) === type &&
+    identityMatches({ row: historyRow, attemptId: safeAttemptId,
+      examId: safeExamId, uid: safeUid, examType: type })
+  );
+
+  // Step 1: Confirm saved attempt identity, reusing the authenticated list.
+  const saved = historyIdentityVerified
+    ? { details: [historyRow] }
+    : await requestApi(
     "getExamAnalyticDetails",
     {
       cid: safeCid,

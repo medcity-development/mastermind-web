@@ -44,28 +44,7 @@ export default function SubExamCard({
       examName
     );
 
-  const href = {
-    pathname:
-      `/government-exams-coaching/kerala-psc/sub-courses/${categorySlug}/${examSlug}`,
-
-    query: {
-      cid:
-        String(
-          exam?.cid ||
-          1
-        ),
-
-      subId:
-        String(
-          categoryId
-        ),
-
-      examId:
-        String(
-          exam.id
-        ),
-    },
-  };
+  const href = `/government-exams-coaching/kerala-psc/sub-courses/${categorySlug}/${examSlug}`;
 
   return (
     <Link

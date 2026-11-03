@@ -358,6 +358,9 @@ export default async function SubExamDetailsPage({
           subId={
             subId
           }
+          governmentExamsSlug={
+            governmentExamsSlug
+          }
           exam={
             exam
           }

@@ -9,19 +9,16 @@ import {
   LockKeyhole,
   Trophy,
 } from "lucide-react";
+import { createSlug } from "@/lib/pscSlug";
 
 export default function LevelPyqCard({
   exam,
-  uid = 0,
-  cid = 1,
+  governmentExamsSlug = "kerala-psc",
   onPremiumClick,
 }) {
   if (!exam?.id) {
     return null;
   }
-
-  const examId =
-    exam.id;
 
   const title =
     exam?.exam_name ||
@@ -48,16 +45,8 @@ export default function LevelPyqCard({
   // FREE PYQ DETAILS URL
   // =========================================================
 
-  const href = {
-    pathname:
-      `/government-exams-coaching/kerala-psc/previous-questions/${examId}`,
-
-    query: {
-      uid: String(uid),
-      cid: String(cid),
-      type: "pqp",
-    },
-  };
+  const href =
+    `/government-exams-coaching/${governmentExamsSlug}/previous-questions/${createSlug(title)}`;
 
   return (
     <article

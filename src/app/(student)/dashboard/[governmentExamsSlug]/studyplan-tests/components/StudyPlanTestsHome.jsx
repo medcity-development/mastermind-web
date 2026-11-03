@@ -10,60 +10,7 @@ import {
   BookOpen,
   LoaderCircle,
 } from "lucide-react";
-
-function attemptRows(result) {
-  const rows = [
-    result?.details,
-    result?.data,
-    result?.result,
-    result?.results,
-  ].find(Array.isArray);
-
-  return Array.isArray(rows) ? rows : [];
-}
-
-function latestPausedAttempts(rows) {
-  const latestByExam = new Map();
-
-  rows.forEach((attempt, index) => {
-    const examId = String(
-      attempt?.exam_id ?? attempt?.examId ?? ""
-    );
-
-    if (!/^\d+$/.test(examId) || Number(examId) <= 0) return;
-
-    const attemptId = Number(
-      attempt?.pauseid ??
-      attempt?.pause_id ??
-      attempt?.attempt_id ??
-      attempt?.id
-    ) || index;
-    const current = latestByExam.get(examId);
-
-    if (!current || attemptId >= current.attemptId) {
-      latestByExam.set(examId, {
-        attempt,
-        attemptId,
-      });
-    }
-  });
-
-  return [...latestByExam.values()]
-    .map(({ attempt }) => attempt)
-    .filter((attempt) => {
-      const status = String(
-        attempt?.exam_status ?? attempt?.status ?? ""
-      ).toLowerCase();
-      const type = String(
-        attempt?.exam_type ?? attempt?.examType ?? "studyplan"
-      ).toLowerCase();
-
-      return (
-        ["pause", "paused"].includes(status) &&
-        type === "studyplan"
-      );
-    });
-}
+import { getPausedAttempts } from "@/lib/pausedExamAttempts";
 
 export default function StudyPlanTestsHome({
   cid,
@@ -102,7 +49,7 @@ export default function StudyPlanTestsHome({
           );
         }
 
-        const paused = latestPausedAttempts(attemptRows(result));
+        const paused = getPausedAttempts(result);
 
         if (!controller.signal.aborted) setAttempts(paused);
       } catch (loadError) {
@@ -125,7 +72,7 @@ export default function StudyPlanTestsHome({
   }, [cid]);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-9xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="rounded-3xl bg-gradient-to-r from-[#071f55] to-[#017dc0] p-6 text-white sm:p-9">
         <p className="text-[10px] font-black uppercase tracking-widest text-blue-100">
           Study Plan Practice

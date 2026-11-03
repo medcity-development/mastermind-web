@@ -630,14 +630,6 @@ export default function PreviousQuestionsList({
                 item={
                   exam
                 }
-                uid={uid}
-                cid={cid}
-                type={
-                  type
-                }
-                examName={
-                  examName
-                }
                 governmentExamsSlug={
                   governmentExamsSlug
                 }

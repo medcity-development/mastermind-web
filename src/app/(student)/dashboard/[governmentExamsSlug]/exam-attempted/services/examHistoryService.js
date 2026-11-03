@@ -326,11 +326,10 @@ export function applyCachedNames(cid, records) {
 export function isNameLookupNeeded(cid, row) {
   const key = nameKey(cid, row);
 
-  return Boolean(
-    key &&
-      !resolveName(row) &&
-      !readCachedName(key)
-  );
+  const cached = key ? readCachedName(key) : null;
+  // A lookup may finish after its effect was cancelled by another row update.
+  // Keep successful cached names eligible so the next effect applies them.
+  return Boolean(key && !resolveName(row) && (!cached || cached.name));
 }
 
 export async function loadExamName(cid, row) {

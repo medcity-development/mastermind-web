@@ -32,7 +32,7 @@ export default function TopicWiseExamCard({
   const name = examName || "Government Exam";
 
   return (
-    <article className="group flex h-full min-h-[320px] flex-col rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+    <article className="group flex h-full min-h-[320px] flex-col rounded-[26px] border border-slate-200 bg-green-50 p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
       <div className="flex items-start justify-between gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#017dc0]">
           <BookOpen size={23} />
@@ -65,7 +65,7 @@ export default function TopicWiseExamCard({
 
       <Link
         href={href}
-        className="mt-auto flex items-center justify-between rounded-2xl bg-[#017dc0] px-5 py-3 text-sm font-bold text-white"
+        className="mt-auto flex items-center justify-between rounded-2xl border border-green-500 px-5 py-3 text-sm font-bold text-green-700"
       >
         Start Practice
         <ArrowRight size={16} />

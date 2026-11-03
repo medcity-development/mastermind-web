@@ -52,13 +52,13 @@ export default function ContactPage() {
               to-[#e5f4ff]
               shadow-[0_10px_30px_rgba(15,58,110,0.06)]
               sm:min-h-[420px]
-              lg:min-h-[520px]
+              lg:min-h-[520px] hidden sm:hidden md:block
             "
             data-aos="fade-up"
           >
             <Image
               alt="Student ready to learn"
-              className="object-contain object-bottom p-3 sm:p-5 pb-0"
+              className="object-contain object-bottom pb-0"
               fill
               sizes="(max-width: 1023px) 100vw, 50vw"
               src="/assets/image.png"

@@ -14,10 +14,7 @@ import {
 export default function ExamInstructions({
   exam,
   instructions = [],
-  examId,
-  uid,
-  cid,
-  type,
+  examSlug,
   view,
   governmentExamsSlug = "kerala-psc",
 }) {
@@ -394,7 +391,7 @@ export default function ExamInstructions({
 
           {/* START BUTTON */}
           <Link
-            href={`/government-exams-coaching/${governmentExamsSlug}/previous-questions/${examId}/start?uid=${uid}&cid=${cid}&type=${type}`}
+            href={`/government-exams-coaching/${governmentExamsSlug}/previous-questions/${examSlug}/start`}
             className="
               group
               mt-5

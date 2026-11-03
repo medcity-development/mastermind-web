@@ -349,6 +349,27 @@ export function guestExamLoginRedirectPath(action) {
     throw new Error("Saved exam destination is invalid.");
   }
 
+  if (examType === "scert") {
+    const classId = positiveId(saved.classId);
+    const testSlug = String(saved.testSlug ?? "").trim();
+
+    if (
+      classId &&
+      /^[a-z0-9-]+$/i.test(testSlug)
+    ) {
+      const scertUrl = new URL(
+        `/dashboard/${encodeURIComponent(slug)}` +
+          `/scert-tests/tests/${encodeURIComponent(testSlug)}/start`,
+        window.location.origin
+      );
+      scertUrl.searchParams.set("classId", String(classId));
+      scertUrl.searchParams.set("examId", String(examId));
+      scertUrl.searchParams.set("guestAction", requestedAction);
+
+      return scertUrl.pathname + scertUrl.search;
+    }
+  }
+
   let url = null;
 
   // Statement Type always resumes inside the dashboard.

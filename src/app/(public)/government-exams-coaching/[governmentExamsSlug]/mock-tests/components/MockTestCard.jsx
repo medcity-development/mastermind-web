@@ -25,7 +25,6 @@ import { createSlug } from "@/lib/pscSlug";
 
 export default function MockTestCard({
   test,
-  uid = 0,
   cid,
   examName,
   shortName,
@@ -48,22 +47,12 @@ export default function MockTestCard({
     return null;
   }
 
-  const examId =
-    test.id;
-
   const testTitle =
     test?.exam_name ||
     `${examName} Mock Test`;
 
   const examPath =
     `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(testTitle)}`;
-
-  const examQuery = {
-    examId: String(examId),
-    uid: String(uid),
-    title: testTitle,
-    selectedTestTitle: testTitle,
-  };
 
   const totalQuestions =
     test?.total_questions;
@@ -366,12 +355,7 @@ export default function MockTestCard({
             </button>
           ) : (
             <Link
-              href={{
-                pathname:
-                  examPath,
-
-                query: examQuery,
-              }}
+              href={examPath}
               className="
                 inline-flex
                 w-full

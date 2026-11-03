@@ -11,6 +11,7 @@ import { getStudentSession } from "@/lib/auth/getStudentSession";
 import { getUserExamsList } from "@/lib/examAttemptHelper";
 import { getPausedAttemptIds } from "@/lib/pausedExamAttempts";
 import { createSlug, formatSlug } from "@/lib/pscSlug";
+import { getTopicWiseExamSlug } from "@/lib/topicWiseExamSlug";
 
 import PremiumExamButton from "./components/PremiumExamButton";
 
@@ -129,9 +130,8 @@ export default async function TopicWiseTestListPage({ params }) {
               Number.isSafeInteger(pauseId) &&
               pauseId > 0;
 
-            // Use the backend exam ID, not the exam-name slug.
             const detailsHref =
-              `${root}/test/${slug}/${test.id}`;
+              `${root}/test/${slug}/${encodeURIComponent(getTopicWiseExamSlug(test))}`;
 
             const resumeHref =
               `${detailsHref}/start?` +

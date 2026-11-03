@@ -1,6 +1,7 @@
 
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { applyPackageAccess } from "@/lib/packageAccess";
 import {
   createSlug,
@@ -283,16 +284,106 @@ export async function getMockTestDetails({
   }
 }
 
+export async function getMockTestBySlug({
+  uid = 0,
+  cid,
+  slug,
+} = {}) {
+  const safeCid = requireCid(cid);
+  const safeSlug = String(slug ?? "").trim();
+
+  if (!safeSlug) {
+    throw new Error("Mock test slug is required.");
+  }
+
+  let offset = 0;
+  const visitedOffsets = new Set();
+
+  while (true) {
+    if (visitedOffsets.has(offset)) {
+      throw new Error("Mock test list pagination did not advance.");
+    }
+
+    visitedOffsets.add(offset);
+
+    const result = await postRequest({
+      endpoint: "getMockTestListbyOffset",
+      fields: {
+        cid: safeCid,
+        uid: String(uid ?? 0),
+        offset: String(offset),
+        filter: "0",
+      },
+      cache: "no-store",
+    });
+
+    if (
+      result?.status !== undefined &&
+      !isPscSuccessStatus(result.status)
+    ) {
+      throw new Error(
+        result?.message || "Unable to load mock tests."
+      );
+    }
+
+    const match = (Array.isArray(result?.data) ? result.data : [])
+      .find((item) => createSlug(item?.exam_name) === safeSlug);
+
+    if (match) {
+      return match;
+    }
+
+    const nextOffset = result?.nextoffset ?? result?.nextOffset;
+    if (
+      nextOffset === null ||
+      nextOffset === undefined ||
+      nextOffset === ""
+    ) {
+      return null;
+    }
+
+    const parsedOffset = Number(nextOffset);
+    if (!Number.isSafeInteger(parsedOffset) || parsedOffset < 0) {
+      throw new Error("Mock test list returned an invalid next page.");
+    }
+
+    offset = parsedOffset;
+  }
+}
+
 /* =========================================================
    MAIN COURSES
 ========================================================= */
 
-export async function getMainCourses() {
-  try {
+const getCachedMainCourses = unstable_cache(
+  async () => {
     const result = await postRequest({
       endpoint: "getCourses",
       revalidate: 3600,
     });
+
+    if (
+      result?.status !== undefined &&
+      !isPscSuccessStatus(result.status)
+    ) {
+      throw new Error(
+        result?.message ||
+          "Unable to load main courses."
+      );
+    }
+
+    return result;
+  },
+  ["psc-main-courses"],
+  {
+    revalidate: 3600,
+    tags: ["psc-main-courses"],
+  }
+);
+
+export async function getMainCourses() {
+  try {
+    const result = await getCachedMainCourses();
 
     return {
       status: result?.status !== false,
@@ -317,6 +408,8 @@ export async function getMainCourses() {
       message:
         error?.message ||
         "Unable to load main courses.",
+      httpStatus: error?.httpStatus ?? error?.status ?? 503,
+      retryAfter: error?.retryAfter ?? 0,
       raw: null,
     };
   }
@@ -400,21 +493,39 @@ export async function getHomeResponses({
    SUB CATEGORIES
 ========================================================= */
 
+const getCachedSubCategories = unstable_cache(
+  async (cid, uid) => {
+    const result = await postRequest({
+      endpoint: "getSubCategoriesNew",
+      fields: {
+        cid: String(cid),
+        uid: String(uid ?? 0),
+      },
+      revalidate: 300,
+    });
+
+    if (result?.status === false) {
+      throw new Error(
+        result?.message || "Unable to load exam categories."
+      );
+    }
+
+    return result;
+  },
+  ["psc-subcategories"],
+  { revalidate: 300, tags: ["psc-subcategories"] }
+);
+
 export async function getSubCategories({
   cid,
   uid = 0,
 } = {}) {
   try {
     const safeCid = requireCid(cid);
-
-    const result = await postRequest({
-      endpoint: "getSubCategoriesNew",
-      fields: {
-        cid: safeCid,
-        uid: String(uid ?? 0),
-      },
-      cache: "no-store",
-    });
+    const result = await getCachedSubCategories(
+      safeCid,
+      String(uid ?? 0)
+    );
 
     const rawCategories = Array.isArray(result?.data)
       ? result.data

@@ -6,12 +6,29 @@ const FINISHED_STATUSES = new Set([
 ]);
 
 export function getExamAttemptStatus(attempt) {
-  return String(
+  const explicit =
     attempt?.exam_status ??
-    attempt?.examStatus ??
-    attempt?.status ??
-    ""
-  )
+    attempt?.examStatus;
+
+  if (
+    explicit !== undefined &&
+    explicit !== null &&
+    String(explicit).trim() !== ""
+  ) {
+    return String(explicit).trim().toLowerCase();
+  }
+
+  const status = attempt?.status;
+
+  if (
+    typeof status === "boolean" ||
+    status === "true" ||
+    status === "false"
+  ) {
+    return "";
+  }
+
+  return String(status ?? "")
     .trim()
     .toLowerCase();
 }

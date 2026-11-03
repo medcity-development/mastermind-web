@@ -1,5 +1,6 @@
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -8,7 +9,9 @@ import {
 
 import {
   getScertExamDetails,
+  getScertTestBySlug,
 } from "@/lib/scertHelper";
+import { createScertSlug } from "@/lib/scertSlug";
 
 import ScertInstructions from "./components/ScertInstructions";
 
@@ -44,23 +47,33 @@ export default async function ScertExamDetailsPage({
   const search =
     await searchParams;
 
-  const examId =
-    search?.examId;
-
-  const classId =
-    search?.classId;
-
-  /* =======================================================
-     VALIDATION
-  ======================================================= */
-
-  if (
-    !config ||
-    !testSlug ||
-    !examId ||
-    !classId
-  ) {
+  if (!config || !testSlug) {
     notFound();
+  }
+
+  const selected = await getScertTestBySlug({
+    uid: 0,
+    cid: config.cid,
+    slug: testSlug,
+    classId: search?.classId,
+    examId: search?.examId,
+  });
+
+  if (!selected) {
+    notFound();
+  }
+
+  const {
+    classId,
+    examId,
+    test,
+  } = selected;
+  const canonicalSlug = createScertSlug(test?.exam_name);
+
+  if (canonicalSlug !== testSlug || search?.classId || search?.examId) {
+    redirect(
+      `/government-exams-coaching/${encodeURIComponent(governmentExamsSlug)}/scert-tests/tests/${canonicalSlug}`
+    );
   }
 
   /* =======================================================

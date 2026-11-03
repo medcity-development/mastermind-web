@@ -292,15 +292,6 @@ export default function MockTestDetails({
       </div>
 
       <MockStartButton
-        examId={
-          resolvedExamId
-        }
-        uid={
-          uid
-        }
-        cid={
-          cid
-        }
         title={
           completeExam
             ?.exam_name

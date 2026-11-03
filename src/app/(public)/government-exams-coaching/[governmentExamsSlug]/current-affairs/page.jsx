@@ -118,6 +118,12 @@ export default async function CurrentAffairsPage({
             result?.years ??
             []
           }
+          loadError={
+            result?.status
+              ? ""
+              : result?.error ||
+                "Unable to load current affairs. Please try again shortly."
+          }
           cid={cid}
           examName={name}
           governmentExamsSlug={

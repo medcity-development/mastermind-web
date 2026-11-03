@@ -4,34 +4,20 @@ import {
   ChevronRight,
   Folder,
 } from "lucide-react";
-
-function createMonthSlug(
-  month,
-  year
-) {
-  return `${String(
-    month
-  )
-    .trim()
-    .toLowerCase()
-    .replace(
-      /[^a-z0-9]+/g,
-      "-"
-    )}-${year}`;
-}
+import { createCurrentAffairsMonthSlug } from "@/lib/currentAffairsSlug";
 
 export default function CurrentAffairsFolderCard({
   item,
   index,
+  governmentExamsSlug,
 }) {
-  const slug =
-    createMonthSlug(
-      item?.month,
-      item?.year
-    );
+  const slug = createCurrentAffairsMonthSlug(
+    item?.month,
+    item?.year
+  );
 
   const href =
-    `/government-exams-coaching/kerala-psc/current-affairs/${slug}?cid=${item?.id}`;
+    `/government-exams-coaching/${governmentExamsSlug}/current-affairs/${slug}`;
 
   return (
     <Link

@@ -111,9 +111,16 @@ export default function StudyPlanTestDetails({
       exam?.title ||
       title ||
       "Study Plan Test";
+    const startQuery = new URLSearchParams({ title: testTitle });
+
+    if (pauseId) {
+      startQuery.set("mode", "resume");
+      startQuery.set("pauseId", String(pauseId));
+    }
+
     const startPath =
       `${rootPath}/${encodeURIComponent(String(examId))}/start?` +
-      new URLSearchParams({ title: testTitle }).toString();
+      startQuery.toString();
     const paid = String(exam?.access || "").toLowerCase() === "paid";
     const hasPackage = exam?.packageAccess === true;
 

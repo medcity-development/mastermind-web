@@ -543,6 +543,10 @@ export default function MockTestsTab({
                       exam?.id ??
                       index
                     }
+                    governmentExamsSlug={
+                      pathname.split("/")[2] ||
+                      "kerala-psc"
+                    }
                     exam={
                       exam
                     }

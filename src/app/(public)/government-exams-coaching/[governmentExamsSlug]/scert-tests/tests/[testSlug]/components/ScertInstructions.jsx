@@ -47,18 +47,8 @@ export default function ScertInstructions({
       ? `/government-exams-coaching/${governmentExamsSlug}/scert-tests/classes/${classId}`
       : `/government-exams-coaching/${governmentExamsSlug}/scert-tests`;
 
-  const startHref = {
-    pathname:
-      `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}/start`,
-
-    query: {
-      classId:
-        String(classId),
-
-      examId:
-        String(examId),
-    },
-  };
+  const startHref =
+    `/government-exams-coaching/${governmentExamsSlug}/scert-tests/tests/${testSlug}/start`;
 
   return (
     <>

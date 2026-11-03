@@ -12,6 +12,10 @@ import {
 import { getGovernmentExamConfig } from "@/lib/governmentExamConfig";
 import { getStudentSession } from "@/lib/auth/getStudentSession";
 import { createSlug } from "@/lib/pscSlug";
+import {
+  getTopicWiseExamSlug,
+  normalizeTopicWiseExamSlug,
+} from "@/lib/topicWiseExamSlug";
 
 import ExamClient from "./components/ExamClient";
 
@@ -68,6 +72,7 @@ export default async function TopicWiseExamStartPage({
     examSlug,
     governmentExamsSlug,
   } = await params;
+  const requestedExamSlug = normalizeTopicWiseExamSlug(examSlug);
 
   const query = await searchParams;
 
@@ -100,34 +105,6 @@ export default async function TopicWiseExamStartPage({
     `/government-exams-coaching/${governmentExamsSlug}/topic-wise-exams`;
 
   const listHref = `${root}/test/${slug}`;
-
-  // Guests can start free exams.
-  // Only resuming an existing server-side attempt requires login.
-  if (mode === "resume" && !uid) {
-    const search = new URLSearchParams({
-      mode: "resume",
-      ...(initialPauseId
-        ? { pauseId: String(initialPauseId) }
-        : {}),
-      ...(guestAction ? { guestAction } : {}),
-    });
-
-    const target =
-      `${root}/test/${slug}/${examSlug}/start?${search}`;
-
-    redirect(
-      `/login?redirect=${encodeURIComponent(target)}`
-    );
-  }
-
-  if (mode === "resume" && !initialPauseId) {
-    return (
-      <ErrorPage
-        message="The resume link has no valid saved attempt ID."
-        href={listHref}
-      />
-    );
-  }
 
   // Load topic.
   const topicsResult = await getTopicWiseExams({
@@ -162,8 +139,10 @@ export default async function TopicWiseExamStartPage({
     const nameSlug = createSlug(item.exam_name || "");
 
     return (
-      id === String(examSlug) ||
-      nameSlug === examSlug
+      id === requestedExamSlug ||
+      `exam-${id}` === requestedExamSlug ||
+      nameSlug === requestedExamSlug ||
+      getTopicWiseExamSlug(item) === requestedExamSlug
     );
   });
 
@@ -171,6 +150,49 @@ export default async function TopicWiseExamStartPage({
     return (
       <ErrorPage
         message="The requested exam was not found in this topic."
+        href={listHref}
+      />
+    );
+  }
+
+  const canonicalExamSlug = getTopicWiseExamSlug(selected);
+  if (requestedExamSlug !== canonicalExamSlug) {
+    const search = new URLSearchParams();
+    if (mode === "resume") search.set("mode", "resume");
+    if (initialPauseId) {
+      search.set("pauseId", String(initialPauseId));
+    }
+    if (guestAction) search.set("guestAction", guestAction);
+
+    const suffix = search.toString();
+    redirect(
+      `${root}/test/${encodeURIComponent(slug)}/${encodeURIComponent(canonicalExamSlug)}/start${suffix ? `?${suffix}` : ""}`
+    );
+  }
+
+  // Guests can start free exams.
+  // Only resuming an existing server-side attempt requires login.
+  if (mode === "resume" && !uid) {
+    const search = new URLSearchParams({
+      mode: "resume",
+      ...(initialPauseId
+        ? { pauseId: String(initialPauseId) }
+        : {}),
+      ...(guestAction ? { guestAction } : {}),
+    });
+
+    const target =
+      `${root}/test/${slug}/${canonicalExamSlug}/start?${search}`;
+
+    redirect(
+      `/login?redirect=${encodeURIComponent(target)}`
+    );
+  }
+
+  if (mode === "resume" && !initialPauseId) {
+    return (
+      <ErrorPage
+        message="The resume link has no valid saved attempt ID."
         href={listHref}
       />
     );
@@ -251,7 +273,7 @@ export default async function TopicWiseExamStartPage({
       cid={cid}
       examType={examType}
       slug={slug}
-      examSlug={String(examId)}
+      examSlug={canonicalExamSlug}
       governmentExamsSlug={governmentExamsSlug}
       mode={mode}
       initialPauseId={initialPauseId}

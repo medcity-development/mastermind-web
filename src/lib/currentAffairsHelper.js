@@ -1,8 +1,32 @@
+import {
+  executePscRequest,
+  setPscRateLimit,
+} from "@/lib/pscRequestManager";
+
+const CURRENT_AFFAIRS_CACHE_TTL_MS = 15 * 60 * 1000;
+const CURRENT_AFFAIRS_CACHE_MAX_ENTRIES = 500;
+const CURRENT_AFFAIRS_CACHE_KEY = Symbol.for(
+  "mastermind.current-affairs.responses"
+);
+const currentAffairsCache =
+  globalThis[CURRENT_AFFAIRS_CACHE_KEY] ??=
+    new Map();
+
 const API_BASE_URL =
   process.env.PSC_API_BASE_URL;
 
 const API_KEY =
   process.env.PSC_API_KEY;
+
+function isSuccessfulStatus(status) {
+  return (
+    status === true ||
+    status === 1 ||
+    ["1", "true"].includes(
+      String(status ?? "").trim().toLowerCase()
+    )
+  );
+}
 
 /* =========================================================
    COMMON POST REQUEST
@@ -49,16 +73,34 @@ async function postCurrentAffairsApi(
     }
   );
 
-  const response =
-    await fetch(
-      `${API_BASE_URL}/${endpoint}`,
-      {
-        method: "POST",
-        body: formData,
+  const requestFields = Object.entries(fields)
+    .filter(([, value]) =>
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    )
+    .sort(([a], [b]) => a.localeCompare(b));
+  const requestKey =
+    `current-affairs:${endpoint}:${JSON.stringify(requestFields)}`;
+  const cached =
+    currentAffairsCache.get(requestKey);
 
-        cache: "no-store",
-      }
-    );
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result;
+  }
+
+  const response = await executePscRequest({
+    key: requestKey,
+    task: () =>
+      fetch(
+        `${API_BASE_URL}/${endpoint}`,
+        {
+          method: "POST",
+          body: formData,
+          cache: "no-store",
+        }
+      ),
+  });
 
   const text =
     await response.text();
@@ -80,15 +122,82 @@ async function postCurrentAffairsApi(
     );
   }
 
-  try {
-    return JSON.parse(
-      text
+  if (!text.trim()) {
+    throw new Error(
+      `${endpoint} returned an empty response.`
     );
+  }
+
+  let result;
+
+  try {
+    result = JSON.parse(text);
   } catch {
     throw new Error(
       `${endpoint} returned invalid JSON.`
     );
   }
+
+  const message = String(
+    result?.message ?? result?.msg ?? ""
+  );
+  const isRateLimited =
+    Number(result?.status) === 429 ||
+    Number(result?.code) === 429 ||
+    result?.rateLimited === true ||
+    /too many attempts|too many requests|rate.limit/i.test(message);
+
+  if (isRateLimited) {
+    const retryAfter = setPscRateLimit(
+      response.headers.get("Retry-After") ??
+        result?.retryAfter ??
+        result?.retry_after
+    );
+    const error = new Error(
+      "Current affairs service is temporarily rate-limited."
+    );
+    error.status = 429;
+    error.httpStatus = 429;
+    error.retryAfter = retryAfter;
+    throw error;
+  }
+
+  if (
+    result?.status !== undefined &&
+    !isSuccessfulStatus(result.status)
+  ) {
+    throw new Error(
+      message || `${endpoint} returned an unsuccessful response.`
+    );
+  }
+
+  if (currentAffairsCache.size >= CURRENT_AFFAIRS_CACHE_MAX_ENTRIES) {
+    const now = Date.now();
+    for (const [key, entry] of currentAffairsCache) {
+      if (entry.expiresAt <= now) {
+        currentAffairsCache.delete(key);
+      }
+    }
+
+    while (
+      currentAffairsCache.size >=
+      CURRENT_AFFAIRS_CACHE_MAX_ENTRIES
+    ) {
+      const oldestKey =
+        currentAffairsCache.keys().next().value;
+      if (oldestKey === undefined) {
+        break;
+      }
+      currentAffairsCache.delete(oldestKey);
+    }
+  }
+
+  currentAffairsCache.set(requestKey, {
+    result,
+    expiresAt: Date.now() + CURRENT_AFFAIRS_CACHE_TTL_MS,
+  });
+
+  return result;
 }
 
 /* =========================================================
@@ -273,6 +382,9 @@ export async function getCurrentAffairMonths({
       status: false,
       months: [],
       years: [],
+      error:
+        error?.message ||
+        "Unable to load current affairs months.",
     };
   }
 }

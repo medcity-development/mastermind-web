@@ -70,13 +70,6 @@ export default function RecommendedCourseCard({
     course?.exam_name ??
     "Exam Course";
 
-  const examId =
-    course?.id;
-
-  const subId =
-    course?.sub_id ??
-    "";
-
   const categoryName =
     course?.name ??
     examName;
@@ -99,15 +92,7 @@ export default function RecommendedCourseCard({
      ROUTE
   ===================================================== */
 
-  const href =
-    `/government-exams-coaching/${governmentExamsSlug}` +
-    `/sub-courses/${categorySlug}/${examSlug}` +
-    `?subId=${encodeURIComponent(
-      subId
-    )}` +
-    `&examId=${encodeURIComponent(
-      examId
-    )}`;
+  const href = `/government-exams-coaching/${governmentExamsSlug}/sub-courses/${categorySlug}/${examSlug}`;
 
   return (
     <article

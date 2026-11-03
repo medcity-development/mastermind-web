@@ -10,11 +10,13 @@ import {
   LockKeyhole,
   Trophy,
 } from "lucide-react";
+import { createSlug } from "@/lib/pscSlug";
 
 export default function LevelMockTestCard({
   exam,
   cid = 1,
   uid = 0,
+  governmentExamsSlug = "kerala-psc",
   onPremiumClick,
 }) {
   if (!exam) {
@@ -55,8 +57,9 @@ export default function LevelMockTestCard({
 
   const href = {
     pathname:
-      `/government-exams-coaching/kerala-psc/mock-tests/${examId}`,
+      `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(title)}`,
     query: {
+      examId: String(examId),
       uid:
         String(uid),
       cid:

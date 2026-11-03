@@ -13,6 +13,7 @@ export default function CurrentAffairsMonthViewer({
   cid,
   title,
   dates = [],
+  governmentExamsSlug,
 }) {
   const firstDate =
     dates?.[0]?.date ??
@@ -106,6 +107,9 @@ export default function CurrentAffairsMonthViewer({
     >
       <CurrentAffairsMonthHeader
         title={title}
+        governmentExamsSlug={
+          governmentExamsSlug
+        }
       />
 
       <CurrentAffairsDateTabs

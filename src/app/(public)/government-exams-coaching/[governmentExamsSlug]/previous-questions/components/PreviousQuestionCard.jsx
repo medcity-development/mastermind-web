@@ -14,12 +14,11 @@ import {
   X,
 } from "lucide-react";
 import { continueToPremiumPackages } from "@/lib/premiumPackagesRedirect";
+import { createSlug } from "@/lib/pscSlug";
 
 export default function PreviousQuestionCard({
   item,
-  uid = 0,
-  cid = 1,
-  type = "pqp",
+  governmentExamsSlug = "kerala-psc",
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -34,7 +33,6 @@ export default function PreviousQuestionCard({
   }
 
   const {
-    id,
     exam_name,
     total_questions,
     total_mark,
@@ -302,7 +300,7 @@ export default function PreviousQuestionCard({
             </button>
           ) : (
             <Link
-              href={`${pathname}/${encodeURIComponent(id)}?uid=${encodeURIComponent(uid)}&cid=${encodeURIComponent(cid)}&type=${encodeURIComponent(type)}`}
+              href={`/government-exams-coaching/${governmentExamsSlug}/previous-questions/${createSlug(exam_name)}`}
               className="
                 group/button
                 inline-flex

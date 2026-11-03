@@ -3,6 +3,12 @@
    PAUSED EXAM ATTEMPTS
 ========================================================= */
 
+import { timestampToMilliseconds } from "@/lib/examAttemptData";
+import {
+  isFinishedExamAttempt,
+  isPausedExamAttempt,
+} from "@/lib/examAttemptStatus";
+
 function getAttemptRows(result) {
   if (Array.isArray(result)) {
     return result;
@@ -41,6 +47,7 @@ function getExamId(row) {
   return positiveId(
     row?.exam_id ??
     row?.examId ??
+    row?._examId ??
     row?.test_id ??
     row?.testId
   );
@@ -52,44 +59,98 @@ function getPauseId(row) {
     row?.pause_id ??
     row?.attempt_id ??
     row?.attemptId ??
+    row?._historyId ??
     row?.id
   );
 }
 
-function getStatus(row) {
-  return String(
-    row?.exam_status ??
-    row?.examStatus ??
-    row?.status ??
-    ""
-  )
-    .trim()
-    .toLowerCase();
-}
-
 function getTimestamp(row) {
-  const value =
-    row?.modified_at ??
-    row?.updated_at ??
-    row?.created_at ??
-    row?.started_at ??
-    row?.start_time;
+  const values = [
+    row?.end_time,
+    row?.endTime,
+    row?.ended_at,
+    row?.modified_at,
+    row?.updated_at,
+    row?.created_at,
+    row?.started_at,
+    row?.start_time,
+    row?.startTime,
+  ];
 
-  if (!value) {
-    return Number.NaN;
+  for (const value of values) {
+    const parsed = timestampToMilliseconds(value);
+
+    if (parsed != null) {
+      return parsed;
+    }
   }
 
-  const parsed = Date.parse(String(value));
-
-  return Number.isFinite(parsed)
-    ? parsed
-    : Number.NaN;
+  return Number.NaN;
 }
 
-function isPaused(row) {
-  return ["pause", "paused"].includes(
-    getStatus(row)
-  );
+function isNewerAttempt(current, previous) {
+  const currentId = getPauseId(current.row) ?? 0;
+  const previousId = getPauseId(previous.row) ?? 0;
+  const currentFinished = isFinishedExamAttempt(current.row);
+  const previousFinished = isFinishedExamAttempt(previous.row);
+  const currentPaused = isPausedExamAttempt(current.row);
+  const previousPaused = isPausedExamAttempt(previous.row);
+
+  // A completed attempt replaces an older paused row for the same exam,
+  // even when the pause record still exists in the list.
+  if (currentFinished && previousPaused && currentId >= previousId) {
+    return true;
+  }
+
+  if (previousFinished && currentPaused && previousId >= currentId) {
+    return false;
+  }
+
+  const currentTime = current.timestamp;
+  const previousTime = previous.timestamp;
+
+  if (
+    Number.isFinite(currentTime) &&
+    Number.isFinite(previousTime) &&
+    currentTime !== previousTime
+  ) {
+    return currentTime > previousTime;
+  }
+
+  if (currentId !== previousId) {
+    return currentId > previousId;
+  }
+
+  if (currentFinished !== previousFinished) {
+    return currentFinished;
+  }
+
+  return current.index >= previous.index;
+}
+
+function latestAttemptsByExam(rows) {
+  const latest = new Map();
+
+  rows.forEach((row, index) => {
+    const examId = getExamId(row);
+
+    if (!examId) {
+      return;
+    }
+
+    const current = {
+      row,
+      index,
+      timestamp: getTimestamp(row),
+    };
+    const previous = latest.get(examId);
+
+    if (!previous || isNewerAttempt(current, previous)) {
+      latest.set(examId, current);
+    }
+  });
+
+  return latest;
 }
 
 /* =========================================================
@@ -103,82 +164,34 @@ function isPaused(row) {
 ========================================================= */
 
 export function getPausedAttemptIds(result) {
-  const rows = getAttemptRows(result);
-
-  const latest = new Map();
-
-  rows.forEach((row, index) => {
-    const examId = getExamId(row);
-
-    if (!examId) {
-      return;
-    }
-
-    const key = String(examId);
-
-    const current = {
-      row,
-      index,
-      timestamp: getTimestamp(row),
-    };
-
-    const previous = latest.get(key);
-
-    if (!previous) {
-      latest.set(key, current);
-      return;
-    }
-
-    const currentTime = current.timestamp;
-    const previousTime = previous.timestamp;
-
-    if (
-      Number.isFinite(currentTime) &&
-      Number.isFinite(previousTime)
-    ) {
-      if (currentTime >= previousTime) {
-        latest.set(key, current);
-      }
-
-      return;
-    }
-
-    if (
-      Number.isFinite(currentTime) &&
-      !Number.isFinite(previousTime)
-    ) {
-      latest.set(key, current);
-      return;
-    }
-
-    if (
-      !Number.isFinite(currentTime) &&
-      !Number.isFinite(previousTime)
-    ) {
-      // Fall back to attempt ID when timestamps
-      // are unavailable.
-      const currentId = getPauseId(row) ?? 0;
-      const previousId =
-        getPauseId(previous.row) ?? 0;
-
-      if (currentId > previousId) {
-        latest.set(key, current);
-      }
-    }
-  });
-
+  const latest = latestAttemptsByExam(getAttemptRows(result));
   const attempts = {};
 
   for (const [examId, entry] of latest) {
-    const row = entry.row;
-    const pauseId = getPauseId(row);
+    const pauseId = getPauseId(entry.row);
 
-    if (isPaused(row) && pauseId) {
-      attempts[examId] = String(pauseId);
+    if (isPausedExamAttempt(entry.row) && pauseId) {
+      attempts[String(examId)] = String(pauseId);
     }
   }
 
   return attempts;
+}
+
+export function getPausedAttempts(result) {
+  const rows = getAttemptRows(result);
+  const ids = getPausedAttemptIds(rows);
+
+  return rows.filter((row) => {
+    const examId = getExamId(row);
+    const pauseId = getPauseId(row);
+
+    return (
+      examId &&
+      pauseId &&
+      ids[String(examId)] === String(pauseId)
+    );
+  });
 }
 
 /* =========================================================

@@ -31,6 +31,8 @@ const MONTH_ORDER = {
 export default function CurrentAffairsFolders({
   months = [],
   years = [],
+  governmentExamsSlug,
+  loadError = "",
 }) {
   const [
     search,
@@ -324,7 +326,26 @@ export default function CurrentAffairsFolders({
 
       {/* FOLDERS */}
 
-      {visibleMonths.length >
+      {loadError ? (
+        <div
+          className="
+            mt-5
+            rounded-[22px]
+            border
+            border-amber-200
+            bg-amber-50
+            px-5
+            py-8
+            text-center
+            text-sm
+            font-medium
+            text-amber-900
+          "
+          role="alert"
+        >
+          {loadError}
+        </div>
+      ) : visibleMonths.length >
       0 ? (
         <div
           className="
@@ -350,6 +371,9 @@ export default function CurrentAffairsFolders({
                 index={
                   startIndex +
                   index
+                }
+                governmentExamsSlug={
+                  governmentExamsSlug
                 }
               />
             )

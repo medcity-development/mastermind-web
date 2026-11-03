@@ -19,6 +19,7 @@ export default function LevelPyqList({
   uid = 0,
   cid = 1,
   levelFilter,
+  governmentExamsSlug = "kerala-psc",
 }) {
   const pathname = usePathname();
   const [
@@ -254,8 +255,7 @@ export default function LevelPyqList({
                   exam?.id
                 }
                 exam={exam}
-                uid={uid}
-                cid={cid}
+                governmentExamsSlug={governmentExamsSlug}
                 onPremiumClick={
                   handlePremiumClick
                 }

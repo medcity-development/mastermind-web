@@ -6,6 +6,33 @@ import { loadServerModule } from "./helpers/load-server-module.mjs";
 const { verifyExamHistoryCourse } = await loadServerModule("examHistoryHelper");
 const { getStudyPlanHistory } = await loadServerModule("studyPlanHistoryHelper");
 
+test("history can return verified study-plan rows without waiting for name lookups", async (context) => {
+  const previousFetch = globalThis.fetch;
+  const previousBase = process.env.PSC_API_BASE_URL;
+  const previousKey = process.env.PSC_API_KEY;
+  process.env.PSC_API_BASE_URL = "https://deferred-names.example.invalid";
+  process.env.PSC_API_KEY = "test-key";
+  context.after(() => {
+    globalThis.fetch = previousFetch;
+    if (previousBase === undefined) delete process.env.PSC_API_BASE_URL;
+    else process.env.PSC_API_BASE_URL = previousBase;
+    if (previousKey === undefined) delete process.env.PSC_API_KEY;
+    else process.env.PSC_API_KEY = previousKey;
+  });
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return Response.json({ status: true, details: [
+      { id: 910, uid: 93, cid: 2, exam_id: 911, exam_type: "studyplan" },
+    ] });
+  };
+  const history = await getStudyPlanHistory({ uid: 93, cid: 2, resolveNames: false });
+  assert.equal(history.total, 1);
+  assert.equal(history.courseFilterVerified, true);
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].endsWith("/getUserExamsList"));
+});
+
 test("study plan analytics can independently verify an attempt while rejecting mismatches", async (context) => {
   const previousFetch = globalThis.fetch;
   const previousBase = process.env.PSC_API_BASE_URL;

@@ -9,9 +9,6 @@ import {
 } from "@/lib/pscSlug";
 
 export default function MockStartButton({
-  examId,
-  uid,
-  cid,
   title = "",
   governmentExamsSlug = "kerala-psc",
 }) {
@@ -27,18 +24,6 @@ export default function MockStartButton({
         href={{
           pathname:
             `/government-exams-coaching/${governmentExamsSlug}/mock-tests/${createSlug(title)}/start`,
-
-          query: {
-            examId: String(examId),
-            uid:
-              String(uid),
-
-            cid:
-              String(cid),
-
-            title:
-              title,
-          },
         }}
         className="
           group

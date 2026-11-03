@@ -1,5 +1,6 @@
 import {
   notFound,
+  redirect,
 } from "next/navigation";
 
 import {
@@ -11,11 +12,11 @@ import {
 } from "@/lib/auth/getStudentSession";
 
 import {
-  getScertFolders,
-  getScertTestsByClassId,
+  getScertTestBySlug,
   getScertExamDetails,
   getScertQuestions,
 } from "@/lib/scertHelper";
+import { createScertSlug } from "@/lib/scertSlug";
 import ScertExamClient from "../../../start/components/ScertExamClient";
 
 
@@ -29,86 +30,6 @@ export const metadata = {
     follow: false,
   },
 };
-
-function createSlug(
-  value = ""
-) {
-  return String(value)
-    .toLowerCase()
-    .trim()
-    .replace(
-      /[^a-z0-9]+/g,
-      "-"
-    )
-    .replace(
-      /^-+|-+$/g,
-      ""
-    );
-}
-
-async function findScertTestBySlug(
-  testSlug,
-  courseCid
-) {
-  const foldersResult =
-    await getScertFolders({
-      uid: 0,
-      cid: courseCid,
-      offset: 0,
-    });
-
-  const folders =
-    Array.isArray(
-      foldersResult?.data
-    )
-      ? foldersResult.data
-      : [];
-
-  for (
-    const folder of folders
-  ) {
-    const classId =
-      folder?.id;
-
-    if (!classId) {
-      continue;
-    }
-
-    const result =
-      await getScertTestsByClassId({
-        uid: 0,
-        classId,
-        filter: 0,
-      });
-
-    const tests =
-      Array.isArray(
-        result?.data
-      )
-        ? result.data
-        : [];
-
-    const test =
-      tests.find(
-        (item) =>
-          createSlug(
-            item?.exam_name
-          ) ===
-          testSlug
-      );
-
-    if (test) {
-      return {
-        classId,
-        test,
-        examId:
-          test.id,
-      };
-    }
-  }
-
-  return null;
-}
 
 export default async function ScertStartPage({
   params,
@@ -142,11 +63,13 @@ export default async function ScertStartPage({
     query?.pauseId ||
     null;
 
-  const selected =
-    await findScertTestBySlug(
-      testSlug,
-      config.cid
-    );
+  const selected = await getScertTestBySlug({
+    uid: 0,
+    cid: config.cid,
+    slug: testSlug,
+    classId: query?.classId,
+    examId: query?.examId,
+  });
 
   if (!selected) {
     notFound();
@@ -156,6 +79,25 @@ export default async function ScertStartPage({
     classId,
     examId,
   } = selected;
+  const canonicalSlug = createScertSlug(selected.test?.exam_name);
+  const retainedQuery = new URLSearchParams();
+  for (const key of ["mode", "pauseId", "guestAction"]) {
+    const value = query?.[key];
+    if (value != null && value !== "") {
+      retainedQuery.set(key, String(value));
+    }
+  }
+
+  if (
+    canonicalSlug !== testSlug ||
+    query?.classId ||
+    query?.examId
+  ) {
+    const suffix = retainedQuery.toString();
+    redirect(
+      `/government-exams-coaching/${encodeURIComponent(governmentExamsSlug)}/scert-tests/tests/${canonicalSlug}/start${suffix ? `?${suffix}` : ""}`
+    );
+  }
 
   const [
     detailsResult,
