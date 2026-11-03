@@ -179,8 +179,8 @@ export default function CourseChoiceModal({
             top-5
             z-20
             flex
-            h-10
-            w-10
+            h-8
+            w-8
             items-center
             justify-center
             rounded-full
@@ -197,7 +197,7 @@ export default function CourseChoiceModal({
             hover:text-slate-800
           "
         >
-          <X size={18} />
+          <X size={16} />
         </button>
 
         <div
@@ -220,8 +220,8 @@ export default function CourseChoiceModal({
               className="
                 mx-auto
                 flex
-                h-14
-                w-14
+                h-12
+                w-12
                 items-center
                 justify-center
                 rounded-[18px]
@@ -232,57 +232,28 @@ export default function CourseChoiceModal({
               "
             >
               <BookOpenCheck
-                size={27}
+                size={25}
                 strokeWidth={2}
               />
             </div>
 
-            <p
-              className="
-                mt-4
-                text-[11px]
-                font-extrabold
-                uppercase
-                tracking-[0.18em]
-                text-[#017dc0]
-              "
-            >
-              One more step
-            </p>
+      
 
             <h2
               className="
                 mt-2
-                text-[27px]
+                text-[22px]
                 font-extrabold
                 tracking-[-0.04em]
                 text-[#071b59]
 
-                sm:text-[34px]
+                sm:text-[32px]
               "
             >
               Choose Your Exam
               Category
             </h2>
 
-            <p
-              className="
-                mx-auto
-                mt-2
-                max-w-[540px]
-                text-[13px]
-                leading-6
-                text-slate-500
-
-                sm:text-[14px]
-              "
-            >
-              Select the
-              government exam
-              category you want
-              to start preparing
-              for.
-            </p>
           </div>
 
           {/* COURSE CARDS */}
@@ -470,28 +441,6 @@ export default function CourseChoiceModal({
 
           {/* FOOTER */}
 
-          <div
-            className="
-              mt-5
-              flex
-              items-center
-              justify-center
-              gap-2
-              text-center
-              text-[11px]
-              text-slate-400
-            "
-          >
-            <CheckCircle2
-              size={14}
-              className="
-                text-emerald-500
-              "
-            />
-
-            You can explore other
-            exam categories later.
-          </div>
         </div>
       </div>
     </div>,

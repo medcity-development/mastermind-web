@@ -16,7 +16,7 @@ export default function MobileHeroContent() {
         pt-10
         sm:px-6
         sm:pb-16
-        sm:pt-12 mt-24
+        sm:pt-12 mt-16
       "
     >
       <div className="w-full text-center">
@@ -125,7 +125,7 @@ export default function MobileHeroContent() {
           "
         >
           <Link
-            href="/register"
+            href="/login"
             className="
               group
               inline-flex
@@ -149,7 +149,7 @@ export default function MobileHeroContent() {
               hover:-translate-y-1
             "
           >
-            Register Now
+            Login
 
             <span
               className="
@@ -163,7 +163,7 @@ export default function MobileHeroContent() {
           </Link>
 
           <Link
-            href="#courses"
+            href="/contact"
             className="
               group
               inline-flex
@@ -185,7 +185,7 @@ export default function MobileHeroContent() {
               hover:bg-white/[0.14]
             "
           >
-            Explore Courses
+            Contact Us
 
             <span
               className="
