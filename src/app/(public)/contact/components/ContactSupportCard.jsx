@@ -70,33 +70,35 @@ import {
                   text-[#7183a3]
                 "
               >
-                Chat with our support team
+                Contact our support team
                 for instant help.
               </p>
             </div>
           </div>
   
-          <button
-            type="button"
+          <a
+            href="https://wa.me/919645070404"
+            target="_blank"
+            rel="noopener noreferrer"
             className="
               flex
               items-center
               justify-center
               gap-2
               rounded-full
-              bg-[#e7f3ff]
+              bg-[#824387]
               px-5
               py-2.5
               text-[11px]
               font-bold
-              text-[#087ee9]
+              text-white
               transition
               hover:bg-[#d8ecff]
             "
           >
-            Chat Now
+            Contact Now
             <ArrowRight className="h-3.5 w-3.5" />
-          </button>
+          </a>
         </div>
       </section>
     );

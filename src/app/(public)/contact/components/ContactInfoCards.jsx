@@ -10,7 +10,7 @@ const items = [
     icon: Phone,
     title: "Call Us",
     text: "Speak to our support team",
-    value: "+91 9846 123 456",
+    value: "+91 9645070404",
     iconBg:
       "from-[#164fa5] to-[#017cc0]",
     glow: "bg-[#00b5e8]/20",
@@ -21,7 +21,7 @@ const items = [
     icon: Mail,
     title: "Email Us",
     text: "Send us your queries",
-    value: "hello@mastermindpsc.com",
+    value: "mastermindpscmedia@gmail.com",
     iconBg:
       "from-[#f13873] to-[#c72c67]",
     glow: "bg-[#f13873]/20",
@@ -32,7 +32,7 @@ const items = [
     icon: MapPin,
     title: "Visit Us",
     text: "Our office location",
-    value: "Kochi, Kerala, India",
+    value: "T.C.No. 82/5176, 3rd floor, PAN AFRICAN PLAZA, Puthenchanthai, M.G.Road, Trivandrum  695001",
     iconBg:
       "from-[#017cc0] to-[#00b5e8]",
     glow: "bg-[#00b5e8]/20",

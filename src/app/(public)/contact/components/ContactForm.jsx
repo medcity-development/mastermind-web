@@ -89,11 +89,11 @@ export default function ContactForm() {
           </p>
         </div>
 
-        <form className="mt-5 space-y-3" onSubmit={handleSubmit}>
+        <form className="mt-7 space-y-3" onSubmit={handleSubmit}>
           <div
             className="
             grid
-            gap-3
+            gap-5
             sm:grid-cols-2
           "
           >
@@ -153,12 +153,10 @@ export default function ContactForm() {
             items-center
             justify-center
             gap-2
-            rounded-full
-            bg-gradient-to-r
-            from-[#087ee9]
-            to-[#075ee7]
+            rounded-2xl
+            bg-gradient-to-br from-[#017cc0] to-[#00b5e8]
             px-5
-            py-3
+            py-4
             text-xs
             font-bold
             text-white
@@ -166,7 +164,7 @@ export default function ContactForm() {
             transition
             hover:-translate-y-0.5
             disabled:cursor-not-allowed
-            disabled:opacity-60
+            disabled:opacity-60 mt-5
           "
             disabled={isSubmitting}
             type="submit"

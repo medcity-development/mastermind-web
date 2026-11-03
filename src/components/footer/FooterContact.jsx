@@ -8,13 +8,13 @@ import {
 
 const CONTACT = {
   phone:
-    "+91 98765 43210",
+    "+91 9645070404",
 
   email:
-    "info@mastermindacademy.in",
+    "mastermindpscmedia@gmail.com",
 
   location:
-    "Kerala, India",
+    "T.C.No. 82/5176, 3rd floor, PAN AFRICAN PLAZA, Puthenchanthai, M.G.Road, Trivandrum  695001",
 };
 
 export default function FooterContact() {

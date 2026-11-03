@@ -18,7 +18,7 @@ export default function ContactHero() {
         via-[#eef7ff]
         to-[#f7f2ff]
         px-5
-        py-8
+        py-5
         sm:px-7
         lg:px-9
         lg:py-10
