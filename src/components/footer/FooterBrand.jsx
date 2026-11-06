@@ -20,7 +20,7 @@ export default function FooterBrand() {
           className="
             relative
             h-[58px]
-            w-[76px]
+            w-[76px] bg-white rounded-xl shadow-sm
           "
         >
           <Image
@@ -30,7 +30,6 @@ export default function FooterBrand() {
             sizes="76px"
             className="
               object-contain
-              object-left
             "
           />
         </div>

@@ -242,7 +242,7 @@ export default function CourseChoiceModal({
             <h2
               className="
                 mt-2
-                text-[22px]
+                text-[18px]
                 font-extrabold
                 tracking-[-0.04em]
                 text-[#071b59]
@@ -314,13 +314,15 @@ export default function CourseChoiceModal({
                     >
                       <span
                         className={`
-                          flex
-                          h-14
-                          w-14
+                          flex h-10 w-10
+                          sm:h-14
+                          sm:w-14
                           shrink-0
                           items-center
                           justify-center
-                          rounded-[16px]
+                          rounded-full
+                          transition-all
+                          duration-300
 
                           ${course.iconBg}
                           ${course.iconColor}
@@ -379,7 +381,7 @@ export default function CourseChoiceModal({
                     <h3
                       className="
                         mt-1
-                        text-[22px]
+                        text-[18px]
                         font-extrabold
                         tracking-[-0.03em]
                         text-[#071b59]

@@ -230,7 +230,7 @@ export default function IntroContent() {
         </Link>
 
         <Link
-          href="/about"
+          href="/about-us"
           className="
             text-[12px]
             font-semibold

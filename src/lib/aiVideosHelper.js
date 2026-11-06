@@ -1,4 +1,4 @@
-// src/lib/aiVideosHelper.js
+// src/lib/aiVideosHelper.js -----to display ai video reels
 
 import "server-only";
 
