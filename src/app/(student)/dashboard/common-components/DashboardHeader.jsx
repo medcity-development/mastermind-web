@@ -638,7 +638,7 @@ export default function DashboardHeader({
 
           <button
             type="button"
-            aria-label="View purchased packages"
+            aria-label={purchasesCount == null ? "View purchased packages" : `View purchased packages (${purchasesCount} purchases)`}
             aria-haspopup="dialog"
             onClick={onPurchasesClick}
             className="
@@ -671,7 +671,7 @@ export default function DashboardHeader({
               size={18}
               strokeWidth={1.9}
             />
-            {purchasesCount !== null ? (
+            {Number.isSafeInteger(purchasesCount) && purchasesCount >= 0 ? (
               <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[9px] font-extrabold leading-none text-white">
                 {purchasesCount > 99 ? "99+" : purchasesCount}
               </span>

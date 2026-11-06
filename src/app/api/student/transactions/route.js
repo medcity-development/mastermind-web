@@ -493,7 +493,7 @@ export async function GET(request) {
 
   return reply({
     status: true,
-    data: ownedTransactions,
+    ...(searchParams.get("countOnly") === "true" ? {} : { data: ownedTransactions }),
     count: ownedTransactions.length,
   });
 }

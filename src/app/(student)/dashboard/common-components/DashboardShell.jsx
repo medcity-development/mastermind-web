@@ -171,12 +171,32 @@ export default function DashboardShell({
   /* =======================================================
      PURCHASES
 
-     Do not automatically fetch all transactions
-     on every dashboard mount.
-
-     PurchasedPackagesModal loads transactions
-     when the user opens it.
+     Load the badge independently of opening the purchases dialog.
   ======================================================= */
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadPurchasesCount() {
+      try {
+        const response = await fetch("/api/student/transactions?countOnly=true", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const result = await response.json();
+        if (!response.ok || result?.status !== true ||
+            !Number.isSafeInteger(result.count) || result.count < 0) return;
+        if (!controller.signal.aborted) setPurchasesCount(result.count);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.warn("Unable to load purchase count:", error?.message);
+        }
+      }
+    }
+
+    void loadPurchasesCount();
+    return () => controller.abort();
+  }, [user?.uid, user?.id]);
 
   const handleTransactionsLoaded =
     useCallback((transactions) => {
