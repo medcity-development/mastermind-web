@@ -235,19 +235,23 @@ export default function ExamHistoryClient({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="text-base font-bold text-[#102c57]">Your attempts</h2><p className="mt-1 text-xs text-slate-500">Finished and paused exams, all in one place.</p></div>
+        <div><h2 className="text-base font-bold text-slate-800">Your attempts</h2><p className="mt-1 text-xs text-slate-500">Finished and paused exams, all in one place.</p></div>
         <div className="flex items-center gap-3">
-        <label htmlFor="history-course" className="shrink-0 text-xs font-medium text-slate-800">Course</label>
+       
         <select
           id="history-course"
           value={historyScope}
           onChange={(event) => { setHistoryScope(event.target.value); setCurrentPage(1); }}
-          className="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-purple-200 px-4 py-2 text-xs font-semibold text-[#123b75] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-44"
+          className="min-h-11 w-full min-w-0 rounded-xl bg-gradient-to-r
+  from-[#2e64ca]/10
+  via-[#1d68da]/10
+  to-[#ca53ce]/10
+  text-black px-4 py-2 text-xs font-semibold text-[#123b75] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-44"
         >
-          <option value="all" className="text-black bg-gray-300">
+          <option value="all" className="text-black bg-gray-50">
             All courses
           </option>
-          <option value="course" className="text-black bg-gray-300">{examName}</option>
+          <option value="course" className="text-black bg-gray-50">{examName}</option>
         </select>
         </div>
       </div>
