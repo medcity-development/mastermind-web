@@ -28,7 +28,7 @@ export default function usePausedExamHistory({ cid }) {
       while (next < HISTORY_TYPES.length && !controller.signal.aborted && !stopped) {
         const type = HISTORY_TYPES[next++];
         try {
-          const response = await fetch(type === "studyplan" ? "/api/exam-attempt/studyplan-history" : "/api/exam-attempt/history", {
+          const response = await fetch("/api/exam-attempt/paused-history", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ cid, exam_type: type }), cache: "no-store", signal: controller.signal,
           });

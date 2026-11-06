@@ -8,6 +8,8 @@ import {
 } from "react";
 
 import ExamHistoryHeader from "./components/ExamHistoryHeader";
+import { LoaderCircle, Layers3, CircleCheck, CirclePause } from "lucide-react";
+import { isFinishedExamAttempt, isPausedExamAttempt } from "@/lib/examAttemptStatus";
 import ExamHistoryTabs from "./components/ExamHistoryTabs";
 import AttemptedExamTable from "./components/AttemptedExamTable";
 import ExamHistoryPagination from "./components/ExamHistoryPagination";
@@ -26,21 +28,22 @@ import {
   positiveId,
 } from "./utils/examHistoryCore";
 
-import { getAttemptExamType } from "./utils/examHistoryUtils";
+import { getAttemptExamType, getExamTypeLabel } from "./utils/examHistoryUtils";
 
 import useExamHistory from "./hooks/useExamHistory";
 import useVisibleExamNames from "./hooks/useVisibleExamNames";
 
 export default function ExamHistoryClient({
   cid,
+  uid,
   examTypes = [],
   examName = "",
   governmentExamsSlug = "",
-  hasActivePlan = false,
 }) {
   const safeCid = positiveId(cid);
 
   const [activeTab, setActiveTab] = useState("all");
+  const [historyScope, setHistoryScope] = useState("all");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -48,6 +51,9 @@ export default function ExamHistoryClient({
     attempts,
     loading,
     historyIncomplete,
+    failedTypes,
+    unverifiedTypes,
+    unresolvedCount,
     rateLimited,
     loadedCount,
     totalTypes,
@@ -56,7 +62,9 @@ export default function ExamHistoryClient({
     updateName,
   } = useExamHistory({
     cid: safeCid,
+    uid,
     examTypes,
+    scope: historyScope,
   });
 
   const tabs = useMemo(
@@ -190,24 +198,59 @@ export default function ExamHistoryClient({
   );
 
   const emptyMessage =
-    attempts.length === 0
+    historyIncomplete && attempts.length === 0
+      ? "Exam history is unavailable"
+      : attempts.length === 0
       ? "No exams attempted yet"
       : "No exams match your search or filter.";
 
   const emptyDescription =
-    attempts.length === 0
+    historyIncomplete && attempts.length === 0
+      ? "We could not load a complete history. Please try refreshing in a moment."
+      : attempts.length === 0
       ? "Attempt an exam to see your scores and analysis here."
       : "Try changing your search or selecting a different exam type.";
 
   return (
     <div className="w-full min-w-0 space-y-5">
       <ExamHistoryHeader
-        examName={examName}
+        examName={historyScope === "all" ? "All courses" : examName}
         search={search}
         onSearch={handleSearch}
         loading={loading}
         onRefresh={refresh}
       />
+
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        {[
+          { label: "Attempts", value: attempts.length, Icon: Layers3, color: "bg-blue-50 text-blue-600" },
+          { label: "Completed", value: attempts.filter(isFinishedExamAttempt).length, Icon: CircleCheck, color: "bg-emerald-50 text-emerald-600" },
+          { label: "Paused", value: attempts.filter(isPausedExamAttempt).length, Icon: CirclePause, color: "bg-amber-50 text-amber-600" },
+        ].map(({ label, value, Icon, color }) => (
+          <div key={label} className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11 ${color}`}><Icon size={20} strokeWidth={1.7} aria-hidden="true" /></span>
+            <div><p className="text-xl font-bold tabular-nums tracking-tight text-[#102c57] sm:text-2xl">{loading ? <span className="inline-block h-6 w-8 animate-pulse rounded bg-slate-100" aria-label="Loading" /> : value}</p><p className="mt-0.5 text-[10px] font-medium text-slate-500 sm:text-xs">{label}</p></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-base font-bold text-[#102c57]">Your attempts</h2><p className="mt-1 text-xs text-slate-500">Finished and paused exams, all in one place.</p></div>
+        <div className="flex items-center gap-3">
+        <label htmlFor="history-course" className="shrink-0 text-xs font-medium text-slate-800">Course</label>
+        <select
+          id="history-course"
+          value={historyScope}
+          onChange={(event) => { setHistoryScope(event.target.value); setCurrentPage(1); }}
+          className="min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-purple-200 px-4 py-2 text-xs font-semibold text-[#123b75] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:w-44"
+        >
+          <option value="all" className="text-black bg-gray-300">
+            All courses
+          </option>
+          <option value="course" className="text-black bg-gray-300">{examName}</option>
+        </select>
+        </div>
+      </div>
 
       <div className="min-w-0 max-w-full overflow-x-auto">
         <ExamHistoryTabs
@@ -217,40 +260,49 @@ export default function ExamHistoryClient({
         />
       </div>
 
-      {loading && attempts.length > 0 && (
-        <p
-          role="status"
-          className="text-xs text-slate-500"
-        >
-          Updating exam history ({loadedCount} of{" "}
-          {totalTypes} exam types processed)...
-        </p>
-      )}
-
-      {historyIncomplete && !loading && attempts.length > 0 && (
-        <p
+      {historyIncomplete && !loading && (
+        <div
           role="status"
           className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
         >
-          {rateLimited
-            ? "The exam history server is rate-limited. Please wait before refreshing. Previously loaded attempts remain available."
-            : "Some exam history could not be refreshed. Previously loaded attempts remain available."}
-        </p>
+          {rateLimited ? (
+            <p>The exam history server is rate-limited. Please wait before refreshing.</p>
+          ) : failedTypes.length > 0 ? (
+            <p>Could not refresh {failedTypes.map(getExamTypeLabel).join(", ")}. Please try again.</p>
+          ) : null}
+          {unverifiedTypes.length > 0 && (
+            <p>
+              {unresolvedCount > 0 ? `${unresolvedCount} saved attempt${unresolvedCount === 1 ? "" : "s"}` : "Some saved attempts"}{" "}
+              could not be matched to this course ({unverifiedTypes.map(getExamTypeLabel).join(", ")}).
+              {" "}Only verified attempts are shown. Refresh to retry verification.
+            </p>
+          )}
+          {failedTypes.length > 0 && attempts.length > 0 && (
+            <p className="mt-1">Available attempts are still shown below.</p>
+          )}
+        </div>
       )}
 
       <section className="w-full min-w-0 overflow-hidden rounded-[24px] border border-[#d8e5f4] bg-white shadow-[0_15px_40px_rgba(15,23,42,0.05)]">
+        {loading ? (
+          <div role="status" aria-live="polite" className="flex min-h-72 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
+            <LoaderCircle size={36} aria-hidden="true" className="text-[#017dc0] motion-safe:animate-spin" />
+            <div>
+              <p className="text-sm font-semibold text-[#082e5a]">Loading your exams...</p>
+              <p className="mt-2 text-xs text-slate-500">{loadedCount} of {totalTypes} exam types checked</p>
+            </div>
+          </div>
+        ) : (
         <AttemptedExamTable
           attempts={visibleAttempts}
-          loading={
-            loading && attempts.length === 0
-          }
           startIndex={startIndex}
           getAnalysisHref={getAnalysisHref}
           emptyMessage={emptyMessage}
           emptyDescription={emptyDescription}
         />
+        )}
 
-        {filteredAttempts.length > 0 && (
+        {!loading && filteredAttempts.length > 0 && (
           <ExamHistoryPagination
             currentPage={safePage}
             totalPages={totalPages}

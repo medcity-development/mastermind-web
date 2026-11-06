@@ -24,12 +24,15 @@ import {
   getCachedHistory,
   loadHistoryType,
 } from "../services/examHistoryService";
+import { getHistoryLoadStatus } from "../utils/historyLoadStatus";
 
-const MAX_WORKERS = 4;
+const MAX_WORKERS = 2;
 
 export default function useExamHistory({
   cid,
+  uid,
   examTypes = [],
+  scope = "course",
 }) {
   const safeCid = positiveId(cid);
 
@@ -53,8 +56,9 @@ export default function useExamHistory({
 
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [historyIncomplete, setHistoryIncomplete] =
-    useState(false);
+  const [loadStatus, setLoadStatus] = useState(() =>
+    getHistoryLoadStatus(new Map())
+  );
   const [rateLimited, setRateLimited] =
     useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -62,14 +66,13 @@ export default function useExamHistory({
 
   const runRef = useRef(0);
   const loadingRef = useRef(false);
-  const scopeRef = useRef("");
 
   const refresh = useCallback(() => {
     if (loadingRef.current) return;
 
     if (cooldownSeconds() > 0) {
       setRateLimited(true);
-      setHistoryIncomplete(true);
+      setLoadStatus((previous) => ({ ...previous, historyIncomplete: true }));
       return;
     }
 
@@ -108,38 +111,19 @@ export default function useExamHistory({
   );
 
   useEffect(() => {
-    const scope = `${safeCid ?? "none"}:${typesKey}`;
-
-    if (scopeRef.current !== scope) {
-      scopeRef.current = scope;
-      setAttempts([]);
-    }
-
     const runId = ++runRef.current;
     let cancelled = false;
 
     const isCurrent = () =>
       !cancelled && runRef.current === runId;
 
-    if (!safeCid) {
-      loadingRef.current = false;
-      setAttempts([]);
-      setLoading(false);
-      setHistoryIncomplete(true);
-      setLoadedCount(0);
-
-      return () => {
-        cancelled = true;
-      };
-    }
-
     const loaded = new Map();
 
     for (const type of types) {
-      const cached = getCachedHistory(safeCid, type);
+      const cached = getCachedHistory(safeCid, type, scope, uid);
 
       if (cached) {
-        loaded.set(type, cached.records);
+        loaded.set(type, cached);
       }
     }
 
@@ -147,7 +131,7 @@ export default function useExamHistory({
       if (!isCurrent()) return;
 
       const merged = uniqueAttempts(
-        [...loaded.values()].flat()
+        [...loaded.values()].flatMap((result) => result.records)
       );
 
       const named = applyCachedNames(
@@ -159,9 +143,19 @@ export default function useExamHistory({
     }
 
     async function run() {
+      if (!isCurrent()) return;
+      if (!safeCid) {
+        loadingRef.current = false;
+        setAttempts([]);
+        setLoading(false);
+        setLoadStatus(getHistoryLoadStatus(new Map(), types));
+        setLoadedCount(0);
+        return;
+      }
+
       const force = refreshKey > 0;
 
-      let incomplete = false;
+      const failedTypes = new Set();
       let limited = false;
 
       const queue = [];
@@ -169,12 +163,10 @@ export default function useExamHistory({
       for (const type of types) {
         const cached = getCachedHistory(
           safeCid,
-          type
+          type,
+          scope,
+          uid
         );
-
-        if (cached?.partialVerification) {
-          incomplete = true;
-        }
 
         if (
           force ||
@@ -191,7 +183,7 @@ export default function useExamHistory({
         types.length - queue.length
       );
 
-      setHistoryIncomplete(incomplete);
+      setLoadStatus(getHistoryLoadStatus(loaded));
       setRateLimited(false);
 
       const needsLoading = queue.length > 0;
@@ -208,7 +200,7 @@ export default function useExamHistory({
       async function worker() {
         while (isCurrent() && !stopped) {
           if (cooldownSeconds() > 0) {
-            incomplete = true;
+            for (const type of queue.slice(index)) failedTypes.add(type);
             limited = true;
             stopped = true;
             return;
@@ -227,21 +219,19 @@ export default function useExamHistory({
               cid: safeCid,
               examType: type,
               force,
+              scope,
+              uid,
             });
 
             if (!isCurrent()) return;
 
-            loaded.set(type, result.records);
-
-            if (result.partialVerification) {
-              incomplete = true;
-            }
+            loaded.set(type, result);
 
             publish();
           } catch (error) {
             if (!isCurrent()) return;
 
-            incomplete = true;
+            failedTypes.add(type);
 
             if (
               error?.rateLimited ||
@@ -249,6 +239,7 @@ export default function useExamHistory({
             ) {
               limited = true;
               stopped = true;
+              for (const pendingType of queue.slice(index)) failedTypes.add(pendingType);
             } else {
               console.warn(
                 "[Exam History] Failed:",
@@ -286,12 +277,13 @@ export default function useExamHistory({
 
       loadingRef.current = false;
 
-      setHistoryIncomplete(incomplete);
+      setLoadStatus(getHistoryLoadStatus(loaded, [...failedTypes]));
       setRateLimited(limited);
       setLoading(false);
     }
 
-    run().catch((error) => {
+    // Start after effect setup so a discarded Strict Mode run cannot publish.
+    Promise.resolve().then(run).catch((error) => {
       if (!isCurrent()) return;
 
       loadingRef.current = false;
@@ -301,19 +293,19 @@ export default function useExamHistory({
         error
       );
 
-      setHistoryIncomplete(true);
+      setLoadStatus(getHistoryLoadStatus(loaded, types));
       setLoading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [safeCid, types, typesKey, refreshKey]);
+  }, [safeCid, types, typesKey, refreshKey, scope, uid]);
 
   return {
     attempts,
     loading,
-    historyIncomplete,
+    ...loadStatus,
     rateLimited,
     loadedCount,
     totalTypes: types.length,

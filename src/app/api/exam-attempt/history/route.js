@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { selectStudentAttempts } from "@/lib/studentAttemptHistory";
 
 import {
   getStudentSession,
@@ -236,6 +237,22 @@ export async function POST(request) {
       : Array.isArray(result.data)
         ? result.data
         : [];
+
+    if (body?.scope === "all") {
+      const attempts = selectStudentAttempts(rows, uid, examType);
+      return reply({
+        status: true,
+        exam_type: examType,
+        historyScope: "all",
+        userFilterVerified: true,
+        courseFilterVerified: false,
+        details: attempts,
+        data: attempts,
+        total: attempts.length,
+        partialVerification: false,
+        unresolvedCount: 0,
+      });
+    }
 
     const candidates = [];
     const seen = new Set();

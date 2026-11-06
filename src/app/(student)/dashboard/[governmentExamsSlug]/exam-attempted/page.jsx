@@ -187,6 +187,7 @@ export default async function ExamHistoryPage({
       className="
         min-h-screen
         w-full
+        min-w-0
         bg-[#f4f7fc]
         px-3
         py-5
@@ -200,12 +201,14 @@ export default async function ExamHistoryPage({
         className="
           mx-auto
           w-full
+          min-w-0
           max-w-[1450px]
         "
       >
         <ExamHistoryClient
           key={`${governmentExamsSlug}-${cid}`}
           cid={cid}
+          uid={uid}
           examTypes={examTypes}
           examName={examName}
           governmentExamsSlug={

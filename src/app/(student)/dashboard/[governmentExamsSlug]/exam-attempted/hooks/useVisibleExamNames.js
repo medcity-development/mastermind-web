@@ -34,7 +34,9 @@ export default function useVisibleExamNames({
     callbackRef.current = onNameResolved;
   }, [onNameResolved]);
 
-  attemptsRef.current = attempts;
+  useEffect(() => {
+    attemptsRef.current = attempts;
+  }, [attempts]);
 
   const missingKeys = useMemo(() => {
     if (!safeCid) return "";

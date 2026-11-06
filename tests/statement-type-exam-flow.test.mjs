@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { loadServerModule } from "./helpers/load-server-module.mjs";
 
 const load = async (path) =>
   import(
@@ -16,7 +17,7 @@ const { calculateExamScore } =
 const { selectMockPausedAttempt } =
   await load("../src/lib/mockPausedAttempt.js");
 const { getPausedAttemptIds } =
-  await load("../src/lib/pausedExamAttempts.js");
+  await loadServerModule("pausedExamAttempts");
 
 test("Statement Type pause saves progress without publishing scores", () => {
   const payload = buildAttemptPayload(

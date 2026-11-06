@@ -38,8 +38,8 @@ function putCache(map, key, value, maxEntries) {
   }
 }
 
-function historyKey(cid, type) {
-  return `${cid}:${normalizeType(type)}`;
+function historyKey(cid, type, scope = "course", uid = "session") {
+  return `${uid}:${scope}:${cid}:${normalizeType(type)}`;
 }
 
 export function cooldownSeconds() {
@@ -124,17 +124,19 @@ function checkRateLimit(response, data) {
   throw limitedError();
 }
 
-export function getCachedHistory(cid, type) {
-  return historyCache.get(historyKey(cid, type)) ?? null;
+export function getCachedHistory(cid, type, scope = "course", uid) {
+  return historyCache.get(historyKey(cid, type, scope, uid)) ?? null;
 }
 
 export async function loadHistoryType({
   cid,
   examType,
   force = false,
+  scope = "course",
+  uid,
 }) {
   const type = normalizeType(examType);
-  const key = historyKey(cid, type);
+  const key = historyKey(cid, type, scope, uid);
 
   const cached = historyCache.get(key);
   const cachedFailure = historyFailureCache.get(key);
@@ -164,7 +166,7 @@ export async function loadHistoryType({
 
   const promise = (async () => {
     const endpoint =
-      type === "studyplan"
+      type === "studyplan" && scope !== "all"
         ? "/api/exam-attempt/studyplan-history"
         : "/api/exam-attempt/history";
 
@@ -176,6 +178,7 @@ export async function loadHistoryType({
       body: JSON.stringify({
         cid,
         exam_type: type,
+        scope,
       }),
       cache: "no-store",
     });
@@ -190,7 +193,10 @@ export async function loadHistoryType({
       );
     }
 
-    if (data.courseFilterVerified !== true) {
+    const verified = scope === "all"
+      ? data.historyScope === "all" && data.userFilterVerified === true
+      : data.courseFilterVerified === true;
+    if (!verified) {
       throw new Error(
         `${type}: Course verification was not confirmed.`
       );
@@ -204,7 +210,7 @@ export async function loadHistoryType({
         (record) =>
           record &&
           typeof record === "object" &&
-          record._courseVerified === true
+          (scope === "all" ? record._userVerified === true : record._courseVerified === true)
       )
       .map((record) => normalizeRecord(record, type));
 
@@ -214,7 +220,9 @@ export async function loadHistoryType({
         data.partialVerification === true,
       unresolvedCount:
         Number(data.unresolvedCount) || 0,
-      expiresAt: Date.now() + HISTORY_TTL,
+      expiresAt: Date.now() + (data.partialVerification === true
+        ? HISTORY_ERROR_TTL
+        : HISTORY_TTL),
     };
 
     putCache(

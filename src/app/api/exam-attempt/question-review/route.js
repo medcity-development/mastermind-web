@@ -25,6 +25,7 @@ const TYPES = new Set([
   "pqp",
   "scert",
   "topicwise",
+  "tst",
   "studyplan",
 ]);
 
@@ -153,12 +154,12 @@ async function fetchQuestionPaper({
   examId,
   type,
 }) {
-  if (type === "topicwise") {
+  if (type === "topicwise" || type === "tst") {
     const result = await getTopicWiseExamQuestions({
       uid,
       cid,
       examId,
-      examType: "twe",
+      examType: backendHistoryType(type),
     });
 
     if (failed(result)) {

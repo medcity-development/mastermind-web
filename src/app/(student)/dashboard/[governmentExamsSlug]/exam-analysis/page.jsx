@@ -33,6 +33,7 @@ const ALLOWED_EXAM_TYPES = new Set([
   "scert",
   "topicwise",
   "twe",
+  "tst",
 ]);
 
 export default async function ExamAnalysisPage({

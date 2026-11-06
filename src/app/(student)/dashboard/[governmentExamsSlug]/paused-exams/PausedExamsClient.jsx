@@ -70,13 +70,13 @@ export default function PausedExamsClient({ cid, governmentExamsSlug, examName }
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-80 w-80 rounded-full border-[50px] border-white/5" />
           <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200"><span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />{examName} ? Your learning space</p>
+              <p className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200"><span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />{examName} &middot; Your learning space</p>
               <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Pick up where you left off.</h1>
               <p className="mt-2 text-sm leading-6 text-blue-100/80">Resume your paused exams, with your saved progress ready to go.</p>
             </div>
             <div className="flex shrink-0 items-center gap-4 self-start rounded-2xl border border-white/15 bg-white/10 px-5 py-4 sm:self-auto">
               <CirclePause size={28} className="text-cyan-200" />
-              <div><p className="text-2xl font-bold tabular-nums">{paused.length}{loading ? <span className="ml-1 text-sm text-blue-200">?</span> : null}</p><p className="text-[11px] text-blue-100">Paused {paused.length === 1 ? "exam" : "exams"}</p></div>
+              <div><p className="text-2xl font-bold tabular-nums">{loading ? <span className="text-sm text-blue-100">Loading...</span> : paused.length}</p><p className="text-[11px] text-blue-100">Paused {!loading && paused.length === 1 ? "exam" : "exams"}</p></div>
             </div>
           </div>
         </header>
@@ -98,8 +98,17 @@ export default function PausedExamsClient({ cid, governmentExamsSlug, examName }
             </div>
           </div>
           {error && <p role="alert" className="m-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-          {historyIncomplete && <p role="status" className="m-4 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">{rateLimited ? "The server is busy. Please wait before refreshing." : "Some exams could not be loaded. Refresh to try again."}</p>}
-          {loading && <p role="status" className="flex items-center gap-2 px-5 py-3 text-xs text-blue-600"><LoaderCircle size={14} className="motion-safe:animate-spin" />{visible.length ? "Checking for more paused exams?" : "Loading your saved exams?"}</p>}
+          {historyIncomplete && !loading && <p role="status" className="m-4 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">{rateLimited ? "The server is busy. Please wait before refreshing." : "Some exams could not be loaded. Refresh to try again."}</p>}
+          {loading ? (
+            <div role="status" aria-live="polite" className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
+              <LoaderCircle size={32} aria-hidden="true" className="text-blue-600 motion-safe:animate-spin" />
+              <div>
+                <p className="text-sm font-semibold text-[#102c57]">Loading your paused exams...</p>
+                <p className="mt-2 text-xs text-slate-500">Please wait while we check your saved progress.</p>
+              </div>
+            </div>
+          ) : (
+          <>
 
           <table className="block w-full text-left text-sm md:table md:table-fixed">
             <caption className="sr-only">Paused exams, ten exams per page</caption>
@@ -112,7 +121,7 @@ export default function PausedExamsClient({ cid, governmentExamsSlug, examName }
                 return <tr key={key} className="group grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-4 p-5 transition-colors hover:bg-blue-50/30 md:table-row md:p-0">
                   <td className="hidden px-6 py-5 text-xs font-medium tabular-nums text-slate-400 md:table-cell">{String(start + index + 1).padStart(2, "0")}</td>
                   <th scope="row" className="col-span-2 min-w-0 text-left md:px-5 md:py-5">
-                    <div className="flex items-center gap-3"><span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50/60 text-blue-500"><BookOpen size={18} /></span><div className="min-w-0"><p className="break-words text-[13px] font-semibold leading-6 text-[#102c57] [overflow-wrap:anywhere]">{title}</p><p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-normal text-slate-400"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Paused ? Ready to resume</p></div></div>
+                    <div className="flex items-center gap-3"><span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50/60 text-blue-500"><BookOpen size={18} /></span><div className="min-w-0"><p className="break-words text-[13px] font-semibold leading-6 text-[#102c57] [overflow-wrap:anywhere]">{title}</p><p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-normal text-slate-400"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Paused &middot; Ready to resume</p></div></div>
                   </th>
                   <td className="md:px-5 md:py-5"><span className={`inline-flex rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${BADGES[type] || BADGES.mock}`}>{LABELS[type]}</span></td>
                   <td className="text-right md:px-5 md:py-5"><button type="button" aria-label={`Resume ${title}`} onClick={() => resume(row)} disabled={!!opening} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1261c9] to-[#079aca] px-4 text-xs font-semibold text-white shadow-sm transition hover:shadow-[0_5px_16px_-5px_rgba(18,97,201,0.5)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50">{opening === key ? <LoaderCircle size={14} className="motion-safe:animate-spin" /> : <Play size={13} fill="currentColor" />}{opening === key ? "Opening..." : "Resume"}<ArrowUpRight size={13} className="hidden lg:block" /></button></td>
@@ -123,7 +132,7 @@ export default function PausedExamsClient({ cid, governmentExamsSlug, examName }
           {!loading && !visible.length && <div className="px-6 py-14 text-center"><CirclePause size={32} className="mx-auto mb-4 text-blue-300" /><h3 className="font-semibold text-slate-700">{search || filter !== "all" ? "No matching exams" : "You're all caught up"}</h3><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">{search || filter !== "all" ? "Try another name or choose a different exam type." : historyIncomplete ? "Unable to load all paused exams. Please try refreshing." : "When you pause an exam, you can continue it from here."}</p></div>}
 
           <footer className="flex flex-col items-center justify-between gap-4 border-t border-slate-100 bg-slate-50/60 px-4 py-4 lg:flex-row sm:px-6">
-            <p aria-live="polite" className="text-center text-[11px] text-slate-500 sm:text-left">Showing <span className="font-semibold text-slate-700">{filtered.length ? start + 1 : 0}?{Math.min(start + PAGE_SIZE, filtered.length)}</span> of <span className="font-semibold text-slate-700">{filtered.length}</span> exams<span className="ml-2 hidden text-slate-400 lg:inline">? 10 per page</span></p>
+            <p aria-live="polite" className="text-center text-[11px] text-slate-500 sm:text-left">Showing <span className="font-semibold text-slate-700">{filtered.length ? start + 1 : 0}&ndash;{Math.min(start + PAGE_SIZE, filtered.length)}</span> of <span className="font-semibold text-slate-700">{filtered.length}</span> exams<span className="ml-2 hidden text-slate-400 lg:inline">&middot; 10 per page</span></p>
             <nav aria-label="Paused exams pagination" className="flex max-w-full items-center gap-1.5">
               <button type="button" aria-label="Previous page" disabled={current === 1} onClick={() => setPage(current - 1)} className={controlClass}><ChevronLeft size={15} /><span className="hidden lg:inline">Previous</span></button>
               <span className="px-3 text-xs font-medium text-slate-500 sm:hidden">{current} / {pages}</span>
@@ -131,6 +140,8 @@ export default function PausedExamsClient({ cid, governmentExamsSlug, examName }
               <button type="button" aria-label="Next page" disabled={current === pages} onClick={() => setPage(current + 1)} className={controlClass}><span className="hidden lg:inline">Next</span><ChevronRight size={15} /></button>
             </nav>
           </footer>
+          </>
+          )}
         </section>
       </div>
     </main>
