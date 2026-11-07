@@ -7,26 +7,7 @@ import {
 } from "../../common-components/quick-actions/dashboardLearningToolsHelper";
 
 import LearningToolCard from "./LearningToolCard";
-
-function chunkLearningTools(
-  learningTools
-) {
-  const firstRow =
-    learningTools.slice(
-      0,
-      5
-    );
-
-  const secondRow =
-    learningTools.slice(
-      5
-    );
-
-  return {
-    firstRow,
-    secondRow,
-  };
-}
+import styles from "./LearningToolsGrid.module.css";
 
 export default async function LearningToolsGrid({
   config,
@@ -67,20 +48,10 @@ export default async function LearningToolsGrid({
     return null;
   }
 
-  const {
-    firstRow,
-    secondRow,
-  } = chunkLearningTools(
-    learningTools
-  );
-
   return (
     <section
       id="dashboard-learning-tools"
-      className="
-        relative
-        w-full
-      "
+      className={`relative w-full min-w-0 ${styles.container}`}
     >
       <div
         className="
@@ -169,86 +140,13 @@ export default async function LearningToolsGrid({
           </p>
         </div>
 
-        <div
-          className="
-            relative
-            z-10
-            grid
-            grid-cols-2
-            gap-3
-            sm:grid-cols-3
-            lg:hidden
-          "
-        >
-          {learningTools.map(
-            (item) => (
-              <LearningToolCard
-                key={
-                  item?.id ??
-                  item.title
-                }
-                item={item}
-              />
-            )
-          )}
-        </div>
-
-        <div
-          className="
-            relative
-            z-10
-            hidden
-            space-y-3
-            lg:block
-          "
-        >
-          <div
-            className="
-              grid
-              grid-cols-5
-              gap-3
-            "
-          >
-            {firstRow.map(
-              (item) => (
-                <LearningToolCard
-                  key={
-                    item?.id ??
-                    item.title
-                  }
-                  item={item}
-                />
-              )
-            )}
-          </div>
-
-          {secondRow.length > 0 && (
-            <div
-              className="
-                grid
-                gap-3
-              "
-              style={{
-                gridTemplateColumns:
-                  `repeat(${Math.min(
-                    secondRow.length,
-                    7
-                  )}, minmax(0, 1fr))`,
-              }}
-            >
-              {secondRow.map(
-                (item) => (
-                  <LearningToolCard
-                    key={
-                      item?.id ??
-                      item.title
-                    }
-                    item={item}
-                  />
-                )
-              )}
-            </div>
-          )}
+        <div className={`relative z-10 ${styles.grid}`}>
+          {learningTools.map((item) => (
+            <LearningToolCard
+              key={item?.id ?? item.title}
+              item={item}
+            />
+          ))}
         </div>
       </div>
     </section>

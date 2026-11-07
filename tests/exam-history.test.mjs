@@ -215,3 +215,29 @@ test("includes supported Study Plan history with canonical type names", async ()
 test("remaining countdown time cannot fabricate an exam completion time", () => {
   assert.equal(getAttemptEndTimestamp({ start_time: '2026-10-29 10:00:00', paused_time: 45000 }).source, 'missing');
 });
+
+test("invalid completion fields do not hide a valid end time", () => {
+  for (const invalid of [null, undefined, "", " ", 0, "0", "null", "undefined", "0000-00-00 00:00:00", "not-a-date"]) {
+    const attempt = { completed_at: invalid, end_time: "2026-11-07 15:46:00" };
+    assert.equal(getAttemptEndTime(attempt), "07 Nov 2026, 03:46 PM");
+    assert.equal(getAttemptEndTimestamp(attempt).source, "completed");
+  }
+});
+
+test("invalid end time falls through to the existing record-update fallback", () => {
+  assert.deepEqual(getAttemptEndTimestamp({ end_time: "0000-00-00 00:00:00", modified_at: "2026-11-07 15:46:00" }), {
+    value: "2026-11-07 15:46:00", source: "record-updated",
+  });
+});
+
+test("explicit completion takes precedence over later record updates", () => {
+  assert.deepEqual(getAttemptEndTimestamp({ end_time: "2026-11-07 15:46:00", modified_at: "2026-11-08 10:00:00" }), {
+    value: "2026-11-07 15:46:00", source: "completed",
+  });
+});
+
+test("missing completion stays missing instead of inventing a date", () => {
+  assert.deepEqual(getAttemptEndTimestamp({ end_time: "invalid", modified_at: "0", paused_time: 45000 }), {
+    value: null, source: "missing",
+  });
+});

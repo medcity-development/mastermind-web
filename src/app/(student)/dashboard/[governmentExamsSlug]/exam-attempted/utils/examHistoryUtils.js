@@ -364,36 +364,39 @@ export function getAttemptStartTimestamp(attempt) {
 }
 
 export function getAttemptEndTimestamp(attempt) {
-  let value =
-    attempt?.completed_at ??
-    attempt?.completedAt ??
-    attempt?.complete_time ??
-    attempt?.completed_time ??
-    attempt?.finish_time ??
-    attempt?.finishTime ??
-    attempt?.finished_at ??
-    attempt?.finishedAt ??
-    attempt?.submitted_at ??
-    attempt?.submittedAt ??
-    attempt?.submission_time ??
-    attempt?.end_time ??
-    attempt?.endTime ??
-    attempt?.endtime ??
-    attempt?.ended_at ??
-    attempt?.endedAt ??
-    attempt?.modified_at ??
-    attempt?.modifiedAt ??
-    attempt?.updated_at ??
-    attempt?.updatedAt ??
-    attempt?.updatetime ??
-    attempt?.modify_time;
+  // Skip empty and invalid values so they cannot hide a later valid timestamp.
+  const fields = [
+    ["completed_at", "completed"],
+    ["completedAt", "completed"],
+    ["complete_time", "completed"],
+    ["completed_time", "completed"],
+    ["finish_time", "completed"],
+    ["finishTime", "completed"],
+    ["finished_at", "completed"],
+    ["finishedAt", "completed"],
+    ["submitted_at", "completed"],
+    ["submittedAt", "completed"],
+    ["submission_time", "completed"],
+    ["end_time", "completed"],
+    ["endTime", "completed"],
+    ["endtime", "completed"],
+    ["ended_at", "completed"],
+    ["endedAt", "completed"],
+    ["modified_at", "record-updated"],
+    ["modifiedAt", "record-updated"],
+    ["updated_at", "record-updated"],
+    ["updatedAt", "record-updated"],
+    ["updatetime", "record-updated"],
+    ["modify_time", "record-updated"],
+  ];
 
-  if (value && (/^0{4}-0{2}-0{2}/.test(String(value)) || value === "0" || value === "null" || value === "undefined")) {
-    value = null;
+  for (const [field, source] of fields) {
+    const value = attempt?.[field];
+    if (parseExamDate(value)) return getTimestamp(value, source);
   }
 
   // paused_time is remaining time, not elapsed time; it cannot establish completion.
-  return getTimestamp(value, attempt?.modified_at || attempt?.updated_at ? "record-updated" : "completed");
+  return getTimestamp(null, "missing");
 }
 
 export function getAttemptStartTime(attempt) {

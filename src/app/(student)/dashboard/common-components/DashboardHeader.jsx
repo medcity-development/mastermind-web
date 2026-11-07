@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useCallback,
+  useSyncExternalStore,
   useEffect,
   useState,
 } from "react";
@@ -17,7 +19,25 @@ import {
   Search,
   ShoppingCart,
 } from "lucide-react";
+import maleAvatar from "@/app/(public)/profile-setup/images/avatar-male.png";
+import femaleAvatar from "@/app/(public)/profile-setup/images/avatar-female.png";
 import { createSlug } from "@/lib/pscSlug";
+
+function subscribeToAvatar(callback) {
+  window.addEventListener("storage", callback);
+  window.addEventListener("student-profile-updated", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("student-profile-updated", callback);
+  };
+}
+
+function avatarImage(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (/female|woman|girl/.test(normalized)) return femaleAvatar;
+  if (/male|man|boy/.test(normalized)) return maleAvatar;
+  return null;
+}
 
 /* =========================================================
    DASHBOARD HEADER
@@ -51,6 +71,21 @@ export default function DashboardHeader({
       .charAt(0)
       .toUpperCase() ||
     "S";
+
+  const uid = user?.uid ?? user?.id;
+  const getSavedAvatar = useCallback(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("student-profile-avatar") || "null");
+      return uid != null && saved?.uid === String(uid) ? String(saved.avatar || "") : "";
+    } catch {
+      return "";
+    }
+  }, [uid]);
+  const savedAvatar = useSyncExternalStore(subscribeToAvatar, getSavedAvatar, () => "");
+  const profile = user?.profile ?? user;
+  const avatar = avatarImage(savedAvatar) || avatarImage(
+    profile?.avatar ?? profile?.gender ?? profile?.sex ?? profile?.avatar_type ?? profile?.avatarType
+  );
 
   const profileHref =
     config?.slug
@@ -303,6 +338,7 @@ export default function DashboardHeader({
     >
       <div
         className="
+          relative
           flex
           h-[85px]
           items-center
@@ -565,7 +601,7 @@ export default function DashboardHeader({
             gap-3
           "
         >
-          <details className="group relative">
+          <details className="group sm:relative">
             <summary
               aria-label={`Switch dashboard, current dashboard ${config?.shortName || config?.name}`}
               className="flex h-9 w-9 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-0 text-[#071b59] shadow-sm transition hover:border-blue-200 hover:bg-blue-50 sm:h-10 sm:w-auto sm:justify-start sm:px-3 [&::-webkit-details-marker]:hidden"
@@ -576,7 +612,7 @@ export default function DashboardHeader({
               </span>
               <ChevronDown size={14} className="hidden text-slate-400 transition group-open:rotate-180 sm:block" />
             </summary>
-            <div className="absolute right-0 top-full z-50 mt-2 w-[230px] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
+            <div className="absolute right-4 top-full z-50 mt-2 w-[230px] max-w-[calc(100%-2rem)] overflow-hidden sm:right-0 sm:max-w-none rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
               <p className="px-3 pb-1 pt-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                 Switch dashboard
               </p>
@@ -717,8 +753,8 @@ export default function DashboardHeader({
                 rounded-full
 
                 bg-gradient-to-br
-                from-[#7c3aed]
-                via-[#4f46e5]
+                from-[#0750bd]
+                via-[#0b41b6]
                 to-[#2563eb]
 
                 text-[12px]
@@ -733,7 +769,15 @@ export default function DashboardHeader({
                 group-hover:scale-105
               "
             >
-              {initial}
+              {avatar ? (
+                <Image
+                  src={avatar}
+                  alt={`${name} avatar`}
+                  width={40}
+                  height={40}
+                  className="h-full w-full rounded-full object-cover"
+                />
+              ) : initial}
             </div>
 
             {/* USER NAME */}

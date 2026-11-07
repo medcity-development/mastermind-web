@@ -297,6 +297,11 @@ export default function ExamClient({
     controller,
   ]);
 
+  function closeResultModal() {
+    clearGuestExamHandoff();
+    router.replace(`/dashboard/${encodeURIComponent(governmentExamsSlug)}`);
+  }
+
   function viewAnalysis() {
     const attemptId = controller.submittedResult?.pauseid ?? controller.submittedResult?.id;
     if (!attemptId || !governmentExamsSlug) return;
@@ -524,7 +529,7 @@ export default function ExamClient({
           exam?.title ??
           "Previous Questions"
         }
-        onClose={viewAnalysis}
+        onClose={closeResultModal}
         onViewAnalysis={viewAnalysis}
       />
 

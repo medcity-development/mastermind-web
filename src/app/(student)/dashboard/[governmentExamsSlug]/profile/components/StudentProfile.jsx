@@ -537,6 +537,7 @@ export default function StudentProfile({
                                 avatar: updatedProfile.avatar,
                             })
                         );
+                        window.dispatchEvent(new Event("student-profile-updated"));
                     } catch (error) {
                         console.error("Unable to save profile avatar locally:", error);
                     }

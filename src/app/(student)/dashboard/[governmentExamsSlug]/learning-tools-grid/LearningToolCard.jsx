@@ -286,7 +286,8 @@ export default function LearningToolCard({
           relative
           z-10
           mt-3
-          max-w-[90%]
+          min-w-0
+          break-words
           text-[12px]
           font-bold
           leading-[1.2]
@@ -353,13 +354,15 @@ export default function LearningToolCard({
     group
     relative
     flex
-    min-h-[142px]
+    min-h-[160px]
+    min-w-0
     w-full
     flex-col
     overflow-hidden
     rounded-[20px]
     border
-    px-4
+    px-3
+    sm:px-4
     py-4
     text-left
     shadow-[0_8px_24px_rgba(15,58,110,0.05)]
@@ -367,8 +370,7 @@ export default function LearningToolCard({
     duration-300
     hover:-translate-y-1.5
     hover:shadow-[0_18px_38px_rgba(15,58,110,0.12)]
-    sm:min-h-[148px]
-    lg:min-h-[140px]
+    sm:min-h-[164px]
 
     ${theme.card}
   `;
