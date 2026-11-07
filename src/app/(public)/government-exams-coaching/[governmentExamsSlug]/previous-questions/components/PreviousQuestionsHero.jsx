@@ -219,7 +219,6 @@ export default function PreviousQuestionsHero({
         <div
           className="
             relative
-            mx-auto
             w-full
             max-w-[500px]
           "
