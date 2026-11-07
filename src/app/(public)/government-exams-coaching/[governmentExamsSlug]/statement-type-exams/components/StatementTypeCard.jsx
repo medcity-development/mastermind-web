@@ -1,3 +1,4 @@
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
 import Link from "next/link";
 
 import {
@@ -37,26 +38,7 @@ export default function StatementTypeCard({
 
   return (
     <article
-      className="
-        group
-        relative
-        flex
-        h-full
-        min-h-[320px]
-        flex-col
-        overflow-hidden
-        rounded-[24px]
-        border
-        border-slate-200
-        bg-white
-        p-5
-        shadow-[0_10px_30px_rgba(15,23,42,0.05)]
-        transition-all
-        duration-300
-        hover:-translate-y-1
-        hover:border-pink-200
-        hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)]
-      "
+      className={listingStyles.card}
     >
       {/* PINK GLOW */}
 

@@ -1,0 +1,68 @@
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 4px 24px -12px rgb(15 35 75 / 16%);
+  transition: border-color .3s, box-shadow .3s, transform .3s;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #153b78, #137cba, #67e8f9);
+}
+.card:hover { border-color: #bfdbfe; box-shadow: 0 20px 48px -20px rgb(22 79 165 / 28%); }
+.card h2, .card h3 {
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 700;
+  color: #10264b;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+.card > div:first-of-type > div:first-child:not([class*="absolute"]) {
+  border: 0;
+  background: linear-gradient(135deg, #102d60, #2165a9);
+  color: #fff;
+  border-radius: 16px;
+}
+.card [class*="grid-cols-2"] > div {
+  border-color: #e2e8f0;
+  border-radius: 14px;
+  background: #f7f9fc;
+}
+.card [class*="grid-cols-2"] svg { color: #4380b6; }
+.card a[class*="w-full"], .card button[class*="w-full"],
+.card a > span[class*="w-full"], .card > a:last-child:not([class*="pt-6"]) {
+  min-height: 44px;
+  border: 1px solid #123b76;
+  border-radius: 12px;
+  background: #123b76;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.card a[class*="w-full"]:hover, .card button[class*="w-full"]:hover,
+.card a:hover > span[class*="w-full"] { background: #0c2c5c; }
+.card a:focus-visible, .card button:focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
+.card span[class*="rounded-full"][class*="amber"] {
+  background: #fff8eb;
+  color: #946719;
+  border: 1px solid #ecd9b0;
+}
+.card span[class*="rounded-full"][class*="green"],
+.card span[class*="rounded-full"][class*="emerald"] {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+@media (prefers-reduced-motion: no-preference) { .card:hover { transform: translateY(-4px); } }
+@media (max-width: 639px) { .card { padding: 16px; } .card h2, .card h3 { font-size: 14px; } }

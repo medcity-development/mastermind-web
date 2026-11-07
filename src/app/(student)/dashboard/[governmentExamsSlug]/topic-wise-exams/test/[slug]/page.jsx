@@ -1,3 +1,4 @@
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -217,7 +218,7 @@ export default async function TopicWiseTestListPage({
             No exams are currently available.
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 min-[1920px]:grid-cols-4">
             {tests.map((test, index) => {
               const examId = positiveId(test.id);
 
@@ -274,7 +275,7 @@ export default async function TopicWiseTestListPage({
               return (
                 <article
                   key={examId ?? `exam-${index}`}
-                  className="group flex h-full flex-col overflow-hidden rounded-[26px] border border-[#dce8f5] bg-white p-5 shadow-[0_8px_30px_rgba(15,42,90,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  className={listingStyles.card}
                 >
 
                   {/* ACCESS BADGE */}

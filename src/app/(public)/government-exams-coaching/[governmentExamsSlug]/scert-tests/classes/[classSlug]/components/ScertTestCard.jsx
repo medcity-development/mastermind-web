@@ -1,5 +1,8 @@
 "use client";
 
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
+
+
 import {
   useState,
 } from "react";
@@ -51,42 +54,7 @@ export default function ScertTestCard({
   return (
     <>
       <article
-        className={`
-          group
-          flex
-          h-full
-          flex-col
-          overflow-hidden
-          rounded-[24px]
-          border
-          p-6
-          shadow-[0_10px_30px_rgba(15,23,42,0.05)]
-          transition-all
-          duration-300
-          hover:-translate-y-1
-
-          ${
-            isPaid
-              ? `
-                  border-amber-200
-                  bg-gradient-to-br
-                  from-amber-50
-                  via-[#fffaf0]
-                  to-white
-                  hover:border-amber-300
-                  hover:shadow-[0_20px_45px_rgba(217,119,6,0.12)]
-                `
-              : `
-                  border-emerald-200
-                  bg-gradient-to-br
-                  from-emerald-50
-                  via-[#f3fff8]
-                  to-white
-                  hover:border-emerald-300
-                  hover:shadow-[0_20px_45px_rgba(16,185,129,0.12)]
-                `
-          }
-        `}
+        className={listingStyles.card}
       >
         <div
           className="

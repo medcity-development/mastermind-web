@@ -1,3 +1,4 @@
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
 import Link from "next/link";
 
 import {
@@ -80,32 +81,7 @@ export default function StatementExamCard({
 
   return (
     <article
-      className={`
-        group
-        flex
-        h-full
-        flex-col
-        rounded-[24px]
-        border
-        p-5
-        transition-all
-        duration-300
-        hover:-translate-y-1
-
-        ${
-          isPaid
-            ? `
-              border-amber-200
-              bg-amber-50/50
-              shadow-[0_10px_30px_rgba(245,158,11,0.04)]
-            `
-            : `
-              border-green-200
-              bg-green-50/50
-              shadow-[0_10px_30px_rgba(34,197,94,0.04)]
-            `
-        }
-      `}
+      className={listingStyles.card}
     >
       {/* ================================================
           TOP

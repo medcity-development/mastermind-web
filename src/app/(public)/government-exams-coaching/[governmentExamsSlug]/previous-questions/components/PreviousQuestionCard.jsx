@@ -1,5 +1,8 @@
 "use client";
 
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
+
+
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -56,26 +59,7 @@ export default function PreviousQuestionCard({
   return (
     <>
       <article
-        className={`
-          group
-          flex
-          h-full
-          flex-col
-          rounded-[22px]
-          border
-          p-5
-          transition-all
-          duration-300
-          hover:-translate-y-0.5
-          hover:shadow-[0_18px_45px_rgba(15,23,42,0.07)]
-          sm:p-6
-
-          ${
-            isPaid
-              ? "border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50"
-              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-green-50"
-          }
-        `}
+        className={listingStyles.card}
       >
         <div
           className="

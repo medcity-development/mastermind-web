@@ -1,5 +1,8 @@
 "use client";
 
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
+
+
 import Link from "next/link";
 
 import {
@@ -135,38 +138,7 @@ export default function MockTestCard({
   return (
     <>
       <article
-        className={`
-          group
-          relative
-          flex
-          h-full
-          flex-col
-          overflow-hidden
-          rounded-[24px]
-          border
-          p-5
-          transition-all
-          duration-300
-          hover:-translate-y-1
-
-          ${
-            premium
-              ? `
-                  border-amber-200
-                  bg-gradient-to-br
-                  from-amber-50
-                  via-white
-                  to-orange-50
-                `
-              : `
-                  border-emerald-200
-                  bg-gradient-to-br
-                  from-emerald-50
-                  via-white
-                  to-green-50
-                `
-          }
-        `}
+        className={listingStyles.card}
       >
         <div
           className="

@@ -53,7 +53,7 @@ export default function TopicWiseExamList({
 
       {topics.length ? (
         <>
-          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3 min-[1920px]:grid-cols-4">
             {topics.map((item) => (
               <TopicWiseExamCard
                 key={item.id}

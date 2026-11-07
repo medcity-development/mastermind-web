@@ -618,7 +618,7 @@ export default function PreviousQuestionsList({
             grid
             grid-cols-1
             gap-5
-            md:grid-cols-2
+            sm:grid-cols-2 xl:grid-cols-3 min-[1920px]:grid-cols-4
           "
         >
           {exams.map(

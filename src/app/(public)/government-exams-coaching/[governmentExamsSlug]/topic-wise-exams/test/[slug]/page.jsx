@@ -1,3 +1,4 @@
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -112,7 +113,7 @@ export default async function TopicWiseTestListPage({ params }) {
           </p>
         )}
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 min-[1920px]:grid-cols-4">
           {tests.map((test) => {
             const access = getAccess(test);
             const isFree = access === "free";
@@ -143,10 +144,7 @@ export default async function TopicWiseTestListPage({ params }) {
             return (
               <article
                 key={test.id}
-                className={`flex flex-col rounded-3xl border p-5 ${isFree
-                    ? "border-green-200 bg-green-50"
-                    : "border-amber-200 bg-amber-50"
-                  }`}
+                className={listingStyles.card}
               >
                 <p className="text-xs font-black uppercase text-slate-500">
                   {isFree

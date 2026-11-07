@@ -370,7 +370,7 @@ export default function PreviousQuestionsList({
           overflow-hidden
           rounded-[24px]
           border
-          border-blue-100
+          border-slate-200/80
           bg-white
           p-4
           shadow-[0_14px_40px_rgba(15,23,42,0.05)]
@@ -486,6 +486,7 @@ export default function PreviousQuestionsList({
 
               <button
                 type="button"
+                aria-pressed={activeFilter === 0}
                 disabled={
                   loading
                 }
@@ -551,6 +552,7 @@ export default function PreviousQuestionsList({
                         category?.id
                       }
                       type="button"
+                      aria-pressed={active}
                       disabled={
                         loading
                       }
@@ -642,6 +644,13 @@ export default function PreviousQuestionsList({
           CARDS
       ===================================================== */}
 
+      {!loading && exams.length > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-1">
+          <h3 className="text-sm font-bold text-[#10264b]">Explore question papers</h3>
+          <span className="text-[11px] font-medium text-slate-500">{exams.length} papers on this page</span>
+        </div>
+      )}
+
       {loading ? (
         <div
           className="
@@ -670,7 +679,9 @@ export default function PreviousQuestionsList({
             grid
             grid-cols-1
             gap-5
-            md:grid-cols-2
+            sm:grid-cols-2
+            xl:grid-cols-3
+            min-[1920px]:grid-cols-4
           "
         >
           {exams.map(

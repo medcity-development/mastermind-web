@@ -1,3 +1,4 @@
+import listingStyles from "@/app/(student)/dashboard/common-components/TestListingCard.module.css";
 import Link from "next/link";
 
 import {
@@ -32,7 +33,7 @@ export default function TopicWiseExamCard({
   const name = examName || "Government Exam";
 
   return (
-    <article className="group flex h-full min-h-[320px] flex-col rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+    <article className={listingStyles.card}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#017dc0]">
           <BookOpen size={23} />

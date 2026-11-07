@@ -132,8 +132,8 @@ export default function StatementExamList({
             grid-cols-1
             gap-5
             sm:grid-cols-2
-            lg:grid-cols-3
-            xl:grid-cols-4
+            xl:grid-cols-3
+            min-[1920px]:grid-cols-4
           "
         >
           {exams.map(

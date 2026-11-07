@@ -266,8 +266,8 @@ export default function ScertTestList({
           grid
           grid-cols-1
           gap-5
-          md:grid-cols-2
-          xl:grid-cols-3
+          sm:grid-cols-2
+          xl:grid-cols-3 min-[1920px]:grid-cols-4
         "
       >
         {currentTests.map(
