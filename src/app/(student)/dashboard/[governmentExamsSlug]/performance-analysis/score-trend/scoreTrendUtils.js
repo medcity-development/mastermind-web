@@ -27,6 +27,10 @@ export function prepareChartData(
                 index
             ) => ({
                 ...attempt,
+                title:
+                    attempt.title === `${attempt.examLabel} #${attempt.attemptId ?? ""}`
+                        ? attempt.examLabel
+                        : attempt.title,
 
                 chartIndex:
                     index,

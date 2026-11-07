@@ -17,6 +17,10 @@ const MAX_CACHED_DETAILS = 200;
 
 export const EXAM_TYPES = [
     {
+        label: "Study Plan",
+        examType: "studyplan",
+    },
+    {
         label: "Statement Tests",
         examType: "tst",
     },
@@ -87,6 +91,7 @@ export async function fetchUserExams({
                         JSON.stringify({
                             cid,
                             uid,
+                            resolveNames: false,
                             exam_type:
                                 examType,
                         }),
@@ -286,14 +291,14 @@ export function normalizeAttempt({
 
     return {
         attemptId,
+        nameLookupRow: source,
         examType,
         examLabel,
 
         title:
-            source?.exam_name ??
-            source?.examName ??
-            source?.exam ??
-            source?.title ??
+            source?.exam_name ||
+            source?.examName ||
+            source?.title ||
             `${examLabel} #${attemptId ?? ""}`,
 
         status:

@@ -1,172 +1,58 @@
 "use client";
 
-import {
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
+import { buildPerformanceSummary, EXAM_TYPES, getTimestamp, loadTypeAttempts } from "../utils/performanceAnalysisUtils";
 
-import {
-    buildPerformanceSummary,
-    EXAM_TYPES,
-    getTimestamp,
-    loadTypeAttempts,
-} from "../utils/performanceAnalysisUtils";
+// Memory-only snapshots are isolated by student and course and refreshed on entry.
+const snapshots = new Map();
+const SNAPSHOT_TTL = 60_000;
 
-export default function usePerformanceAnalysis({
-    cid,
-    uid,
-}) {
-    const [
-        attempts,
-        setAttempts,
-    ] = useState([]);
-
-    const [
-        loading,
-        setLoading,
-    ] = useState(true);
-
-    const [
-        error,
-        setError,
-    ] = useState("");
-
-    /* =======================================================
-       LOAD
-    ======================================================= */
+export default function usePerformanceAnalysis({ cid, uid }) {
+    const cacheKey = JSON.stringify([String(uid), String(cid)]);
+    const [state, setState] = useState(() => {
+        const cached = snapshots.get(cacheKey);
+        const usable = cached && cached.expiresAt > Date.now();
+        return { attempts: usable ? cached.attempts : [], loading: !usable, refreshing: true, completed: 0, error: "" };
+    });
 
     useEffect(() => {
-        let cancelled =
-            false;
+        let cancelled = false;
+        const results = new Map();
+        const errors = [];
+        let completed = 0;
+        // Keep cached totals intact until the complete refresh is available.
+        const cached = snapshots.get(cacheKey);
+        const hasSnapshot = cached && cached.expiresAt > Date.now();
 
-        async function load() {
-            if (
-                !cid ||
-                !uid
-            ) {
-                setAttempts([]);
-                setLoading(false);
-
-                return;
-            }
-
+        async function loadType(type) {
             try {
-                setLoading(true);
-                setError("");
-
-                const results =
-                    await Promise.allSettled(
-                        EXAM_TYPES.map(
-                            (type) =>
-                                loadTypeAttempts({
-                                    cid,
-                                    uid,
-
-                                    examType:
-                                        type.examType,
-
-                                    examLabel:
-                                        type.label,
-                                })
-                        )
-                    );
-
-                const attemptsList =
-                    results
-                        .filter(
-                            (result) =>
-                                result.status ===
-                                "fulfilled"
-                        )
-                        .flatMap(
-                            (result) =>
-                                result.value
-                        )
-                        .sort(
-                            (first, second) =>
-                                getTimestamp(
-                                    second
-                                ) -
-                                getTimestamp(
-                                    first
-                                )
-                        );
-
-                const errors =
-                    results
-                        .filter(
-                            (result) =>
-                                result.status ===
-                                "rejected"
-                        )
-                        .map(
-                            (result) =>
-                                result.reason
-                                    ?.message
-                        )
-                        .filter(Boolean)
-                        .join(" ");
-
-                if (!cancelled) {
-                    setAttempts(
-                        attemptsList
-                    );
-
-                    setError(
-                        errors
-                    );
-                }
-            } catch (loadError) {
-                console.error(
-                    "Performance Analysis:",
-                    loadError
-                );
-
-                if (!cancelled) {
-                    setAttempts([]);
-
-                    setError(
-                        loadError?.message ||
-                        "Unable to load performance."
-                    );
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
+                const rows = await loadTypeAttempts({ cid, uid, examType: type.examType, examLabel: type.label });
+                results.set(type.examType, rows);
+            } catch (error) {
+                errors.push(error?.message || `Unable to load ${type.label}.`);
             }
+            completed += 1;
+            if (cancelled) return;
+            const done = completed === EXAM_TYPES.length;
+            const attempts = [...results.values()].flat().sort((a, b) => getTimestamp(b) - getTimestamp(a));
+            if (done && !errors.length) {
+                snapshots.delete(cacheKey);
+                snapshots.set(cacheKey, { attempts, expiresAt: Date.now() + SNAPSHOT_TTL });
+                while (snapshots.size > 10) snapshots.delete(snapshots.keys().next().value);
+            }
+            setState(previous => ({
+                attempts: hasSnapshot && (!done || errors.length) ? previous.attempts : attempts,
+                loading: !done && !hasSnapshot && results.size === 0,
+                refreshing: !done,
+                completed,
+                error: errors.join(" "),
+            }));
         }
 
-        load();
+        EXAM_TYPES.forEach(type => { void loadType(type); });
+        return () => { cancelled = true; };
+    }, [cacheKey, cid, uid]);
 
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        cid,
-        uid,
-    ]);
-
-    /* =======================================================
-       SUMMARY
-    ======================================================= */
-
-    const summary =
-        useMemo(
-            () =>
-                buildPerformanceSummary(
-                    attempts
-                ),
-            [
-                attempts,
-            ]
-        );
-
-    return {
-        attempts,
-        summary,
-        loading,
-        error,
-    };
+    const summary = useMemo(() => buildPerformanceSummary(state.attempts), [state.attempts]);
+    return { ...state, summary, totalTypes: EXAM_TYPES.length };
 }

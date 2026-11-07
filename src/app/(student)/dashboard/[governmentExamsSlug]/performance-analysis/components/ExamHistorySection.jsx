@@ -11,6 +11,7 @@ import ExamHistoryEmpty from "./ExamHistoryEmpty";
 const PAGE_SIZE = 10;
 
 export default function ExamHistorySection({
+    cid,
     attempts = [],
 }) {
     const [page, setPage] = useState(1);
@@ -134,6 +135,7 @@ export default function ExamHistorySection({
             {attempts.length ? (
                 <>
                     <ExamHistoryTable
+                        cid={cid}
                         key={currentPage}
                         startIndex={startIndex}
                         attempts={

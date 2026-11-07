@@ -22,6 +22,9 @@ export default function PerformanceAnalysisClient({
     attempts,
     summary,
     loading,
+    refreshing,
+    completed,
+    totalTypes,
     error,
   } =
     usePerformanceAnalysis({
@@ -67,7 +70,7 @@ export default function PerformanceAnalysisClient({
               text-slate-500
             "
           >
-            Loading performance...
+            Loading performance… {completed}/{totalTypes} exam types checked
           </p>
         </div>
       </div>
@@ -115,6 +118,12 @@ export default function PerformanceAnalysisClient({
         }
       />
 
+      {refreshing && (
+        <p role="status" className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Updating performance… {completed}/{totalTypes} exam types checked. Totals may change as results arrive.
+        </p>
+      )}
+
       <PerformanceSummaryGrid
         summary={
           summary
@@ -134,6 +143,7 @@ export default function PerformanceAnalysisClient({
       />
 
       <ExamHistorySection
+        cid={cid}
         attempts={
           attempts
         }

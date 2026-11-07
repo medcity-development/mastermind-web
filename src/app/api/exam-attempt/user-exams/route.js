@@ -349,6 +349,19 @@ export async function POST(request) {
 
     /* ================= NAME LOOKUP ================= */
 
+    // Analytics can render scores immediately and resolve visible row names later.
+    if (body?.resolveNames === false) {
+      return NextResponse.json({
+        status: true,
+        exam_type: examType,
+        details: details.map(item => ({
+          ...item,
+          exam_type: getExamType(item, examType),
+          exam_name: getExistingName(item),
+        })),
+      }, { headers: { "Cache-Control": "private, no-store" } });
+    }
+
     const nameCache = new Map();
 
     const enrichedDetails = await Promise.all(

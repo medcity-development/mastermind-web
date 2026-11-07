@@ -136,6 +136,7 @@ export default async function PerformanceAnalysisPage({
         "
       >
         <PerformanceAnalysisClient
+          key={`${uid}:${cid}`}
           cid={cid}
           uid={uid}
           examName={

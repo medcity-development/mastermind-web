@@ -1,7 +1,24 @@
+import { useEffect, useState } from "react";
+import { loadExamName, isNameLookupNeeded } from "../../exam-attempted/services/examHistoryService";
 import {
   formatStatus,
 } from "../utils/performanceAnalysisUtils";
 import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
+
+function ExamTitle({ cid, attempt }) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    const row = attempt.nameLookupRow;
+    if (cid && row && isNameLookupNeeded(cid, row)) {
+      loadExamName(cid, row).then(value => {
+        if (!cancelled) setName(value);
+      }).catch(() => { /* Keep the attempt label when a lookup fails. */ });
+    }
+    return () => { cancelled = true; };
+  }, [cid, attempt]);
+  return <span title={name || attempt.title}>{name || attempt.title}</span>;
+}
 
 function StatusBadge({
   value,
@@ -94,6 +111,7 @@ function MetricCell({
 }
 
 export default function ExamHistoryTable({
+  cid,
   attempts = [],
   startIndex = 0,
 }) {
@@ -232,7 +250,7 @@ export default function ExamHistoryTable({
                           attempt.title
                         }
                       >
-                        {attempt.title}
+                        <ExamTitle cid={cid} attempt={attempt} />
                       </p>
 
                       <p
