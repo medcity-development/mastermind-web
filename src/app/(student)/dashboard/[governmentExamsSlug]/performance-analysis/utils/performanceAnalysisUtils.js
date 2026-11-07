@@ -2,7 +2,14 @@ import {
     getAttemptId,
     getResultArray,
 } from "@/lib/examAttemptData";
-import { isFinishedExamAttempt } from "@/lib/examAttemptStatus";
+import { isFinishedExamAttempt, isPausedExamAttempt } from "@/lib/examAttemptStatus";
+
+// Share overlapping loads (including development Strict Mode's effect replay).
+const pendingTypeLoads = new Map();
+const pendingDetails = new Map();
+const completedDetails = new Map();
+const DETAILS_TTL = 60_000;
+const MAX_CACHED_DETAILS = 200;
 
 /* =========================================================
    EXAM TYPES
@@ -126,6 +133,36 @@ export async function fetchUserExams({
 ========================================================= */
 
 export async function fetchAttemptDetails({
+    cid,
+    uid,
+    attemptId,
+    examType,
+}) {
+    const key = JSON.stringify([String(uid), String(cid), examType, String(attemptId)]);
+    const cached = completedDetails.get(key);
+    if (cached?.expiresAt > Date.now()) return cached.data;
+    completedDetails.delete(key);
+
+    if (pendingDetails.has(key)) return pendingDetails.get(key);
+
+    const request = requestAttemptDetails({ cid, uid, attemptId, examType });
+    pendingDetails.set(key, request);
+    try {
+        const details = await request;
+        // Paused attempts and failures must be fetched again on the next load.
+        if (details && isFinishedExamAttempt(details)) {
+            completedDetails.set(key, { data: details, expiresAt: Date.now() + DETAILS_TTL });
+            while (completedDetails.size > MAX_CACHED_DETAILS) {
+                completedDetails.delete(completedDetails.keys().next().value);
+            }
+        }
+        return details;
+    } finally {
+        pendingDetails.delete(key);
+    }
+}
+
+async function requestAttemptDetails({
     cid,
     uid,
     attemptId,
@@ -287,7 +324,20 @@ export function normalizeAttempt({
    LOAD TYPE
 ========================================================= */
 
-export async function loadTypeAttempts({
+export async function loadTypeAttempts(options) {
+    const key = JSON.stringify([String(options.uid), String(options.cid), options.examType, options.examLabel]);
+    if (pendingTypeLoads.has(key)) return pendingTypeLoads.get(key);
+
+    const request = requestTypeAttempts(options);
+    pendingTypeLoads.set(key, request);
+    try {
+        return await request;
+    } finally {
+        pendingTypeLoads.delete(key);
+    }
+}
+
+async function requestTypeAttempts({
     cid,
     uid,
     examType,
@@ -357,6 +407,7 @@ export async function loadTypeAttempts({
 
                     if (
                         attemptId &&
+                        !isPausedExamAttempt(item) &&
                         !hasStats
                     ) {
                         details =

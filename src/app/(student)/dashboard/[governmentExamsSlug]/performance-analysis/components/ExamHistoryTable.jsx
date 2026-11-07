@@ -95,6 +95,7 @@ function MetricCell({
 
 export default function ExamHistoryTable({
   attempts = [],
+  startIndex = 0,
 }) {
   return (
     <div
@@ -209,7 +210,7 @@ export default function ExamHistoryTable({
                         text-[#017dc0]
                       "
                     >
-                      {index + 1}
+                      {startIndex + index + 1}
                     </div>
 
                     <div

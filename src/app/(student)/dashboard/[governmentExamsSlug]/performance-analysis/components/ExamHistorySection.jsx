@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
     History,
 } from "lucide-react";
@@ -5,9 +8,17 @@ import {
 import ExamHistoryTable from "./ExamHistoryTable";
 import ExamHistoryEmpty from "./ExamHistoryEmpty";
 
+const PAGE_SIZE = 10;
+
 export default function ExamHistorySection({
     attempts = [],
 }) {
+    const [page, setPage] = useState(1);
+    const totalPages = Math.max(1, Math.ceil(attempts.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const endIndex = Math.min(startIndex + PAGE_SIZE, attempts.length);
+
     return (
         <section
             className="
@@ -123,14 +134,18 @@ export default function ExamHistorySection({
             {attempts.length ? (
                 <>
                     <ExamHistoryTable
+                        key={currentPage}
+                        startIndex={startIndex}
                         attempts={
-                            attempts
+                            attempts.slice(startIndex, endIndex)
                         }
                     />
 
                     <footer
                         className="
               flex
+              flex-wrap
+              gap-3
               items-center
               justify-between
 
@@ -146,20 +161,31 @@ export default function ExamHistorySection({
               text-slate-400
             "
                     >
-                        <span>
-                            {
-                                attempts.length
-                            } saved attempts
+                        <span aria-live="polite">
+                            Showing {startIndex + 1}–{endIndex} of {attempts.length} saved attempts
                         </span>
 
-                        <span
-                            className="
-                font-bold
-                text-[#017dc0]
-              "
-                        >
-                            Scroll to view more
-                        </span>
+                        <nav aria-label="Exam history pagination" className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setPage(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-[11px] font-bold text-[#017dc0] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                Previous
+                            </button>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setPage(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-[11px] font-bold text-[#017dc0] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                Next
+                            </button>
+                        </nav>
                     </footer>
                 </>
             ) : (

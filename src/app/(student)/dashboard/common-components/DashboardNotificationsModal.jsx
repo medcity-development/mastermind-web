@@ -22,6 +22,7 @@ import {
 
 const CACHE_TTL = 15_000;
 const DEFAULT_COOLDOWN = 60_000;
+const NOTIFICATIONS_PER_PAGE = 10;
 
 const notificationCache = new Map();
 const pendingRequests = new Map();
@@ -271,6 +272,27 @@ export default function DashboardNotificationsModal({
 
   const [notifications, setNotifications] =
     useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSlug, setPageSlug] = useState(normalizedSlug);
+  if (pageSlug !== normalizedSlug) {
+    setPageSlug(normalizedSlug);
+    setPage(1);
+  }
+  const contentRef = useRef(null);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(notifications.length / NOTIFICATIONS_PER_PAGE)
+  );
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * NOTIFICATIONS_PER_PAGE;
+  const visibleNotifications = notifications.slice(
+    startIndex,
+    startIndex + NOTIFICATIONS_PER_PAGE
+  );
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [currentPage, normalizedSlug]);
 
   const [loading, setLoading] =
     useState(true);
@@ -819,7 +841,7 @@ export default function DashboardNotificationsModal({
 
         {/* CONTENT */}
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto p-3">
           {loading &&
           !hasNotifications ? (
             <div className="flex min-h-40 items-center justify-center gap-2 text-sm font-semibold text-slate-500">
@@ -866,7 +888,7 @@ export default function DashboardNotificationsModal({
             </div>
           ) : hasNotifications ? (
             <ul className="space-y-2">
-              {notifications.map(
+              {visibleNotifications.map(
                 (
                   notification,
                   index
@@ -878,7 +900,7 @@ export default function DashboardNotificationsModal({
 
                   const id = String(
                     notification?.id ??
-                      index
+                      (startIndex + index)
                   );
 
                   const title = String(
@@ -1020,6 +1042,35 @@ export default function DashboardNotificationsModal({
             </div>
           )}
         </div>
+        {hasNotifications ? (
+          <nav
+            aria-label="Notifications pagination"
+            className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3"
+          >
+            <p className="text-[11px] font-medium text-slate-500" aria-live="polite">
+              {startIndex + 1}–{Math.min(startIndex + NOTIFICATIONS_PER_PAGE, notifications.length)} of {notifications.length}
+              <span className="ml-2">Page {currentPage} of {totalPages}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </nav>
+        ) : null}
       </section>
     </div>
   );

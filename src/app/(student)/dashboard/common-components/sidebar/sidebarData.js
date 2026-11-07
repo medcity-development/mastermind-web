@@ -7,6 +7,7 @@ import {
   Home,
   Trophy,
   UserRound,
+  MessageSquare,
 } from "lucide-react";
 
 export function getSidebarItems({
@@ -77,6 +78,11 @@ export function getSidebarItems({
    * Do not remove this.
    */
   const accountItems = [
+    {
+      label: "Feedback",
+      icon: MessageSquare,
+      href: `${dashboardPath}/feedback`,
+    },
     {
       label: "Profile",
       icon: UserRound,
