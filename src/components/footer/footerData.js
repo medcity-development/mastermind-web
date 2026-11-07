@@ -88,35 +88,32 @@ export const legalLinks = [
   // },
 ];
 
-/* =========================================================
-   SOCIAL LINKS
 
-   Put your real links here.
-========================================================= */
 
 export const socialLinks = [
   {
+    label: "YouTube",
+    href: "https://www.youtube.com/@mastermind_exams",
+    type: "youtube",
+  },
+  {
+    label: "Telegram",
+    href: "https://t.me/mastermindpsc",
+    type: "telegram",
+  },
+  {
     label: "Facebook",
-    href:
-      "https://www.facebook.com/",
+    href: "https://www.facebook.com/mastermindpsckerala",
     type: "facebook",
   },
   {
     label: "Instagram",
-    href:
-      "https://www.instagram.com/",
+    href: "https://www.instagram.com/mastermind.exams",
     type: "instagram",
   },
   {
-    label: "LinkedIn",
-    href:
-      "https://www.linkedin.com/",
-    type: "linkedin",
-  },
-  {
-    label: "YouTube",
-    href:
-      "https://www.youtube.com/",
-    type: "youtube",
+    label: "WhatsApp Channel",
+    href: "https://whatsapp.com/channel/0029VaEgTCOI7BeIob5F5W1I",
+    type: "whatsapp",
   },
 ];
