@@ -1,0 +1,118 @@
+@media (max-width: 1023px) {
+  .panel {
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 15%);
+    background: radial-gradient(ellipse at 50% 100%, #1764b6 0%, transparent 65%), linear-gradient(145deg, #102b68, #08245e);
+  }
+
+  .layout {
+    min-height: 0;
+    gap: 0;
+    padding: 32px 20px 0;
+  }
+
+  .intro {
+    padding: 0;
+  }
+
+  .intro h2 {
+    font-size: clamp(30px, 7vw, 46px);
+    line-height: 1.12;
+  }
+
+  .intro > p:last-of-type {
+    max-width: 360px;
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #c5d5ef;
+  }
+
+  .features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 24px;
+    max-width: 480px;
+  }
+
+  .feature {
+    min-width: 0;
+    padding: 14px 5px;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 16px;
+    background: rgb(255 255 255 / 5%);
+  }
+
+  .feature > span {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+  }
+
+  .feature svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .feature h3 {
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .feature p {
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .download {
+    order: 3;
+    padding: 0 0 24px;
+  }
+
+  .download > div > p {
+    display: none;
+  }
+
+  .download a {
+    min-height: 58px;
+    max-width: 220px;
+    margin-top: 0;
+    border-radius: 14px;
+  }
+
+  .phone {
+    order: 2;
+    min-height: 0;
+    height: auto;
+    align-items: flex-start;
+    padding: 24px 0;
+    margin-top: 8px;
+  }
+
+  .phoneImage {
+    width: clamp(176px, 50vw, 210px);
+    max-width: 85%;
+    padding: 12px 10px;
+    border: 7px solid #fff;
+    border-radius: 32px;
+    background: linear-gradient(150deg, #80b8e5, #347bc0 55%, #24549d);
+    box-shadow: 0 0 0 1px #dbe7f3, 0 18px 36px rgb(0 14 45 / 28%), inset 0 1px 0 rgb(255 255 255 / 35%);
+  }
+
+  .phoneImage img {
+    display: block;
+    border-radius: 18px;
+    filter: drop-shadow(0 8px 10px rgb(0 20 55 / 20%));
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .layout {
+    padding-top: 40px;
+  }
+
+  .phoneImage {
+    width: 210px;
+  }
+}

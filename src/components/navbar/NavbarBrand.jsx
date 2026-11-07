@@ -19,7 +19,7 @@ export default function NavbarBrand() {
         width={180}
         height={90}
         priority
-        className="w-[160px] h-[70px] md:w-[180px] h-[90px] object-contain"
+        className="h-[60px] w-[140px] md:h-[90px] md:w-[180px] object-contain"
       />
     </Link>
   );

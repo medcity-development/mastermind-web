@@ -1,0 +1,283 @@
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 0% 15%, #dceeff 0%, transparent 60%), linear-gradient(145deg, #f8fbff, #edf2ff 65%, #dce8fc);
+  color: #102752;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(68 112 180 / 6%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(68 112 180 / 6%) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, #000, transparent 90%);
+}
+.orbit {
+  position: absolute;
+  z-index: -1;
+  width: 560px;
+  height: 560px;
+  right: -360px;
+  top: 100px;
+  border: 1px solid rgb(147 197 253 / 12%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 55px rgb(147 197 253 / 3%), 0 0 0 110px rgb(147 197 253 / 2%);
+  pointer-events: none;
+}
+.content {
+  position: relative;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 24px 36px;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #205bb0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .13em;
+}
+.eyebrow > span, .cardFooter > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #079bd6;
+  flex-shrink: 0;
+}
+.exams {
+  display: flex;
+  gap: 8px;
+  margin-top: 22px;
+}
+.exams span {
+  border: 1px solid #d4e2f4;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 10px;
+  color: #235391;
+  background: #ffffffcc;
+}
+.title {
+  font-size: clamp(34px, 9.4vw, 62px);
+  line-height: 1.12;
+  letter-spacing: -.055em;
+  font-weight: 750;
+  margin: 22px 0 0;
+}
+.title span {
+  display: block;
+  color: #1764b5;
+  background: linear-gradient(100deg, #154fa5, #008cc5);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.description {
+  color: #536781;
+  font-size: 13px;
+  line-height: 1.85;
+  max-width: 440px;
+  margin-top: 20px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: 25px;
+}
+.primary, .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 12px;
+  transition: background .2s;
+}
+.primary {
+  padding: 0 18px;
+  background: linear-gradient(110deg, #1958ac, #087ec9);
+  color: #fff;
+  box-shadow: 0 6px 25px #60a5fa25;
+}
+.primary:hover { background: #154c98; }
+.secondary { color: #2058a3; }
+.secondary:hover { color: #1764b5; }
+.primary:focus-visible, .secondary:focus-visible {
+  outline: 2px solid #1a61b5;
+  outline-offset: 5px;
+}
+.note { color: #596e89; font-size: 9px; margin-top: 14px; }
+.learningCard {
+  margin-top: 30px;
+  padding: 19px;
+  border-radius: 22px;
+  border: 1px solid #d5e3f5;
+  background: linear-gradient(135deg, #ffffffed, #f5f9ffdd);
+  box-shadow: 0 18px 45px #20549a14, 0 2px 5px #20549a05;
+}
+.cardTop { display: flex; align-items: center; gap: 11px; }
+.spark { display: grid; place-items: center; width: 37px; height: 37px; flex-shrink: 0; border-radius: 12px; background: #e6f1ff; color: #2266bc; }
+.cardLabel { font-size: 7px; letter-spacing: .13em; color: #526f94; font-weight: 700; }
+.cardTop h2 { font-size: 12px; margin-top: 4px; font-weight: 600; }
+.path { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 18px 0; margin-top: 5px; border-bottom: 1px solid #dae5f3; color: #5e789c; font-size: 8px; }
+.path strong { display: block; color: #244c82; font-size: 10px; font-weight: 500; margin-top: 4px; }
+.features { display: grid; gap: 17px; padding: 20px 0; }
+.feature { display: flex; align-items: center; gap: 13px; }
+.feature > svg { color: #1764b5; flex-shrink: 0; }
+.feature h3 { font-size: 11px; font-weight: 600; }
+.feature p { color: #536b8a; font-size: 10px; margin-top: 3px; }
+.cardFooter { display: flex; align-items: center; gap: 7px; border-top: 1px solid #dae5f3; padding-top: 13px; color: #536b8a; font-size: 9px; }
+@media (min-width: 480px) {
+  .content { padding: 32px 36px 44px; }
+  .features { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .feature { flex-direction: column; align-items: flex-start; }
+}
+@media (min-width: 768px) {
+  .content { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: center; padding-top: 44px; padding-bottom: 70px; }
+  .title { font-size: clamp(42px, 5vw, 60px); }
+  .learningCard { margin-top: 0; padding: 24px; }
+  .features { grid-template-columns: 1fr; }
+  .feature { flex-direction: row; align-items: center; }
+}
+
+@media (max-width: 767px) {
+  .content {
+    padding: 26px 20px 34px;
+  }
+
+  .copy {
+    min-width: 0;
+  }
+
+  .eyebrow {
+    font-size: 8px;
+    letter-spacing: .1em;
+  }
+
+  .exams {
+    margin-top: 18px;
+  }
+
+  .title {
+    margin-top: 20px;
+    font-size: clamp(35px, 10vw, 56px);
+    line-height: 1.1;
+    letter-spacing: -.05em;
+  }
+
+  .description {
+    margin-top: 18px;
+    font-size: 13px;
+    line-height: 1.75;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    gap: 10px;
+    margin-top: 22px;
+  }
+
+  .primary, .secondary {
+    min-height: 50px;
+    padding: 0 10px;
+    gap: 7px;
+    border-radius: 14px;
+    font-size: 11px;
+  }
+
+  .secondary {
+    border: 1px solid #d3e1f3;
+    background: #ffffffb3;
+  }
+
+  .note {
+    text-align: center;
+    font-size: 9px;
+  }
+
+  .learningCard {
+    position: relative;
+    margin-top: 26px;
+    padding: 20px 16px 16px;
+    border-radius: 24px;
+    background: linear-gradient(150deg, #fff, #f8fbff);
+  }
+
+  .learningCard::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 28px;
+    right: 28px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #66b7e7, #b4bafa, transparent);
+  }
+
+  .cardLabel { font-size: 8px; }
+  .cardTop h2 { font-size: 13px; }
+
+  .path {
+    padding: 14px 12px;
+    margin-top: 18px;
+    border: 1px solid #e4edf8;
+    border-radius: 14px;
+    background: #f0f6ff;
+    font-size: 9px;
+  }
+
+  .path strong { font-size: 11px; }
+
+  .features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 18px 0;
+  }
+
+  .feature {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 0 4px;
+  }
+
+  .feature h3 { font-size: 10px; }
+  .feature p { font-size: 9px; line-height: 1.6; }
+  .cardFooter { font-size: 9px; justify-content: center; }
+}
+
+@media (max-width: 767px) {
+  .hero {
+    background: radial-gradient(ellipse at 100% 25%, #25468c 0%, transparent 65%), linear-gradient(145deg, #091b3c, #14275a 65%, #25255c);
+    color: #f4f7ff;
+  }
+
+  .hero::before {
+    background-image:
+      linear-gradient(rgb(174 200 255 / 5%) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(174 200 255 / 5%) 1px, transparent 1px);
+  }
+
+  .eyebrow { color: #b5d4ff; }
+  .exams span { background: #ffffff0a; border-color: #ffffff26; color: #dae8ff; }
+  .title span { background-image: linear-gradient(100deg, #85caff, #c0b7ff); color: #a9ceff; }
+  .description { color: #c1cde3; }
+  .note { color: #a4b6d4; }
+  .primary { background: linear-gradient(110deg, #2365db, #5751dd); box-shadow: 0 8px 24px #020c302e; }
+  .primary:hover { background: #345cce; }
+  .secondary { color: #edf3ff; background: #ffffff0b; border-color: #ffffff30; }
+  .secondary:hover { color: #fff; background: #ffffff18; }
+  .primary:focus-visible, .secondary:focus-visible { outline-color: #b4d7ff; }
+  .learningCard { color: #102752; }
+}

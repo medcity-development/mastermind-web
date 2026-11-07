@@ -1,206 +1,48 @@
 import Link from "next/link";
-import MobileHeroFeatures from "./MobileHeroFeatures";
-import MobileHeroTrust from "./MobileHeroTrust";
+import { ArrowUpRight, ArrowRight, BookOpen, GraduationCap, ClipboardCheck, Sparkles } from "lucide-react";
+import styles from "./MobileHero.module.css";
+
+const features = [
+  { icon: GraduationCap, title: "Expert-led", detail: "Learn with mentors" },
+  { icon: ClipboardCheck, title: "Exam-ready", detail: "Practise mock tests" },
+  { icon: BookOpen, title: "Stay ahead", detail: "Updated materials" },
+];
 
 export default function MobileHeroContent() {
   return (
-    <div
-      className="
-        relative
-        z-10
-        mx-auto
-        w-full
-        max-w-[760px]
-        px-5
-        pb-14
-        pt-10
-        sm:px-6
-        sm:pb-16
-        sm:pt-12 mt-16
-      "
-    >
-      <div className="w-full text-center">
-        {/* Badge */}
-
-        <div
-          className="
-            inline-flex
-            items-center
-            gap-2
-            rounded-full
-            border
-            border-white/15
-            bg-white/[0.08]
-            px-4
-            py-2
-            text-[10px]
-            font-semibold
-            tracking-[0.05em]
-            text-blue-100
-            shadow-[0_10px_30px_rgba(0,0,0,.12)]
-            backdrop-blur-xl
-            sm:text-xs
-          "
-        >
-          <span
-            className="
-              flex
-              h-5
-              w-5
-              items-center
-              justify-center
-              rounded-full
-              bg-white/10
-              text-[10px]
-              text-blue-200
-            "
-          >
-            ✦
-          </span>
-
-          KERALA PSC, SSC & RRB COACHING
+    <div className={styles.content}>
+      <div className={styles.copy}>
+        <div className={styles.eyebrow}><span /> YOUR NEXT CHAPTER STARTS HERE</div>
+        <div className={styles.exams} aria-label="Exams we prepare you for">
+          <span>Kerala PSC</span><span>SSC</span><span>RRB</span>
         </div>
-
-        {/* Heading */}
-
-        <h1
-          className="
-            mt-6
-            text-[clamp(2.65rem,11vw,4rem)]
-            font-bold
-            leading-[1.03]
-            tracking-[-0.045em]
-            text-white
-          "
-        >
-          <span className="block">
-            Master Your
-          </span>
-
-          <span
-            className="
-              block
-              bg-gradient-to-r
-              from-[#64c7ff]
-              via-[#bb8cff]
-              to-[#f18dc8]
-              bg-clip-text
-              pb-1
-              text-transparent
-            "
-          >
-            Competitive Exams
-          </span>
-        </h1>
-
-        {/* Description */}
-
-        <p
-          className="
-            mx-auto
-            mt-5
-            max-w-[570px]
-            text-sm
-            leading-7
-            text-blue-100/75
-            sm:text-base
-            sm:leading-8
-          "
-        >
-          Prepare smarter for Kerala PSC, SSC and RRB with expert-led
-          classes, mock tests, previous year questions, current affairs
-          and structured study materials.
-        </p>
-
-        {/* Actions */}
-
-        <div
-          className="
-            mt-7
-            flex
-            flex-col
-            justify-center
-            gap-3
-            min-[420px]:flex-row
-          "
-        >
-          <Link
-            href="/login"
-            className="
-              group
-              inline-flex
-              min-h-12
-              items-center
-              justify-center
-              gap-4
-              rounded-xl
-              bg-gradient-to-r
-              from-[#0872ff]
-              via-[#3c52ff]
-              to-[#7840ee]
-              px-7
-              py-3
-              text-sm
-              font-semibold
-              text-white
-              shadow-[0_12px_35px_rgba(33,72,255,0.28)]
-              transition-all
-              duration-300
-              hover:-translate-y-1
-            "
-          >
-            Login
-
-            <span
-              className="
-                transition-transform
-                duration-300
-                group-hover:translate-x-1
-              "
-            >
-              →
-            </span>
-          </Link>
-
-          <Link
-            href="/contact"
-            className="
-              group
-              inline-flex
-              min-h-12
-              items-center
-              justify-center
-              gap-4
-              rounded-xl
-              border
-              border-white/20
-              bg-white/[0.08]
-              px-7
-              py-3
-              text-sm
-              font-semibold
-              text-white
-              backdrop-blur-xl
-              transition
-              hover:bg-white/[0.14]
-            "
-          >
-            Contact Us
-
-            <span
-              className="
-                transition-transform
-                group-hover:translate-x-1
-              "
-            >
-              →
-            </span>
-          </Link>
+        <h1 className={styles.title}>Big ambitions.<br />Better <span>preparation.</span></h1>
+        <p className={styles.description}>Build the confidence to ace your next exam. Expert classes, focused practice and the right resources, all in one place.</p>
+        <div className={styles.actions}>
+          <Link href="/login" className={styles.primary}>Start learning <ArrowUpRight size={19} aria-hidden="true" /></Link>
+          <Link href="/contact" className={styles.secondary}>Talk to us <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
-
-        <MobileHeroFeatures />
-
-        <MobileHeroTrust />
+        <p className={styles.note}>Your goals. Your pace. Your MasterMind.</p>
+      </div>
+      <div className={styles.learningCard}>
+        <div className={styles.cardTop}>
+          <span className={styles.spark}><Sparkles size={19} aria-hidden="true" /></span>
+          <div><p className={styles.cardLabel}>THE MASTERMIND METHOD</p><h2>A little progress. Every day.</h2></div>
+        </div>
+        <div className={styles.path} aria-label="Learn, practise, progress">
+          <span>01 <strong>Learn</strong></span><ArrowRight size={14} aria-hidden="true" />
+          <span>02 <strong>Practise</strong></span><ArrowRight size={14} aria-hidden="true" />
+          <span>03 <strong>Progress</strong></span>
+        </div>
+        <div className={styles.features}>
+          {features.map(({icon: Icon, title, detail}) => (
+            <div className={styles.feature} key={title}>
+              <Icon size={19} aria-hidden="true" />
+              <div><h3>{title}</h3><p>{detail}</p></div>
+            </div>
+          ))}
+        </div>
+        <div className={styles.cardFooter}><span /> Made for your next big step</div>
       </div>
     </div>
   );

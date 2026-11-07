@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import styles from "./MobileAppWrapper.module.css";
 
 import {
   BookOpenCheck,
@@ -36,18 +37,16 @@ export default function MobileAppWrapper() {
       className="relative scroll-mt-24 overflow-hidden bg-white py-8 sm:py-10 lg:py-14"
     >
       <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-visible rounded-[26px] bg-gradient-to-br from-[#164fa5] via-[#082d84] to-[#164fa5] shadow-[0_22px_70px_rgba(5,28,86,0.18)]">
+        <div className={`${styles.panel} relative overflow-visible rounded-[26px] bg-gradient-to-br from-[#164fa5] via-[#082d84] to-[#164fa5] shadow-[0_22px_70px_rgba(5,28,86,0.18)]`}>
           {/* Decorative dots */}
           <DotPattern className="bottom-10 left-5 opacity-45 sm:left-8" />
 
-          <DotPattern className="right-5 top-5 opacity-65 sm:right-8 sm:top-7" />
-
-          <div className="grid min-h-[540px] grid-cols-1 items-center py-10 lg:grid-cols-[0.95fr_1.05fr_0.78fr]">
+          <div className={`${styles.layout} grid min-h-[540px] grid-cols-1 items-center py-10 lg:grid-cols-[0.95fr_1.05fr_0.78fr]`}>
             {/* =====================================================
                 LEFT - PHONE
             ====================================================== */}
-            <div className="relative order-2 flex min-h-[420px] items-end justify-center px-4 pt-8 sm:min-h-[500px] lg:order-1 lg:min-h-[560px] lg:justify-start lg:px-0 lg:pt-0">
-              <div className="relative z-20 w-[230px] sm:w-[280px] md:w-[315px] lg:absolute lg:-bottom-5 lg:left-[7%] lg:w-[330px] xl:left-[10%] xl:w-[365px]">
+            <div className={`${styles.phone} relative order-2 flex min-h-[420px] items-end justify-center px-4 pt-8 sm:min-h-[500px] lg:order-1 lg:min-h-[560px] lg:justify-start lg:px-0 lg:pt-0`}>
+              <div className={`${styles.phoneImage} relative z-20 w-[230px] sm:w-[280px] md:w-[315px] lg:absolute lg:-bottom-5 lg:left-[7%] lg:w-[330px] xl:left-[10%] xl:w-[365px]`}>
                 <Image
                   src="/assets/mastermind-app.png"
                   alt="MasterMind Learning App"
@@ -62,7 +61,8 @@ export default function MobileAppWrapper() {
             {/* =====================================================
                 CENTER - HEADING + FEATURES
             ====================================================== */}
-            <div className="order-1 px-6 pt-10 text-center sm:px-10 sm:pt-12 lg:order-2 lg:px-6 lg:py-14 lg:text-left xl:px-10">
+            <div className={`${styles.intro} order-1 px-6 pt-10 text-center sm:px-10 sm:pt-12 lg:order-2 lg:px-6 lg:py-14 lg:text-left xl:px-10`}>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200 lg:hidden">Your preparation, in your pocket</p>
               <h2 className="text-[38px] font-extrabold leading-[1.03] tracking-[-0.035em] text-white sm:text-[48px] md:text-[56px] lg:text-[52px] xl:text-[62px]">
                 Learn Anytime,
 
@@ -77,7 +77,7 @@ export default function MobileAppWrapper() {
               </p>
 
               {/* Features */}
-              <div className="mx-auto mt-8 grid max-w-[620px] grid-cols-1 gap-4 sm:grid-cols-3 lg:mx-0 lg:gap-0">
+              <div className={`${styles.features} mx-auto mt-8 grid max-w-[620px] grid-cols-1 gap-4 sm:grid-cols-3 lg:mx-0 lg:gap-0`}>
                 {features.map(
                   (
                     {
@@ -89,7 +89,7 @@ export default function MobileAppWrapper() {
                   ) => (
                     <div
                       key={title}
-                      className={`
+                      className={`${styles.feature}
                         relative
                         flex
                         flex-col
@@ -146,7 +146,7 @@ export default function MobileAppWrapper() {
             {/* =====================================================
                 RIGHT - APP DOWNLOAD
             ====================================================== */}
-            <div className="order-3 px-6 pb-10 pt-8 sm:px-10 lg:border-l lg:border-dashed lg:border-white/20 lg:px-8 lg:py-14 xl:px-10">
+            <div className={`${styles.download} order-3 px-6 pb-10 pt-8 sm:px-10 lg:border-l lg:border-dashed lg:border-white/20 lg:px-8 lg:py-14 xl:px-10`}>
               <div className="mx-auto max-w-[330px] text-center lg:mx-0 lg:text-left">
                 <p className="text-[25px] font-semibold leading-[1.25] text-white sm:text-[28px] lg:text-[26px] xl:text-[30px]">
                   Download the
@@ -157,7 +157,7 @@ export default function MobileAppWrapper() {
                 </p>
 
                 {/* Mock score and live class cards */}
-                <div className="mt-7 grid gap-3">
+                <div className="mt-7 hidden gap-3 lg:grid">
                   {/* Mock test score */}
                   <div className="rounded-2xl border border-white/15 bg-white/95 p-4 text-left shadow-[0_15px_36px_rgba(0,0,0,0.18)] backdrop-blur-xl">
                     <div className="flex items-center gap-3">
